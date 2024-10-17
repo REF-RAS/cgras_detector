@@ -1,0 +1,10 @@
+name: Acropora Palmata All Period
+file: /home/qcr/cgras_data/YoloModel/20240923_tiledimages_yolov8xseg_naive.pt
+species: acropora palmata
+input_image_width: 640
+input_image_height: 640
+valid_start_day: 0
+valid_end_day: null
+coral_classes: ['recruit_live_white', 'recruit_cluster_live_white', 'recruit_symbiotic', 'recruit_cluster_symbiotic', 'recruit_partial', 'recruit_cluster_partial']
+dead_coral_classes: []
+remarks: null

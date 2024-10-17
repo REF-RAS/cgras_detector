@@ -1,0 +1,10 @@
+name: Acropora Palmata All Period V2
+file: /home/qcr/cgras_data/YoloModel/20240926_cgras_tiled_yolov8n_seg_640p.pt
+species: acropora palmata
+input_image_width: 640
+input_image_height: 640
+valid_start_day: 0
+valid_end_day: null
+coral_classes: ['recruit_live_white', 'recruit_cluster_live_white', 'recruit_symbiotic', 'recruit_cluster_symbiotic', 'recruit_partial', 'recruit_cluster_partial']
+dead_coral_classes: []
+remarks: hi Andrew, can you please try this model? I believe it should be a bit better, though still having some confusion with the partial class. It is also the "n" version of yolov8, so it's much smaller and more compact. Should be faster, which might help with usability. Might be a minor hit in performance. Additionally, this was trained with 50% overlap on a proper dataset to increase the chance of a whole coral being seen, rather than just a small portion of the coral being seen and cut off. Previouslly only 10% overlap. I also found a bug in the dataset provided to me by my RA, which has since been corrected.

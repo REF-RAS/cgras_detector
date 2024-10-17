@@ -1,0 +1,25 @@
+species: _default
+func_name: eval_default
+func_def: >
+  def eval_default(count_data):
+      nominal_loss_rate_per_day = 0.015
+      if len(count_data) <= 1:
+          return 0   # neutral health index
+      for index, data in enumerate(count_data):
+          if index == 0:
+              coral_count_start = data['coral_object_count']
+              age_start = data['age']
+          elif index == len(count_data) - 1:
+              coral_count_end = data['coral_object_count']
+              age_end = data['age']
+      nominal_coral_count_end = coral_count_start - ((nominal_loss_rate_per_day * coral_count_start)  * (age_end - age_start))
+      nominal_coral_count_end = max(0, nominal_coral_count_end)
+      if coral_count_end > nominal_coral_count_end:
+          score = (coral_count_end - nominal_coral_count_end) / (coral_count_start - nominal_coral_count_end)
+          score = min(1.0, score)
+      else:
+          score = -(coral_count_start - coral_count_end) / (coral_count_start - nominal_coral_count_end) + 1
+          score = max(-1.0, score)
+      return score
+
+

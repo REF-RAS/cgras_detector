@@ -1,0 +1,23 @@
+# YAML file for the system
+---
+# ---
+# Dash agent (detector) setting
+cgras.detector.web.host: 0.0.0.0
+cgras.detector.web.port: 8023
+cgras.detector.web.debug.mode: True
+cgras.detector.web.launch_browser: False
+
+# Main system timers for the detector implemented by Dash
+cgras.detector.system.timer: 1  # seconds
+cgras.detector.dashboard.refresh: 1  # seconds
+
+# The data folder
+cgras.data.folder: /home/qcr/cgras_data
+cgras.detector.subfolder: detector
+
+# User interface parameters
+cgras.detector.max_coral_days: 120
+
+# --- 
+# Connection with other components
+cgras.connection.timeout: 120
