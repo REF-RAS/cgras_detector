@@ -26,12 +26,12 @@ class ApplicationFileManager():
         os.makedirs(self.images_folder, exist_ok=True)
         self.database_folder = os.path.join(self.cgras_home, 'database')
         os.makedirs(self.database_folder, exist_ok=True)        
-        self.capturer_folder = os.path.join(self.cgras_home, 'capturer')
-        os.makedirs(self.capturer_folder, exist_ok=True)
+        self.coordinator_folder = os.path.join(self.cgras_home, 'coordinator')
+        os.makedirs(self.coordinator_folder, exist_ok=True)
         self.detector_folder = os.path.join(self.cgras_home, 'detector')
         os.makedirs(self.detector_folder, exist_ok=True)
         # create the subfolders under the two platforms
-        self._create_platform_folders(self.capturer_folder)
+        self._create_platform_folders(self.coordinator_folder)
         self._create_platform_folders(self.detector_folder)
     
     @staticmethod
@@ -53,7 +53,7 @@ class ApplicationFileManager():
         return self.database_folder
     
     def get_capturer_folder(self, *args) -> str:
-        return self.get_subfolder(self.capturer_folder, *args)
+        return self.get_subfolder(self.coordinator_folder, *args)
     
     def get_detector_folder(self, *args) -> str:
         return self.get_subfolder(self.detector_folder, *args)

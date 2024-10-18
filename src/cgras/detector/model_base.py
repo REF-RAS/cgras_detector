@@ -70,7 +70,7 @@ class StateManager():
         """
         return self.get()
     
-    def get_last_state(self):
+    def get_previous_state(self):
         """ Returns the last state
         """
         return self.last_state

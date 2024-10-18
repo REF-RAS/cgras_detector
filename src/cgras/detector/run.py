@@ -233,7 +233,7 @@ class ApplicationCoordinator(object):
                     elif state == SystemStates.D_FAILED:
                         traceback.print_exc()
                         the_detection_task = STATE.get_var('the_detection_task')
-                        previous_state = STATE.get_last_state()
+                        previous_state = STATE.get_previous_state()
                         DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.FAILED.value)
                         DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, the_detection_task.get_tile_sample_id(), 
                             the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.FAILED.value, f'Failed at {previous_state}')

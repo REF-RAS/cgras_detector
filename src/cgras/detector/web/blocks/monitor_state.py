@@ -25,7 +25,7 @@ class MonitorStateBlock():
         self.prefix = prefix = prefix + 'msb'
         self.update_store_id = prefix + 'update_store'
         # model variables
-
+        self.message = ''
         # define widgets 
         self._panel = dbc.Col([
                 html.H4(dbc.Badge('SYSTEM MONITOR', className='ms-2 mb-4', color='white', text_color='secondary')),
@@ -81,25 +81,27 @@ class MonitorStateBlock():
         def update_content(data):
             # obtain the states of the two platforms
             state:SystemStates = STATE.get()
+            previous_state:SystemStates = STATE.get_previous_state()
             capturer_state = CAPTURER_STATE.get()
             # query cpu percent and memory percent
             cpu_percent = psutil.cpu_percent()
-            mem_percent = psutil.virtual_memory().percent
-            n = random.random()            
+            mem_percent = psutil.virtual_memory().percent        
             if state in [SystemStates.READY, SystemStates.AUTO_START, SystemStates.CLICK_START]:
-                if n < 0.3:
-                    message = 'I am consuming electricity without any coral babies to look after. Can you feel my guilt?'
-                elif n < 0.6:
-                    message = 'I am wasting my talent here. Got nothing to do. I should be nursing coral babies. '
-                else:
-                    message = 'I turn into a couch potato. Is it my destiny?'
+                if previous_state not in [SystemStates.READY, SystemStates.AUTO_START, SystemStates.CLICK_START] or random.random() < 0.2:
+                    self.message = [
+                        'I am consuming electricity without any coral babies to look after. Can you feel my guilt?',
+                        'I am wasting my talent here. Got nothing to do. I should be nursing coral babies. ',
+                        'I turn into a couch potato. Is it my destiny?'
+                    ][random.randrange(0, 3)]
             elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE, SystemStates.POLL_UPDATE_HEALTH_INDEX]:
-                if n < 0.5:
-                    message = 'I just asked my supervisor for more coral larvae but got nothing. I am feeling insecure.'
-                else:
-                    message = 'You have no new coral again! Should I look elsewhere for coral babies?'
+                if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE, SystemStates.POLL_UPDATE_HEALTH_INDEX] or random.random() < 0.2:
+                    self.message = [
+                        'I just asked my supervisor for more coral larvae but got nothing. I am feeling insecure.',
+                        'No new coral again! Should I look elsewhere for coral babies?',
+                        'Can we make corals more productive? '
+                    ][random.randrange(0, 3)]
             else:
-                message = 'Leave me alone. I am keeping large and small corals happy.'
+                self.message = 'Leave me alone. I am keeping large and small corals happy.'
             return (state.name, capturer_state.name, cpu_percent, f'{cpu_percent} %', mem_percent, f'{mem_percent} %', 
-                    message,)
+                    self.message,)
         return update_content 

@@ -98,7 +98,7 @@ class MonitorExecuteProgressBlock():
                 if state == SystemStates.D_INIT:
                     progress_message = 'Getting ready for the analysis of coral babies'
                 elif state == SystemStates.D_RECO:
-                    progress_message = 'Putting the photos of coral babies together into one album'
+                    progress_message = 'Putting the photos of coral babies together into an album'
                     progress = (2.5, 0, 0, 0)
                 elif state == SystemStates.D_LOCTILE:
                     progress_message = 'Making sure the coral babies are within bounds'
@@ -112,10 +112,10 @@ class MonitorExecuteProgressBlock():
                         progress = (5, 5, 0, 0)
                     progress_message = f'Counting coral babies in a photo ({sub_progress[0]} of {sub_progress[1]})'
                 elif state == SystemStates.D_COLLECT_STAT:
-                    progress_message = f'Recording their data for looking back when they have grown up'
+                    progress_message = f'Recording their data for reminisce when corals are grown up'
                     progress = (5, 5, 80, 2)
                 elif state == SystemStates.D_UPDATE_HEALTH_INDEX:
-                    progress_message = f'Calculating health indices of the coral babies'
+                    progress_message = f'Doing health checks on the coral babies'
                     progress = (5, 5, 80, 5)
                 else:
                     progress_bar_style = {'visibility': 'hidden'}

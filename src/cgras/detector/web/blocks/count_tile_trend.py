@@ -30,24 +30,22 @@ class CountTileTrendBlock():
         # define widgets 
         _coral_count_datatable = dash_table.DataTable(id=prefix+'coral_count_datatable', row_selectable=False, cell_selectable=False)
         
+
+        self.chart_message = html.P('No trend chart is shown because this tile has fewer than 2 samples')
+        
         self._panel = html.Div([
             html.H4(dbc.Badge('CORAL COUNT TREND', className='ms-1 me-2', color='white', text_color='secondary')),
             dbc.Row([
-                dbc.Col([
-                    _coral_count_datatable], className='col-3'),
-                dbc.Col([ 
-                    dcc.Graph(id=prefix+'chart', style={'visibility': 'hidden', 'height': 'auto'}),
-                    ], className='col-9'),                
+                dbc.Col([_coral_count_datatable], className='col-3'),
+                dbc.Col(id=prefix+'chart_panel', className='col-9'),                
                 ], className='mx-auto col-12'),
-            ], 
+            ],
             id=prefix+'main_panel', className='col-12 text-center')
         
     def register_trigger(self, trigger_id:str):
         # define callbacks for the datatable data
         self.app.callback([Output(self.prefix+'coral_count_datatable', 'data'),
-                           Output(self.prefix+'chart', 'figure'),
-                           Output(self.prefix+'chart', 'config'),
-                           Output(self.prefix+'chart', 'style'),
+                           Output(self.prefix+'chart_panel', 'children'),                           
                            Output(self.prefix+'main_panel', 'style'),],
             [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_datatable()) 
     
@@ -77,15 +75,16 @@ class CountTileTrendBlock():
             self.trend_figure = px.line(coral_trend_model, x='age', y='coral_object_count')            
             # generate the chart illustrating coral trends
             if len(table_model) == 0:
-                return (table_model.to_dict('records'), self.trend_figure, config, {'visibility': 'hidden'}, {'visibility': 'hidden'})
+                return (table_model.to_dict('records'), None,  {'visibility': 'hidden'})
             elif len(table_model) <= 1:
-                return (table_model.to_dict('records'), self.trend_figure, config, {'visibility': 'hidden'}, {})
+                return (table_model.to_dict('records'), self.chart_message, {})
 
             self.trend_figure.update_traces(line=dict(color='rgb(255, 0, 0)', width=4))
             self.trend_figure.update_xaxes(title='Age (days since settlement)', visible=True, showticklabels=True, showgrid=True, gridwidth=1, gridcolor='LightGrey', range=[0, coral_trend_model.iloc[-1]['age']])
             self.trend_figure.update_yaxes(title='Coral count', visible=True, showticklabels=True, showgrid=True, gridwidth=1, gridcolor='LightGrey')
             # fig.update_layout(yaxis_visible=True, yaxis_showticklabels=True)
             self.trend_figure.update_layout(plot_bgcolor='rgb(255, 255, 225)')
+            chart_graph = dcc.Graph(figure=self.trend_figure, config=config, style={'height': 'auto'})
 
-            return (table_model.to_dict('records'), self.trend_figure, config, {}, {})
+            return (table_model.to_dict('records'), chart_graph, {})
         return update_datatable 

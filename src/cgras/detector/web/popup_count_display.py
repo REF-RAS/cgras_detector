@@ -11,12 +11,12 @@ __status__ = 'Development'
 
 import pandas as pd
 import dash
-from dash import html, dcc, callback, Input, Output, State, ctx, dash_table, clientside_callback
+from dash import html, dcc, callback, Input, Output, State, clientside_callback
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
 from cgras.tools.logging_tools import logger
-from cgras.detector.web.blocks import CountTileSelectTable, CoralCountTileInfoBlock, CountTileTrendBlock, CountHeatmapBlock, CountResultDownloadBlock
+from cgras.detector.web.blocks import CoralCountTileInfoBlock, CountTileTrendBlock, CountHeatmapBlock, CountScatterMapBlock
 
 dash.register_page(__name__)
 
@@ -33,6 +33,7 @@ class CountDisplayPopup():
         self.tile_detect_info = CoralCountTileInfoBlock(app, prefix)
         self.coral_count_trend = CountTileTrendBlock(app, prefix)
         self.heatmap_compare = CountHeatmapBlock(app, prefix)
+        self.count_scatter_plot = CountScatterMapBlock(app, prefix)
         self._define_page()
     
     def layout(self, tile_id=None):
@@ -56,9 +57,10 @@ class CountDisplayPopup():
             dbc.Row([
                 dbc.Col([
                         self.tile_detect_info.get_panel(),
-                        dbc.Row(className='mt-4'),
-                        dbc.Row(className='mt-4'),                        
+                        dbc.Row(className='mt-4'),                       
                         self.coral_count_trend.get_panel(),
+                        dbc.Row(className='mt-4'),                        
+                        self.count_scatter_plot.get_panel(),   
                         dbc.Row([self.heatmap_compare.get_panel()], className='mx-auto col-12, mt-4'), 
                 ], id=self.prefix+'_panel', className='col-12', style={'visibility': 'visible'}), 
             ], className='mx-auto col-12'),
@@ -69,7 +71,8 @@ class CountDisplayPopup():
         self.tile_detect_info.register_trigger(self.update_trigger_id)
         self.coral_count_trend.register_trigger(self.update_trigger_id)
         self.heatmap_compare.register_trigger(self.update_trigger_id)  
-
+        self.count_scatter_plot.register_trigger(self.update_trigger_id)
+       
         self.app.callback([Output(self.update_trigger_id, 'data'),
                            Output(self.prefix+'_panel', 'style'),],
             [Input(self.prefix+'_dummy_div', 'children'),

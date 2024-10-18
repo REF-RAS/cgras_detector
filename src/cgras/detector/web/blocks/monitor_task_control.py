@@ -18,7 +18,7 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from cgras.detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, CALLBACK_MANAGER, CallbackTypes, STATE, SystemStates, logger
 
-class ProcessTaskControlBlock():
+class MonitorTaskControlBlock():
     def __init__(self, app, prefix):
         self.app = app 
         self.prefix = prefix = prefix + 'ptc'
@@ -37,6 +37,7 @@ class ProcessTaskControlBlock():
         # database reset panel
         self._panel = dbc.Col([
                 dcc.Store(id=self.update_store_id),
+                dcc.Store(id=prefix+'task_execute_mode_store'),
                 html.H4(dbc.Badge('TASK EXECUTION MODE', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.Div([task_execute_mode_select], className='mt-3 mx-auto'),
                 html.P(id=prefix+'mode_message', className='mt-2 mx-auto col-12'),
@@ -52,13 +53,13 @@ class ProcessTaskControlBlock():
                 message_alert,
             ], className='mx-auto text-center pb-2')
 
-        self.app.callback([Output(prefix+'manual_task_menu', 'style', allow_duplicate=True),
-                           Output(prefix+'mode_dropdown', 'value')],
+        self.app.callback([Output(prefix+'task_execute_mode_store', 'data')],
                             [Input(prefix+'mode_dropdown', 'value')], 
             prevent_initial_call=True)(self._mode_dropdown_changed())
 
         self.app.callback([Output(prefix+'manual_task_menu', 'style'),
-                           Output(prefix+'mode_message', 'children')],
+                           Output(prefix+'mode_message', 'children'),
+                           Output(prefix+'mode_dropdown', 'value')],
             [Input(self.update_store_id, 'data')],)(self._update_content())
         
         self.app.callback([Output(prefix+'message_alert', 'is_open'),
@@ -106,14 +107,12 @@ class ProcessTaskControlBlock():
             else:
                 style = {'visibility': 'hidden'} 
                 message = 'Automated execution of tile sample processing and new tile sample import'
-            return (style, message, )
+            return (style, message, task_execute_mode,)
         return update_content
     
     def _mode_dropdown_changed(self):
         def mode_dropdown_changed(mode):
             PERSISTENT_STORE_DAO.update_task_execute_mode(mode)
             CALLBACK_MANAGER.fire_event(CallbackTypes.TASK_EXECUTE_MODE_CHANGED, mode)
-            style = {'visibility': 'hidden'}
-            mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL)
-            return (style, mode,)
+            return (mode, )
         return mode_dropdown_changed

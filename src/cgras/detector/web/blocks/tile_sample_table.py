@@ -85,16 +85,18 @@ class TileSampleTable():
                         , className='d-grid gap-2 col-8 mx-auto', style={'padding': '6px'})
                         ], id=prefix+'deletedata_modal', is_open=False)
 
-        self._div_panel_children = []
+        self._div_panel_children = [
+            dbc.Button('Select All', id=prefix+'table_selectall_button', color='light', className='mb-1 me-5', size='sm', style={'width': '100px'})
+        ]
         if allow_reprocess:
             self._div_panel_children.append(
-                dbc.Button('Re-Process ', id=prefix+'table_reprocess_button', color='warning', className='mb-1 me-1', size='sm', style={'width': '100px'}))
+                dbc.Button('Re-Process ', id=prefix+'table_reprocess_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))
         if allow_priority:
             self._div_panel_children.append(
-                dbc.Button('Prioritize', id=prefix+'table_priority_button', color='secondary', className='mb-1 me-1', size='sm', style={'width': '100px'}))
+                dbc.Button('Prioritize', id=prefix+'table_priority_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))
         if allow_view:
             self._div_panel_children.append(
-                dbc.Button('Processing Details', id=prefix+'table_view_button', color='secondary', className='mb-1 me-1', size='sm', style={'width': '100px'}))    
+                dbc.Button('Processing Details', id=prefix+'table_view_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))    
         self._div_panel_children.extend([         
             dbc.Button('Delete', id=prefix+'table_delete_button', color='danger', className='mb-1 me-1', size='sm', style={'width': '100px'}),
             dcc.Dropdown(id=prefix+'season_list_dropdown', 
@@ -168,11 +170,16 @@ class TileSampleTable():
 
         self.app.callback(Output(prefix+'datatable', 'style_data_conditional'),
                             [Input(prefix+'datatable', 'derived_viewport_selected_rows'),
-                             State(prefix+'datatable', 'data')])(self._style_selected_rows())      
+                             State(prefix+'datatable', 'data')])(self._style_selected_rows())
         
         self.app.callback([Output(self.prefix+'datatable', 'data')],
             [Input(self.update_table_store_id, 'data'),
-             Input(self.prefix+'season_list_dropdown', 'value')], prevent_initial_call=True, allow_duplicate=True)(self._update_datatable())        
+             Input(self.prefix+'season_list_dropdown', 'value')], prevent_initial_call=True, allow_duplicate=True)(self._update_datatable())       
+        
+        self.app.callback([Output(self.prefix+'datatable', 'selected_rows')],
+            [Input(self.prefix+'table_selectall_button', 'n_clicks'),
+             State(self.prefix+'datatable', 'data'),
+             State(self.prefix+'datatable', 'selected_rows')], prevent_initial_call=True, allow_duplicate=True)(self._selectall_button_pressed())               
     
     def register_trigger(self, trigger_id:str):
         # define callbacks for the datatable data
@@ -299,6 +306,19 @@ class TileSampleTable():
             ]
             return style_data_conditional
         return style_selected_rows
+    
+    def _selectall_button_pressed(self): 
+        def selectall_button_pressed(selectall_button, model, selected_rows):
+            logger.warning(f'_selectall: {selectall_button, len(model), selected_rows}')
+            if selectall_button is None:
+                raise PreventUpdate
+            if selected_rows is not None and len(selected_rows) == len(model):
+                selected_rows = []
+            else:
+                selected_rows = [index for index in range(len(model))]
+            return (selected_rows,)  
+        return selectall_button_pressed     
+    
 
     def _update_panel(self): 
         def update_panel(store):

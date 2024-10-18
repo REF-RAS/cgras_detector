@@ -17,7 +17,7 @@ from dash.exceptions import PreventUpdate
 from cgras.tools.logging_tools import logger
 from cgras.detector.model import STATE, SystemStates
 
-from cgras.detector.web.blocks import ProcessTaskControlBlock, MonitorStateBlock, MonitorExecuteProgressBlock, MonitorRecentTaskTableBlock, MonitorTaskStatBlock
+from cgras.detector.web.blocks import MonitorTaskControlBlock, MonitorStateBlock, MonitorExecuteProgressBlock, MonitorRecentTaskTableBlock, MonitorTaskStatBlock
 
 dash.register_page(__name__)
 
@@ -32,7 +32,7 @@ class DashboardPage():
         if self.refresh_cycle is None or type(self.refresh_cycle) not in [float, int]:
             self.refresh_cycle = 1
         # the component blocks
-        self.process_task_control_panel = ProcessTaskControlBlock(app, prefix)
+        self.process_task_control_panel = MonitorTaskControlBlock(app, prefix)
         self.monitor_state_panel = MonitorStateBlock(app, prefix)
         self.monitor_execute_progress_panel = MonitorExecuteProgressBlock(app, prefix)
         self.monitor_recent_task_table_panel = MonitorRecentTaskTableBlock(app, prefix) 
