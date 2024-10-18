@@ -44,15 +44,15 @@ from . import page_count_display, page_dashboard, page_db_browse, page_models, p
 class DashApplicationMain():
     def __init__(self):
         global APP
-        self.DASH_HOST = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_WEB_HOST)
-        self.DASH_PORT = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_WEB_PORT)
-        self.SYSTEM_TIMER = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_SYSTEM_TIMER, 1) * 1000  # in milliseconds
+        self.DASH_HOST = CONFIG.get(SystemConfigNames.WEB_HOST)
+        self.DASH_PORT = CONFIG.get(SystemConfigNames.WEB_PORT)
+        self.SYSTEM_TIMER = CONFIG.get(SystemConfigNames.SYSTEM_TIMER, 1) * 1000  # in milliseconds
 
         self.app = APP
         self.flask_server = self.app.server
         self.dash_thread = None
         # define the pages
-        self._dashboard_page = page_dashboard.DashboardPage(self.app, CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_DASHBOARD_REFRESH, 1))
+        self._dashboard_page = page_dashboard.DashboardPage(self.app, CONFIG.get(SystemConfigNames.DASHBOARD_TIMER, 1))
         self._setup_page = page_system_setup.AdminSetupPage(self.app)
         self._db_browse_page = page_db_browse.DBTableBrowsePage(self.app)   
         self._sample_manager_page = page_sample_manager.SampleManagerPage(self.app)     
@@ -103,7 +103,7 @@ class DashApplicationMain():
                
     def start(self):
         rospy.loginfo(f'{type(self).__name__}: starting the dash flask server')
-        self.app.run_server(host=self.DASH_HOST, port=self.DASH_PORT, debug=CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_WEB_DEBUG_MODE, True))
+        self.app.run_server(host=self.DASH_HOST, port=self.DASH_PORT, debug=CONFIG.get(SystemConfigNames.WEB_DEBUG_MODE, True))
 
     def stop(self, *args, **kwargs):
         rospy.loginfo(f'{type(self).__name__}: the dash flask server is being shutdown')

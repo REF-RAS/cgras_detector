@@ -127,7 +127,7 @@ class ApplicationCoordinator(object):
                 try:
                     state = STATE.get()
                     # check lost connection to the capturer
-                    if model.CAPTURER_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CGRAS_CONNECTION_TIMEOUT, 60):
+                    if model.CAPTURER_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CONNECTION_TIMEOUT, 60):
                         model.CAPTURER_STATE.update(model.CapturerStates.UNKNOWN)
                     
                     if state == SystemStates.READY:
@@ -250,9 +250,8 @@ class ApplicationCoordinator(object):
 if __name__ == '__main__':
     rospy.init_node(ApplicationCoordinator.NODE_NAME, anonymous=False)
     the_agent = ApplicationCoordinator()
-    DASH_HOST = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_WEB_HOST)
-    DASH_PORT = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_WEB_PORT)
-    if CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_WEB_LAUNCH_BROWSER, False):
-        URL = f'http://{DASH_HOST}:{DASH_PORT}'
-        webbrowser.open(URL)
+    DASH_HOST = CONFIG.get(SystemConfigNames.WEB_HOST)
+    DASH_PORT = CONFIG.get(SystemConfigNames.WEB_PORT)
+    # URL = f'http://{DASH_HOST}:{DASH_PORT}'
+    # webbrowser.open(URL)
 

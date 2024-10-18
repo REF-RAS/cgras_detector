@@ -29,7 +29,7 @@ from stitching.seam_finder import SeamFinder
 from stitching.blender import Blender
 
 from cgras.detector.models.reconstruct_tools import ImageMap, CameraTransformTools, test_get_cgras_sample_images_as_list
-from cgras.detector.models import Constants, logger
+from cgras.detector.models import Constants, logger, ModelsConfigNames
 
 logger.setLevel(logging.INFO)
 
@@ -413,9 +413,9 @@ class ImageReconstruct2DModel():
         :type working_scale: float        
         """
         # input parameters
-        logdata_folder = kwargs.get('logdata_folder', None)
-        debug_images_at_original_scale = kwargs.get('reco_debug_images_at_original_scale', False)
-        debug_feature_matching_images = kwargs.get('reco_debug_feature_matching_images', False)
+        logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
+        debug_images_at_original_scale = kwargs.get(ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value, False)
+        debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
         # model variables     
         self.working_scale = working_scale              # the working scale and its inverse
         self.scaling_factor = 1 / working_scale
@@ -676,10 +676,10 @@ class ImageReconstruct1DModel():
         assert type(images_1d_list[0]) == np.ndarray, 'Parameter images_as_list should contain only numpy images'
         
         # input parameters
-        debug_feature_matching_images = kwargs.get('reco_debug_feature_matching_images', False)
+        debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
         # input parameters and model variables        
-        feature_detector = kwargs.get('reco_feature_detector', 'sift')
-        confidence_threshold = kwargs.get('reco_matching_confidence_threshold', 0.4)
+        feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTOR.value, 'sift')
+        confidence_threshold = kwargs.get(ModelsConfigNames.RECO_MATCHING_CONFIDENCE_THRESHOLD.value, 0.4)
         # get image size
         logger.info(f'{type(self).__name__}: Number of images: {len(images_1d_list)}')
         self.images_as_list = images_1d_list

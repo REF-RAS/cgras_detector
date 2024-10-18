@@ -13,6 +13,7 @@ import os, math, random, re
 from datetime import datetime
 from enum import Enum
 from cgras.tools.logging_tools import init_logger
+from .models_config import ModelsConfigNames
 
 class Constants(Enum):
     SCALE_ORIGINAL = 0

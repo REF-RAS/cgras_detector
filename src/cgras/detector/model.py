@@ -14,7 +14,7 @@ import os, sys, threading, collections, time
 from enum import Enum
 # project modules
 import cgras.detector.model_base as model_base
-from cgras.detector.config_manager import SystemConfig, SystemConfigNames
+from cgras.detector.system_config import SystemConfig, SystemConfigNames
 from cgras.tools.logging_tools import logger
 import catkin_pkg.package
 
@@ -64,10 +64,11 @@ class CapturerStates(Enum):
 
 # global variable for accessing the system configuration
 CONFIG:SystemConfig = SystemConfig(os.path.join(os.path.dirname(__file__), '../../../config/system_config.yaml'))
+CGRAS_DATA_FOLDER = CONFIG.get(SystemConfigNames.DATA_FOLDER, '/home/qcr/cgras_data')
 # global variables for import by other modules
 STATE = model_base.StateManager(SystemStates.READY)                              # the state of the detection and visualization processor
 CALLBACK_MANAGER:model_base.CallbackManager = model_base.CallbackManager()      # the callback manager for linking the GUI and the processor
-APP_FILE_MANAGER:ApplicationFileManager = ApplicationFileManager(**CONFIG)      # the object manages the data folders for the application
+APP_FILE_MANAGER:ApplicationFileManager = ApplicationFileManager(CGRAS_DATA_FOLDER)      # the object manages the data folders for the application
 # global variables for managing database tables
 AIMSTILE_DBFM = DBFileManager(APP_FILE_MANAGER.database_folder, 'tile.db', AIMSTILE_DDL)
 AIMSTILE_DAO:AIMSTileDAO = AIMSTileDAO(AIMSTILE_DBFM.db_file)

@@ -20,7 +20,7 @@ from cgras.detector.models.reconstruct import ImageReconstructModel, ImageRecons
 from cgras.detector.models.reconstruct_tools import test_get_cgras_sample_images_as_list 
 from cgras.detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from cgras.detector.models.yolo_detector import YoloObjectDetector, YoloResult, ObjectType
-from cgras.detector.models import logger
+from cgras.detector.models import logger, ModelsConfigNames
 from cgras.detector.model import CoralObject, ObjectClassCategories
 
 class CoralObjectDetectModel():
@@ -52,14 +52,14 @@ class CoralObjectDetectModel():
             whole_reco_image_size = reco_model.get_whole_reco_image_size()
             self.tile_size = whole_reco_image_size
         # other keyword parameters - operational
-        self.blob_size = kwargs.get('cod_blob_size', None)
+        self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
-            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) cod_blob_size is missing')
-        self.blob_overlap_pix = kwargs.get('cod_blob_overlap_pix', 0)
-        self.duplicate_max_displacement = kwargs.get('cod_duplicate_max_displacement_images', 10)
+            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE} is missing')
+        self.blob_overlap_pix = kwargs.get(ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value, 0)
+        self.duplicate_max_displacement = kwargs.get(ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES.value, 10)
         # other keyword parameters - output cached data and debug information
-        self.logdata_folder = kwargs.get('logdata_folder', None)
-        self.cod_model_cache_filename = kwargs.get('cod_model_filename', f'coral_object_detect_model.yaml')
+        self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
+        self.cod_model_cache_filename = kwargs.get(ModelsConfigNames.COD_MODEL_FILENAME.value, f'coral_object_detect_model.yaml')
         # model parameters
         self.image_grid_size = reco_model.get_image_map_size()
         self.object_list_of_images = dict()
@@ -272,20 +272,20 @@ class CoralObjectDetectImageModel():
         :type locate_tile_model: LocateTileModel, optional
         """       
         # other keyword parameters - operational
-        self.blob_size = kwargs.get('cod_blob_size', None)
+        self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
-            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) cod_blob_size is missing')
+            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE} is missing')
         # the object categories as defined by the yolo model
-        self.coral_classes = kwargs.get('coral_classes', [])
-        self.dead_coral_classes = kwargs.get('dead_coral_classes', [])
+        self.coral_classes = kwargs.get(ModelsConfigNames.OBJECT_CLASSES_CORAL.value, [])
+        self.dead_coral_classes = kwargs.get(ModelsConfigNames.OBJECT_CLASSES_DEAD_CORAL.value, [])
         # parameters for blob creation and duplicate removal
-        self.blob_overlap_pix = kwargs.get('cod_blob_overlap_pix', 0)
-        self.duplicate_max_displacement = kwargs.get('cod_duplicate_max_displacement_blobs', 10)
+        self.blob_overlap_pix = kwargs.get(ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value, 0)
+        self.duplicate_max_displacement = kwargs.get(ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS.value, 10)
         # other keyword parameters - output cache and debug information
-        self.logdata_folder = kwargs.get('logdata_folder', None)
+        self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         # other keyword parameters - use cached detection object list instead of actual detection using the yolo_model
-        self.use_cached_object_detection = kwargs.get('cod_use_cached_object_detection', False)
-        self.debug_blob_images = kwargs.get('cod_debug_blob_images', True)
+        self.use_cached_object_detection = kwargs.get(ModelsConfigNames.COD_USE_CACHED_OBJECT_DETECTION.value, False)
+        self.debug_blob_images = kwargs.get(ModelsConfigNames.COD_DEBUG_BLOB_IMAGES.value, True)
         # model variables
         self.object_class_names:dict = None                   # list of class names of the detection model
         self.metadata_of_blobs = dict()                # metadata of the blobs including detection 
@@ -337,7 +337,7 @@ class CoralObjectDetectImageModel():
                         'cod_blob_bbox': [start_x, start_y, end_x, end_y] 
                     }
                     blob_metdata.update(speed_as_dict)
-                    self.metadata_of_blobs[cache_index] = blob_metdata
+                    self.metadata_of_blobs[cache_index] = blob_metdata   # the data structure is for logdata
                     object_list = self._extract_objects_from_result(yolo_result, image_col_index, image_row_index, corner, blob_col_index, blob_row_index, reco_model, locate_tile_model)  
                     self.raw_object_list_of_blobs[cache_index] = object_list
                     # if the self.debug_blob_images is True, then generate the annotated image for this image blob and save to the logdata folder
@@ -739,7 +739,7 @@ def test_load_coral_object_detect_model(params, print=False):
     return cod_model
 
 if __name__ == '__main__':
-    logdata_folder = '/home/qcr/cgras_data/detector/data/2024-Nov/2024-Nov-P00001-CG1-202411151200/'
+    logdata_folder = '/home/qcr/cgras_data/detector/data/2023Dec/2023Dec-P00003-CG1-202311201200/'
     params = {
         'logdata_folder': logdata_folder, 
         'reco_model_filename': 'reco_model.yaml',

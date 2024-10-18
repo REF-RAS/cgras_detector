@@ -24,7 +24,7 @@ class YoloModelTable():
     def __init__(self, app, prefix):
         self.app = app 
         self.prefix = prefix = prefix + 'ymet_'
-        self.default_max_end_day = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_MAX_CORAL_DAYS)
+        self.default_max_end_day = CONFIG.get(SystemConfigNames.MAX_CORAL_AGE)
         self.updated_success_trigger_id = prefix + 'updated_datatable_trigger'
         # define widgets 
         self._delete_confirm_dialog = dcc.ConfirmDialog(id=prefix+'delete_confirm_dialog',

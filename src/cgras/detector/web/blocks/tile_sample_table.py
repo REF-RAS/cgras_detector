@@ -18,7 +18,7 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from cgras.detector.model import DETECT_DAO
 from cgras.detector.dao_detect import StatusNames
-from cgras.detector.task_detection import DetectionTaskHelper
+from cgras.detector.task_detection import DetectionTaskModel
 from cgras.tools.logging_tools import logger
 
 class TileSampleTable():
@@ -275,9 +275,9 @@ class TileSampleTable():
                     DETECT_DAO.update_tile_sample_status(id, StatusNames.PENDING.value)
                     # remove the cache files
                     if mode == '_whole':
-                        DetectionTaskHelper.delete_cache_files(id, delete_reco=True, delete_object_detection=True)
+                        DetectionTaskModel.delete_cache_files(id, delete_reco=True, delete_object_detection=True)
                     elif mode == '_redo_detect':
-                        DetectionTaskHelper.delete_cache_files(id, delete_reco=True, delete_object_detection=False)
+                        DetectionTaskModel.delete_cache_files(id, delete_reco=True, delete_object_detection=False)
                     elif mode == '_redo_analysis':
                         ...
                 message = f'The tile sample(s) {row_index_list} moved to the pending queue'

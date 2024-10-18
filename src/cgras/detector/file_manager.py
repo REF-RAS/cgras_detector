@@ -17,18 +17,18 @@ from datetime import datetime
 from cgras.tools.logging_tools import logger
 
 class ApplicationFileManager():
-    def __init__(self, **kwargs):
+    def __init__(self, cgras_data_folder):
         self.log_lock = threading.Lock()
         self.user_home = os.path.expanduser('~') 
-        self.cgras_home = kwargs.get('cgras.data.folder', '/home/qcr/cgras_data')
+        self.cgras_data_folder = cgras_data_folder
         # crate subfolders
-        self.images_folder = os.path.join(self.cgras_home, 'images')
+        self.images_folder = os.path.join(self.cgras_data_folder, 'images')
         os.makedirs(self.images_folder, exist_ok=True)
-        self.database_folder = os.path.join(self.cgras_home, 'database')
+        self.database_folder = os.path.join(self.cgras_data_folder, 'database')
         os.makedirs(self.database_folder, exist_ok=True)        
-        self.coordinator_folder = os.path.join(self.cgras_home, 'coordinator')
+        self.coordinator_folder = os.path.join(self.cgras_data_folder, 'coordinator')
         os.makedirs(self.coordinator_folder, exist_ok=True)
-        self.detector_folder = os.path.join(self.cgras_home, 'detector')
+        self.detector_folder = os.path.join(self.cgras_data_folder, 'detector')
         os.makedirs(self.detector_folder, exist_ok=True)
         # create the subfolders under the two platforms
         self._create_platform_folders(self.coordinator_folder)
@@ -44,7 +44,7 @@ class ApplicationFileManager():
         os.makedirs(temp_folder, exist_ok=True)                   
     
     def get_cgras_home(self) -> str:
-        return self.cgras_home    
+        return self.cgras_data_folder    
     
     def get_images_folder(self) -> str:
         return self.images_folder

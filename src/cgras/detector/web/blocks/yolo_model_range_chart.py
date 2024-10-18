@@ -27,7 +27,7 @@ class YoloModelRangeChartBlock():
     def __init__(self, app, prefix):
         self.app = app
         self.prefix = prefix = prefix + 'ymrc_'
-        self.default_max_end_day = CONFIG.get(SystemConfigNames.CGRAS_DETECTOR_MAX_CORAL_DAYS)
+        self.default_max_end_day = CONFIG.get(SystemConfigNames.MAX_CORAL_AGE)
         # --- define widgets
         self._model = self.get_default_chart_model()
         
