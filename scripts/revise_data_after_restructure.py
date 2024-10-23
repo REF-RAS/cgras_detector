@@ -10,8 +10,8 @@ __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
 import sys, random
-from cgras.tools import db_tools
-from cgras.detector.model import AIMSTILE_DAO, DETECT_DAO
+from tools import db_tools
+from detector.model import AIMSTILE_DAO, DETECT_DAO
 
 
 def add_settle_time_to_tile_sample():

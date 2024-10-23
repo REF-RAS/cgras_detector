@@ -1,0 +1,18 @@
+<launch>
+    <arg name="namespace" default="cgras" doc="The namespace for the project" />
+    <arg name="detector" default="true" />
+    <arg name="cgras_data_folder" default="/home/qcr/cgras_data" />
+
+    <group ns="$(arg namespace)">
+        <param name="detector" type="boolean" value="$(arg detector)" /> 
+        <param name="cgras_data_folder" type="string" value="$(arg cgras_data_folder)" />
+
+        <!-- launch the detector node -->
+        <group if="$(arg detector)">
+            <node pkg="cgras_detector" type="run_server.py" name="cgras_detector_node" output="log">
+            </node>
+        </group>
+
+    </group>
+
+</launch>   

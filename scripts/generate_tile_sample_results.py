@@ -10,9 +10,9 @@ __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
 import sys, random
-from cgras.tools import db_tools
-from cgras.detector.model import DETECT_DAO
-from cgras.detector.dao_detect import StatusNames, ObjectClassCategories
+from tools import db_tools
+from detector.model import DETECT_DAO
+from detector.dao_detect import StatusNames, ObjectClassCategories
 
 def change_tile_sample_status(tile_sample_id:str, status:int):
     DETECT_DAO.update_tile_sample_status(tile_sample_id, status)

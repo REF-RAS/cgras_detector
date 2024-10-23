@@ -8,8 +8,7 @@ cgras_detector:
   system_timer: 1  # seconds
   dashboard_timer: 1  # seconds
   # the data folder
-  data_folder: /home/qcr/cgras_data
-  data_system_subfolder: detector
+  cgras_data_folder: /home/qcr/cgras_data
   # connection timeout
   connection_timeout: 120   # seconds
   # yolo model range

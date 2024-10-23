@@ -1,0 +1,99 @@
+# Copyright 2024 - Andrew Kwok Fai LUI, 
+# Robotics and Autonomous Systems Group, REF, RI
+# and the Queensland University of Technology
+
+__author__ = 'Andrew Lui'
+__copyright__ = 'Copyright 2024'
+__license__ = 'GPL'
+__version__ = '1.0'
+__email__ = 'ak.lui@qut.edu.au'
+__status__ = 'Development'
+
+# general modules
+import os, sys, threading, collections, time, shutil, traceback
+from enum import Enum
+from datetime import datetime
+# project modules
+from tools.logging_tools import logger
+
+class ApplicationFileManager():
+    SYSTEM_FOLDER = 'system'
+    DATA_FOLDER = 'data'
+    TEMP_FOLDER = 'temp'
+    
+    def __init__(self, cgras_data_folder):
+        self.log_lock = threading.Lock()
+        self.user_home = os.path.expanduser('~') 
+        self.cgras_data_folder = cgras_data_folder
+        # crate subfolders
+        self.images_folder = os.path.join(self.cgras_data_folder, 'images')
+        os.makedirs(self.images_folder, exist_ok=True)
+        self.database_folder = os.path.join(self.cgras_data_folder, 'database')
+        os.makedirs(self.database_folder, exist_ok=True)        
+        self.coordinator_folder = os.path.join(self.cgras_data_folder, 'coordinator')
+        os.makedirs(self.coordinator_folder, exist_ok=True)
+        self.detector_folder = os.path.join(self.cgras_data_folder, 'detector')
+        os.makedirs(self.detector_folder, exist_ok=True)
+        # create the subfolders under the two platforms
+        self._create_platform_folders(self.coordinator_folder)
+        self._create_platform_folders(self.detector_folder)
+    
+    @staticmethod
+    def _create_platform_folders(platform_home):
+        system_folder = os.path.join(platform_home, ApplicationFileManager.SYSTEM_FOLDER)
+        os.makedirs(system_folder, exist_ok=True)
+        data_folder = os.path.join(platform_home, ApplicationFileManager.DATA_FOLDER)
+        os.makedirs(data_folder, exist_ok=True)       
+        temp_folder = os.path.join(platform_home, ApplicationFileManager.TEMP_FOLDER)
+        os.makedirs(temp_folder, exist_ok=True)                   
+    
+    def get_cgras_home(self) -> str:
+        return self.cgras_data_folder    
+    
+    def get_images_folder(self) -> str:
+        return self.images_folder
+
+    def get_database_folder(self) -> str:
+        return self.database_folder
+    
+    def get_capturer_folder(self, *args) -> str:
+        return self.get_subfolder(self.coordinator_folder, *args)
+    
+    def get_detector_folder(self, *args) -> str:
+        return self.get_subfolder(self.detector_folder, *args)
+    
+    def get_detector_subfolder(self, subfolder, *args) -> str:
+        if subfolder not in [ApplicationFileManager.SYSTEM_FOLDER, ApplicationFileManager.DATA_FOLDER, ApplicationFileManager.TEMP_FOLDER]:
+            raise AssertionError(f'{type(self).__name__}: invalid parameter (subfolder): {subfolder} ')
+        return self.get_subfolder(self.detector_folder, subfolder, *args)   
+    
+    @staticmethod
+    def get_subfolder(parent_folder:str, *args) -> str:
+        """ return the path string of a subfolder of a parent_folder, and create the folder if not exists, with the partial paths specified as
+            positional raguments
+
+        :param parent_folder: the parent folder path 
+        :type parent_folder: str
+        :return: the full path to the subfolder, which has been created if not exists
+        :rtype: str
+        """
+        if args is not None and len(args) > 0:
+            parent_folder = os.path.join(parent_folder, *args)
+            os.makedirs(parent_folder, exist_ok=True)
+        return parent_folder
+
+    # --- copy the images in the images folder to /assets/system
+    def populate_system_assets_folder(self):
+        try:
+            source_path = os.path.join(os.path.dirname(__file__), 'web/_system')
+            system_folder_path = self.get_detector_folder(self.SYSTEM_FOLDER)
+            logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            shutil.rmtree(system_folder_path, ignore_errors=True)
+            shutil.copytree(source_path, system_folder_path, dirs_exist_ok=True)
+            # self.generate_pattern_images()
+            return True
+        except Exception as e:
+            logger.warning(f'ApplicationFileManager.populate_system_assets_folder: {traceback.format_exc()}')
+            return False
+
+

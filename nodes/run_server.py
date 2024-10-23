@@ -11,15 +11,13 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-# import libraries
-import  webbrowser
 # ros modules
 import rospy
 # project modules: web and generic
 
-from cgras.tools.logging_tools import logger
-from cgras.detector.model import CONFIG, SystemConfigNames
-from cgras.detector.run import ApplicationCoordinator
+from tools.logging_tools import logger
+from detector.model import CONFIG, SystemConfigNames
+from detector.run import ApplicationCoordinator
 
 # ----------------------------------------------------------------------
 # The main program for running the detector as a web server and a daemon
@@ -29,6 +27,4 @@ if __name__ == '__main__':
     DASH_HOST = CONFIG.get(SystemConfigNames.WEB_HOST)
     DASH_PORT = CONFIG.get(SystemConfigNames.WEB_PORT)
 
-    # URL = f'http://{DASH_HOST}:{DASH_PORT}'
-    # webbrowser.open(URL)
 
