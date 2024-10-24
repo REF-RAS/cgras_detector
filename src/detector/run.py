@@ -94,6 +94,7 @@ class ApplicationCoordinator(object):
             if state in [SystemStates.D_INIT, SystemStates.D_RECO, SystemStates.D_LOCTILE, SystemStates.D_OBJECT, SystemStates.D_COLLECT_STAT]:
                 if event == CallbackTypes.PROCESS_TILE_TO_ABORT:
                     the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
+                    logger.warning(f'ABORT CALLBACK: {the_detection_task}')
                     if the_detection_task:
                         STATE.update_state(SystemStates.D_ABORTED)
                         the_detection_task.abort_task()
@@ -254,7 +255,7 @@ class ApplicationCoordinator(object):
                             previous_state = STATE.get_previous_state()
                             DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.FAILED.value)
                             DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, the_detection_task.get_tile_sample_id(), 
-                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.FAILED.value, f'Failed at {previous_state}')
+                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.FAILED.value, f'Failed at {previous_state.name}')
                         STATE.update_state(SystemStates.READY)    
                           
                     elif state == SystemStates.D_ABORTED:
@@ -264,7 +265,7 @@ class ApplicationCoordinator(object):
                             previous_state = STATE.get_previous_state()
                             DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.ABORTED.value)
                             DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, the_detection_task.get_tile_sample_id(), 
-                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.ABORTED.value, f'Aborted at {previous_state}')     
+                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.ABORTED.value, f'Aborted at {previous_state.name}')     
                                                    
                         STATE.update_state(SystemStates.READY)                                             
                         

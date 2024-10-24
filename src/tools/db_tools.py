@@ -28,14 +28,14 @@ class Dict2Class(object):
         return ''.join(out)
 
 # --- returns a db connection object to the db_file
-def create_connection(db_file) -> sqlite3.Connection:
+def create_connection(db_file, **kwargs) -> sqlite3.Connection:
     """ Returns a connection object to the given db_file
 
     :param db_file: The path to the sqlite3 db file
     :return: The sqlite3 conn object
     """
     try:
-        conn = sqlite3.connect(db_file)
+        conn = sqlite3.connect(db_file, **kwargs)
         return conn
     except sqlite3.Error as e:
         raise e

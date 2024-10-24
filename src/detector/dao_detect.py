@@ -42,6 +42,7 @@ DETECT_DDL = {
         create_time text,
         status integer DEFAULT -1,
         priority text,
+        remarks text DEFAULT '',
         UNIQUE (tile_id, batch_id)
     );
     """,
@@ -179,6 +180,7 @@ class StatusNames(Enum):
     SUCCESS = 1
     FAILED = 2
     ABORTED = 3
+    INVALID = 4  # Delete a tile sample puts it into INVALID
 
 class CoralObject():
     """ CoralObject models an object in the tile images detected by an object detection model. It comprises locational information including the index in the image grid, the index of the blob in each image,
@@ -350,15 +352,27 @@ class DetectorDAO():
     
     # update the status of the tile_sample given its tile_sample_id 
     @synchronized
-    def update_tile_sample_status(self, tile_sample_id:str, status:int):
+    def update_tile_sample_status(self, tile_sample_id:str, status:int, remarks:str=None):
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
-            c.execute('UPDATE tile_sample SET status = ? WHERE id = ?', (status, tile_sample_id,))
+            if remarks is None:
+                c.execute('UPDATE tile_sample SET status = ? WHERE id = ?', (status, tile_sample_id,))
+            else:
+                c.execute('UPDATE tile_sample SET status = ?, remarks = ? WHERE id = ?', (status, remarks, tile_sample_id,))
             return True  
+        
+    @synchronized
+    def clear_tile_sample_data(self, tile_sample_id:str):
+        with db_tools.create_connection(self.db_file) as conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM tile_sample_detect_stat WHERE tile_sample_id = ?', (tile_sample_id,))
+            c.execute('DELETE FROM detected_object WHERE tile_sample_id = ?', (tile_sample_id,))
+            return True
     
     # delete the record of tile_sample given the id
     @synchronized
     def delete_tile_sample(self, tile_sample_id:str):
+        ######
         sql = 'DELETE FROM tile_sample WHERE id = ?'
         return db_tools.update(self.db_file, sql, (tile_sample_id,))   
     
@@ -383,8 +397,9 @@ class DetectorDAO():
                 sql = 'SELECT * FROM tile_sample WHERE status = ?'
                 param_list.append(status)
         else:
-            sql = 'SELECT * FROM tile_sample WHERE status <> ?'
+            sql = 'SELECT * FROM tile_sample WHERE status NOT IN (?, ?)'
             param_list.append(StatusNames.PENDING.value)
+            param_list.append(StatusNames.INVALID.value)
         if season_title is not None:
             sql += ' AND season = ?'
             param_list.append(season_title)            
@@ -499,16 +514,14 @@ class DetectorDAO():
         operator = yaml_data.get('operator', 'Unknown') 
         yaml_images_list = yaml_data.get('images', None)
         try:
-            with db_tools.create_connection(self.db_file) as conn: 
-                conn.isolation_level = None  # TODO: to turn off auto-commit (may be unnecessary, minor issue, to check)
-                tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-                self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, settle_time, importer_id, operator)
-                self.delete_source_images_of_tile_sample(tile_sample_id)
-                for index, yaml_images in enumerate(yaml_images_list):
-                    x, y = yaml_images.get('x', None), yaml_images.get('y', None)
-                    filepath = yaml_images.get('file', None)
-                    capture_id = yaml_images.get('capture_id', f'{tile_sample_id}-{x}-{y}')
-                    self.add_source_image(capture_id, tile_sample_id, x, y, filepath)
+            tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
+            self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, settle_time, importer_id, operator)
+            self.delete_source_images_of_tile_sample(tile_sample_id)
+            for index, yaml_images in enumerate(yaml_images_list):
+                x, y = yaml_images.get('x', None), yaml_images.get('y', None)
+                filepath = yaml_images.get('file', None)
+                capture_id = yaml_images.get('capture_id', f'{tile_sample_id}-{x}-{y}')
+                self.add_source_image(capture_id, tile_sample_id, x, y, filepath)
             return True
         except Exception as e:
             logger.warning(e)
@@ -816,9 +829,9 @@ class DetectorDAO():
     @synchronized
     def add_tile_df_to_cache_tile_health(self, tile_df:list=None):
         for index, row in tile_df.iterrows():
-                sql = 'INSERT OR REPLACE INTO cache_tile_health_stat (tile_id, season, species, settle_time) SELECT ?, ?, ?, ? WHERE NOT EXISTS \
-                    (SELECT * FROM cache_tile_health_stat WHERE tile_id = ?)'
-                db_tools.update(self.db_file, sql, (row['tile_id'], row['season'], row['species'], row['settle_time'], row['tile_id'],))
+            sql = 'INSERT OR REPLACE INTO cache_tile_health_stat (tile_id, season, species, settle_time) SELECT ?, ?, ?, ? WHERE NOT EXISTS \
+                (SELECT * FROM cache_tile_health_stat WHERE tile_id = ?)'
+            db_tools.update(self.db_file, sql, (row['tile_id'], row['season'], row['species'], row['settle_time'], row['tile_id'],))
 
     @synchronized
     def list_all_cache_tile_health(self, season:str=None) -> list:

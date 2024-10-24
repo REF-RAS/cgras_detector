@@ -40,9 +40,10 @@ class TileSampleSearchBlock():
                                        searchable=False, clearable=False, className='ms-2', maxHeight=80, style={'width': '160px', 'zIndex': 10})
         # the status filter
         self.status_options = [
-            {'label': 'All Status', 'value': StatusNames.UNKNOWN.value},
+            {'label': 'All Valid Status', 'value': StatusNames.UNKNOWN.value},
             {'label': 'Failed', 'value': StatusNames.FAILED.value},
             {'label': 'Aborted', 'value': StatusNames.ABORTED.value},
+            {'label': 'Invalid', 'value': StatusNames.INVALID.value},
             {'label': 'Success', 'value': StatusNames.SUCCESS.value},]
         status_dropdown = dcc.Dropdown(options=self.status_options, id=prefix+'status_dropdown', 
                                        searchable=False, clearable=False, className='ms-2', maxHeight=80, style={'width': '160px', 'zIndex': 10})  

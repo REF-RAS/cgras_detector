@@ -27,6 +27,7 @@ class ModelsConfigNames(Enum):
     RECO_DEBUG_FEATURE_MATCH_IMAGES = 'reco_debug_feature_matching_images'
     RECO_FEATURE_DETECTOR = 'reco_feature_detector'
     RECO_MATCHING_CONFIDENCE_THRESHOLD = 'reco_matching_confidence_threshold'
+    RECO_WORKING_SCALE = 'reco_working_scale'
     COD_MODEL_FILENAME = 'cod_model_filename'
     COD_DEBUG_BLOB_IMAGES = 'cod_debug_blob_images'
     COD_BLOB_OVERLAP_PIX = 'cod_blob_overlap_pix'

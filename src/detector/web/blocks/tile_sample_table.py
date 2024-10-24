@@ -22,18 +22,18 @@ from detector.task_detection import DetectionTaskModel
 from tools.logging_tools import logger
 
 class TileSampleTable():
-    def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_view=False):
+    def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_reload=False, allow_view=False):
         self.app = app 
         self.prefix = prefix = prefix + 'tse_'
         self.allow_priority = allow_priority
         self.allow_reprocess = allow_reprocess
         self.update_table_store_id = prefix + 'update_table_store'
         # define widgets 
-        self._delete_confirm_dialog = dcc.ConfirmDialog(id=prefix+'delete_confirm_dialog',
-            message='The selected tile sample(s) will be deleted! (the source image files are kept) Are you sure?',)  
+        self._invalidate_confirm_dialog = dcc.ConfirmDialog(id=prefix+'invalidate_confirm_dialog',
+            message='The selected tile sample(s) will be invalidated and the findings cleared! Are you sure?',)  
         
-        self._reprocess_confirm_dialog = dcc.ConfirmDialog(id=prefix+'reprocess_confirm_dialog',
-            message='The results of the selected tile sample(s) will be invaliated and the sample placed in the pending queue. Are you sure?',)          
+        self._redo_confirm_dialog = dcc.ConfirmDialog(id=prefix+'reprocess_confirm_dialog',
+            message='The findings of the selected tile sample(s) will be invaliated and the sample placed in the pending queue. Are you sure?',)          
         
         self._message_alert = dbc.Alert('', id=prefix+'message_alert', dismissable=True, duration=10000,
                                  is_open=False, className='mx-auto mt-4 col-8', color='secondary')
@@ -71,7 +71,7 @@ class TileSampleTable():
                 dbc.ModalBody(children=[html.P('Select the starting point of the re-process (i.e., involves removing different cache files)', className='text-secondary'),
                                         self._reprocess_mode_radio ,
                                             html.Div(id=prefix+'confirm_modal_button_panel', children=[
-                                            dbc.Button('Confirm Re-Process', id=prefix+'confirm_reprocess_button', n_clicks=0, className='me-3'), 
+                                            dbc.Button('Confirm Re-Process', id=prefix+'confirm_redo_button', n_clicks=0, className='me-3'), 
                                             dbc.Button('Cancel', id=prefix+'cancel_reprocess_button', n_clicks=0, color='secondary'),], 
                                         className='text-center, mt-3', style={'display': 'block'}, ),
                                         ]),
@@ -90,15 +90,18 @@ class TileSampleTable():
         ]
         if allow_reprocess:
             self._div_panel_children.append(
-                dbc.Button('Re-Process ', id=prefix+'table_reprocess_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))
+                dbc.Button('Redo', id=prefix+'table_reprocess_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))
         if allow_priority:
             self._div_panel_children.append(
                 dbc.Button('Prioritize', id=prefix+'table_priority_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))
         if allow_view:
             self._div_panel_children.append(
-                dbc.Button('Processing Details', id=prefix+'table_view_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))    
+                dbc.Button('View Details', id=prefix+'table_view_button', color='primary', className='mb-1 me-1', size='sm', style={'width': '100px'}))  
+        if allow_reload:
+            dbc.Button('Reload', id=prefix+'table_reload_button', color='warning', className='mb-1 me-1', size='sm', style={'width': '100px'}),            
+              
         self._div_panel_children.extend([         
-            dbc.Button('Delete', id=prefix+'table_delete_button', color='danger', className='mb-1 me-1', size='sm', style={'width': '100px'}),
+            dbc.Button('Invalidate', id=prefix+'table_invalid_button', color='danger', className='mb-1 me-1', size='sm', style={'width': '100px'}),
             dcc.Dropdown(id=prefix+'season_list_dropdown', 
                                        searchable=False, clearable=False, className='ms-2', maxHeight=80, style={'width': '200px'}),
         ])
@@ -109,13 +112,13 @@ class TileSampleTable():
                 dbc.Row(html.Div(self._datatable_panel_children, className='p-2', style={'background-color': 'rgb(225, 225, 225)'})),
                 self._message_alert,
                 dcc.Store(id=self.update_table_store_id),
-                dcc.Store(id=prefix+'row_delete_store'),
+                dcc.Store(id=prefix+'row_invalid_store'),
                 dcc.Store(id=prefix+'row_priority_store'),
                 dcc.Store(id=prefix+'row_reprocess_store'),
                 dcc.Store(id=prefix+'row_view_store'),
                 self._confirm_reprocess_modal,
                 self._deletedata_modal,    
-                self._delete_confirm_dialog,            
+                self._invalidate_confirm_dialog,            
                 ], style={'margin-top':'24px'})
         
         # define callback for selecting a scan and open the modal window
@@ -125,35 +128,35 @@ class TileSampleTable():
         #         Output('viewdata_modal', 'is_open'),],
         #     [Input('row_priority_store', 'data')], prevent_initial_call=True)(self._browse_scan())
         
-        self.app.callback([Output(prefix+'delete_confirm_dialog', 'displayed')],
-            [Input(prefix+'row_delete_store', 'data')], prevent_initial_call=True)(self._delete_row_requested())   
+        self.app.callback([Output(prefix+'invalidate_confirm_dialog', 'displayed')],
+            [Input(prefix+'row_invalid_store', 'data')], prevent_initial_call=True)(self._invalidate_row_requested())   
 
         self.app.callback([Output(prefix+'confirm_reprocess_modal', 'is_open', allow_duplicate=True)],
-            [Input(prefix+'row_reprocess_store', 'data')], prevent_initial_call=True)(self._reprocess_row_requested())     
+            [Input(prefix+'row_reprocess_store', 'data')], prevent_initial_call=True)(self._redo_row_requested())     
 
         self.app.callback([Output(prefix+'message_alert', 'is_open'),
                            Output(prefix+'message_alert', 'children'),
                            Output(prefix+'confirm_reprocess_modal', 'is_open'),
                            Output(self.update_table_store_id, 'data', allow_duplicate=True)],
-                        [Input(prefix+'confirm_reprocess_button', 'n_clicks'),
+                        [Input(prefix+'confirm_redo_button', 'n_clicks'),
                         Input(prefix+'cancel_reprocess_button', 'n_clicks'),
                         State(prefix+'reprocess_mode', 'value'),
                         State(prefix+'row_reprocess_store', 'data'),
-                        State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._reprocess_row_confirmed())           
+                        State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._redo_row_confirmed())           
         
         self.app.callback([Output(prefix+'message_alert', 'is_open', allow_duplicate=True),
                            Output(prefix+'message_alert', 'children', allow_duplicate=True),
                            Output(self.update_table_store_id, 'data', allow_duplicate=True)],
-                            [Input(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
-                            State(prefix+'row_delete_store', 'data'),
-                            State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._delete_row_confirmed())    
+                            [Input(prefix+'invalidate_confirm_dialog', 'submit_n_clicks'),
+                            State(prefix+'row_invalid_store', 'data'),
+                            State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._invalidate_row_confirmed())    
         
         self.app.callback([Output(prefix+'message_alert', 'is_open', allow_duplicate=True),
                            Output(prefix+'message_alert', 'children', allow_duplicate=True)],
                             [Input(prefix+'row_priority_store', 'data'),], prevent_initial_call=True)(self._priority_row_confirmed())        
         
         input_list = [State(prefix+'datatable', 'selected_rows'), 
-                      Input(prefix+'table_delete_button', 'n_clicks')]
+                      Input(prefix+'table_invalid_button', 'n_clicks')]
         if allow_reprocess:
             input_list.append(Input(prefix+'table_reprocess_button', 'n_clicks'))
         if allow_priority:
@@ -163,7 +166,7 @@ class TileSampleTable():
 
         self.app.callback([Output(prefix+'row_reprocess_store', 'data'),
                            Output(prefix+'row_priority_store', 'data'),
-                            Output(prefix+'row_delete_store', 'data'),
+                            Output(prefix+'row_invalid_store', 'data'),
                             Output(prefix+'row_view_store', 'data'),
                             Output(prefix+'datatable', 'selected_rows', allow_duplicate=True),
                            ], input_list, prevent_initial_call=True)(self._table_button_pressed())     
@@ -233,56 +236,61 @@ class TileSampleTable():
                 return (row_index_list, None, None, None, [])
             elif button_id.endswith('table_priority_button'):
                 return (None, row_index_list, None, None, [])
-            elif button_id.endswith('table_delete_button'):
+            elif button_id.endswith('table_invalid_button'):
                 return (None, None, row_index_list, None, [])     
             elif button_id.endswith('table_view_button'):
                 return (None, None, None, row_index_list, [])        
             return (None, None, None, None, [])
         return table_button_pressed 
 
-    def _delete_row_requested(self): 
-        def delete_row_clicked(row_index_list):
+    def _invalidate_row_requested(self): 
+        def invalidate_row_requested(row_index_list):
             if row_index_list is None:
                 raise PreventUpdate        
             return (True,)  
-        return delete_row_clicked 
+        return invalidate_row_requested 
 
-    def _delete_row_confirmed(self): 
-        def delete_row_confirmed(submit_n_clicks, row_index_list, store):
+    def _invalidate_row_confirmed(self): 
+        def invalidate_row_confirmed(submit_n_clicks, row_index_list, store):
             if submit_n_clicks:
                 for row_index in row_index_list:
-                    id = self._model.iloc[row_index]['id']
-                    DETECT_DAO.delete_tile_sample(id)
-                message = f'The tile sample(s) {row_index_list} deleted'
+                    tile_sample_id = self._model.iloc[row_index]['id']
+                    DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.INVALID.value)
+                    DETECT_DAO.clear_tile_sample_data(tile_sample_id)
+                    DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
+                    # DETECT_DAO.delete_tile_sample(id)
+                message = f'The tile sample(s) {row_index_list} invalidated'
                 return (True, message, store)
             return (False, '', store)
-        return delete_row_confirmed 
+        return invalidate_row_confirmed 
 
-    def _reprocess_row_requested(self): 
-        def reprocess_row_requested(row_index_list):
+    def _redo_row_requested(self): 
+        def redo_row_requested(row_index_list):
             if row_index_list is None:
                 raise PreventUpdate        
             return (True,)  
-        return reprocess_row_requested 
+        return redo_row_requested 
 
-    def _reprocess_row_confirmed(self): 
-        def reprocess_row_confirmed(confirm_button, cancel_button, mode, row_index_list, store):
+    def _redo_row_confirmed(self): 
+        def redo_row_confirmed(confirm_button, cancel_button, mode, row_index_list, store):
             button_id = ctx.triggered_id if not None else 'No clicks yet'
-            if button_id.endswith('confirm_reprocess_button'):
+            if button_id.endswith('confirm_redo_button'):
                 for row_index in row_index_list:
-                    id = self._model.iloc[row_index]['id']
-                    DETECT_DAO.update_tile_sample_status(id, StatusNames.PENDING.value)
+                    tile_sample_id = self._model.iloc[row_index]['id']
+                    DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.PENDING.value)
+                    DETECT_DAO.clear_tile_sample_data(tile_sample_id)
                     # remove the cache files
                     if mode == '_whole':
-                        DetectionTaskModel.delete_cache_files(id, delete_reco=True, delete_object_detection=True)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
                     elif mode == '_redo_detect':
-                        DetectionTaskModel.delete_cache_files(id, delete_reco=True, delete_object_detection=False)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=False)
                     elif mode == '_redo_analysis':
                         ...
+                        
                 message = f'The tile sample(s) {row_index_list} moved to the pending queue'
                 return (True, message, False, store)
             return (False, ' ', False, store) 
-        return reprocess_row_confirmed 
+        return redo_row_confirmed 
 
     def _priority_row_confirmed(self): 
         def priority_row_confirmed(row_index_list):

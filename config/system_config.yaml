@@ -18,6 +18,7 @@ cgras_detector:
   task_params_filename: params.yaml
   reco_model_filename: reco_model.yaml
   loctile_model_filename: loctile_model.yaml
+  reco_working_scale: 0.1
   reco_debug_images_at_original_scale: False
   reco_debug_feature_matching_images: True
   reco_feature_detector: sift

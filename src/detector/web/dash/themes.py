@@ -3,4 +3,4 @@
 # )
 
 # BOOTSTRAP = "../../scripts/bootstrap.min.css"
-BOOTSTRAP = "detector/system/scripts/bootstrap.min.css"
+BOOTSTRAP = ('detector/system/scripts/bootstrap.min.css')

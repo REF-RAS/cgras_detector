@@ -54,7 +54,7 @@ class CoralObjectDetectModel():
         # other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
-            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE} is missing')
+            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE.value} is missing')
         self.blob_overlap_pix = kwargs.get(ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value, 0)
         self.duplicate_max_displacement = kwargs.get(ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES.value, 10)
         # other keyword parameters - output cached data and debug information
@@ -68,8 +68,11 @@ class CoralObjectDetectModel():
         # model parameters: abort
         self.to_abort = False
         # step 1: iterate through each image in the 2d list of images
+   
         for row_index, row_1d_image_list in enumerate(images_2d_list):
             for col_index, image in enumerate(row_1d_image_list):
+                if hasattr(self, 'progress_cb') and self.progress_cb is not None:
+                    self.progress_cb((self.count_images_completed, self.num_images))
                 time.sleep(0.1)
                 if self.to_abort:
                     return   
@@ -79,9 +82,7 @@ class CoralObjectDetectModel():
                 if self.object_class_names is None:
                     self.object_class_names = cod_model.get_object_class_names() 
                 self.count_images_completed += 1 
-                if hasattr(self, 'progress_cb') and self.progress_cb is not None:
-                    self.progress_cb((self.count_images_completed, self.num_images))
-                                
+
         # step 2: resolve duplicate objects in the overlapping regions between images
         logger.info(f'DUPLICATE REMOVAL between images in the tile') 
         self.num_invalidated_objects = self._invalidate_duplicate_objects(self.object_list_of_images, self.image_grid_size, self.duplicate_max_displacement)
@@ -274,7 +275,7 @@ class CoralObjectDetectImageModel():
         # other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
-            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE} is missing')
+            raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE.value} is missing')
         # the object categories as defined by the yolo model
         self.coral_classes = kwargs.get(ModelsConfigNames.OBJECT_CLASSES_CORAL.value, [])
         self.dead_coral_classes = kwargs.get(ModelsConfigNames.OBJECT_CLASSES_DEAD_CORAL.value, [])

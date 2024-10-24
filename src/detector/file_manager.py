@@ -82,7 +82,7 @@ class ApplicationFileManager():
             os.makedirs(parent_folder, exist_ok=True)
         return parent_folder
 
-    # --- copy the images in the images folder to /assets/system
+    # --- copy the images in the images folder to the system folder of detector
     def populate_system_assets_folder(self):
         try:
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system')

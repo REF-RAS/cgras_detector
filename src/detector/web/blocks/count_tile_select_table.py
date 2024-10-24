@@ -20,7 +20,7 @@ from detector.model import DETECT_DAO
 from tools.logging_tools import logger
 
 class CountTileSelectTable():
-    def __init__(self, app, prefix, page_size=8):
+    def __init__(self, app, prefix, page_size=25):
         self.app = app 
         self.prefix = prefix = prefix + 'atb_'
         self.row_selected_trigger_id = self.prefix + 'row_selected_store'

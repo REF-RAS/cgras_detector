@@ -26,7 +26,8 @@ from tools.logging_tools import logger
 import tools.hash_tools as hash_tools
 import detector.model as model
 from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER
-from detector.web.dash import themes
+# from detector.web.dash import themes
+from dash_bootstrap_components import themes
 
 SERVER = Flask(__name__)
 APP = dash.Dash(__name__, 
@@ -34,8 +35,13 @@ APP = dash.Dash(__name__,
                 server=SERVER,
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}],
                 suppress_callback_exceptions=True,
-                assets_ignore='foundation-renamed.min.css',
-                assets_folder=APP_FILE_MANAGER.get_cgras_home())
+                include_assets_files=True,
+                # assets_ignore='foundation-renamed.min.css|jquery.nanogallery2.min.js|nanogallery2.min.css',
+                # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js',
+                # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js|bootstrap.min.css',  # this combination stops the annoying refreshing of the UI when online
+                assets_ignore='*.css|*.js',
+                assets_folder=APP_FILE_MANAGER.get_cgras_home()
+                )
 
 APP.config['suppress_callback_exceptions'] = True
 

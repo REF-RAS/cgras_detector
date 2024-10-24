@@ -115,11 +115,11 @@ class DetectionTaskModel():
             self.params = params
         else:
             self.params = CONFIG.to_params([SystemConfigNames, ModelsConfigNames])
-        self.logdata_folder = self.params[ModelsConfigNames.LOGDATA_FOLDER] = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, self.season, self.tile_sample_id)
-        self.params[ModelsConfigNames.YOLO_MODEL_FILE] = self.yolo_model_dict['model_file_path']
-        self.params[ModelsConfigNames.COD_BLOB_SIZE] = (self.yolo_model_dict['input_image_width'], self.yolo_model_dict['input_image_height'], )
-        self.params[ModelsConfigNames.OBJECT_CLASSES_CORAL] = self.yolo_model_dict['coral_classes']
-        self.params[ModelsConfigNames.OBJECT_CLASSES_DEAD_CORAL] = self.yolo_model_dict['dead_coral_classes']
+        self.logdata_folder = self.params[ModelsConfigNames.LOGDATA_FOLDER.value] = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, self.season, self.tile_sample_id)
+        self.params[ModelsConfigNames.YOLO_MODEL_FILE.value] = self.yolo_model_dict['model_file_path']
+        self.params[ModelsConfigNames.COD_BLOB_SIZE.value] = (self.yolo_model_dict['input_image_width'], self.yolo_model_dict['input_image_height'], )
+        self.params[ModelsConfigNames.OBJECT_CLASSES_CORAL.value] = self.yolo_model_dict['coral_classes']
+        self.params[ModelsConfigNames.OBJECT_CLASSES_DEAD_CORAL.value] = self.yolo_model_dict['dead_coral_classes']
         # add other tile info to the params for metadata yaml file output
         self.params['tile_sample_id'] = self.tile_sample_id
         self.params['tile_id'] = self.tile_id
@@ -130,7 +130,7 @@ class DetectionTaskModel():
         self.params['species'] = self.species
         self.params['coral_age_in_days'] = self.days_since_settle
         # write the params to the log folder
-        task_params_metadata_filename = self.params.get(ModelsConfigNames.TASK_PARAMS_FILENAME, '_params.yaml')
+        task_params_metadata_filename = self.params.get(ModelsConfigNames.TASK_PARAMS_FILENAME.value, '_params.yaml')
         try:
             param_yaml_file = os.path.join(self.logdata_folder, task_params_metadata_filename)
             with open(param_yaml_file, 'w') as outfile:
@@ -224,15 +224,15 @@ class DetectionTaskModel():
         except:
             logger.info(f'{type(self).__name__}: No cached file. Building the CoralObjectDetectModel from capture images, reco model, loctile model, and yolo model')
             # load the yolo_model first
-            yolo_model_file=self.params.get('yolo_model_file')
+            yolo_model_file=self.params.get(ModelsConfigNames.YOLO_MODEL_FILE.value)
             if self.to_abort:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
                 return
             try:
-                yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file)
                 logger.info(f'{type(self).__name__}: Attempting to load the yolo_model_file at {yolo_model_file}')
-            except:
-                logger.info(f'{type(self).__name__}: Failed. Unable to load the yolo model file')
+                yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file)
+            except Exception as e:
+                logger.info(f'{type(self).__name__}: Failed to load the yolo model file: {e}')
                 raise AssertionError(f'The yolo model file is invalid or not present')
             # build the cod model
             if self.to_abort:
@@ -319,11 +319,11 @@ class DetectionTaskModel():
         logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
         with contextlib.suppress(FileNotFoundError, Exception):
             if delete_reco:
-                os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.RECO_MODEL_FILENAME, 'reco_model.yaml')))
-                os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.LOCTILE_MODEL_FILENAME, 'loctile_model.yaml')))
+                os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.RECO_MODEL_FILENAME.value, 'reco_model.yaml')))
+                os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.LOCTILE_MODEL_FILENAME.value, 'loctile_model.yaml')))
             
             if delete_object_detection:            
-                os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.COD_MODEL_FILENAME, 'coral_object_detect_model.yaml')))
+                os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.COD_MODEL_FILENAME.value, 'coral_object_detect_model.yaml')))
                 for file in glob.glob(os.path.join(logdata_folder, 'object_list_*.yaml')):
                     os.remove(file) 
 
@@ -338,6 +338,7 @@ def get_basic_detection_params() -> dict:
         'reco_debug_feature_matching_images': True,
         'reco_feature_detector': 'sift',
         'reco_matching_confidence_threshold': 0.4,
+        'reco_working_scale': 0.1,
         'cod_model_filename': 'coral_object_detect_model.yaml', 
         'cod_debug_blob_images': True,
         'cod_blob_overlap_pix': 32,
@@ -354,7 +355,8 @@ def get_basic_detection_params() -> dict:
 
 
 if __name__ == '__main__':
-    tile_sample_id = '2023Dec-P00003-CG1-202311201200'
+    # tile_sample_id = '2023Dec-P00003-CG1-202311201200'
+    tile_sample_id = '2023Dec-P10001-CG1-202402161404'
     dt_model = DetectionTaskModel(tile_sample_id, get_basic_detection_params())
     dt_model.execute_task()
     
