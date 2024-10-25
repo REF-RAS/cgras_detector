@@ -14,10 +14,10 @@ from dash import html, dcc, Input, Output
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import STATE, SystemStates
 
-from detector.web.blocks import MonitorTaskControlBlock, MonitorStateBlock, MonitorExecuteProgressBlock, MonitorRecentTaskTableBlock, MonitorTaskStatBlock
+from detector.web.blocks import MonitorTaskControlBlock, MonitorStateBlock, MonitorExecuteProgressBlock, MonitorRecentTaskTableBlock, MonitorErrorTableBlock, MonitorTaskStatBlock
 
 dash.register_page(__name__)
 
@@ -37,6 +37,7 @@ class DashboardPage():
         self.monitor_execute_progress_panel = MonitorExecuteProgressBlock(app, prefix)
         self.monitor_recent_task_table_panel = MonitorRecentTaskTableBlock(app, prefix) 
         self.monitor_task_stat_panel = MonitorTaskStatBlock(app, prefix)
+        self.monitor_error_table_panel = MonitorErrorTableBlock(app, prefix)
         # define the page
         self._define_page()
     
@@ -50,6 +51,7 @@ class DashboardPage():
         self.monitor_execute_progress_panel.register_trigger(self.update_store_id)      
         self.monitor_recent_task_table_panel.register_trigger(self.update_store_id)
         self.monitor_task_stat_panel.register_trigger(self.update_store_id)
+        self.monitor_error_table_panel.register_trigger(self.update_store_id)
         
         # putting the GUI components together 
         self._panel = html.Div(id='scan-body',children = [
@@ -63,8 +65,9 @@ class DashboardPage():
                 dbc.Col(self.monitor_execute_progress_panel.get_panel(), className='col-12 border'),
                 ], className='mx-auto col-12 mt-3'), 
             dbc.Row([
-                dbc.Col(self.monitor_recent_task_table_panel.get_panel(), className='col-9 border'),
-                dbc.Col(self.monitor_task_stat_panel.get_panel(), className='col-3 border'),
+                dbc.Col(self.monitor_recent_task_table_panel.get_panel(), className='col-7 border'),
+                dbc.Col(self.monitor_error_table_panel.get_panel(), className='col-3 border'),
+                dbc.Col(self.monitor_task_stat_panel.get_panel(), className='col-2 border'),
                 ], className='mx-auto col-12 mt-3'),           
         ])
         self._layout = dbc.Container(self._panel, fluid=True)

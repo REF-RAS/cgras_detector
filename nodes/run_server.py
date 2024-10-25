@@ -15,7 +15,7 @@ __status__ = 'Development'
 import rospy
 # project modules: web and generic
 
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import CONFIG, SystemConfigNames
 from detector.run import ApplicationCoordinator
 

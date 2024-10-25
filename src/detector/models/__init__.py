@@ -12,11 +12,11 @@ __status__ = 'Development'
 import os, math, random, re
 from datetime import datetime
 from enum import Enum
-from tools.logging_tools import init_logger
+from tools.logging_tools import get_logger
 from .models_config import ModelsConfigNames
 
 class Constants(Enum):
     SCALE_ORIGINAL = 0
     SCALE_WORKING = 1
 
-logger = init_logger()
+logger = get_logger()

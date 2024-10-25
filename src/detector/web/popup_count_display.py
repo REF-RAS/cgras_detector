@@ -15,7 +15,7 @@ from dash import html, dcc, callback, Input, Output, State, clientside_callback
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.web.blocks import CoralCountTileInfoBlock, CountTileTrendBlock, CountHeatmapBlock, CountScatterMapBlock
 
 dash.register_page(__name__)

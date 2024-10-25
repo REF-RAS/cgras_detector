@@ -15,7 +15,7 @@ from enum import Enum
 # project modules
 import detector.model_base as model_base
 from detector.system_config import SystemConfig, SystemConfigNames
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 import catkin_pkg.package
 
 from detector.database_manager import DBFileManager

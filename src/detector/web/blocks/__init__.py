@@ -23,6 +23,7 @@ from .monitor_task_control import MonitorTaskControlBlock
 from .monitor_state import MonitorStateBlock
 from .monitor_execute_progress import MonitorExecuteProgressBlock
 from .monitor_recent_task_table import MonitorRecentTaskTableBlock
+from .monitor_error_table import MonitorErrorTableBlock
 from .monitor_task_stat import MonitorTaskStatBlock
 from .health_view_table import HealthViewTable
 from .health_model_import import HealthModelFileImportBlock

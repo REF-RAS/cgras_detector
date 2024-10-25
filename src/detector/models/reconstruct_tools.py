@@ -13,6 +13,7 @@ import os, math, random, re
 import numpy as np
 import cv2
 from collections import defaultdict
+from .detector_error import DetectorError, DetectorErrorCodes
 
 class ImageMap():
     """ Model a 2D list of images as an ImageMap object that facilitates downscaling for reducing the processing time 
@@ -45,12 +46,14 @@ class ImageMap():
             for col_index, image_obj in enumerate(image_row):
                 # if image_obj is a file path, read in the image
                 if type(image_obj) == str:
+                    if not os.path.isfile(image_obj):
+                        raise DetectorError(DetectorErrorCodes.IMAGE_FILE_NOT_FOUND, f'No file is not found at {image_obj}')
                     try:
                         image_obj = cv2.imread(image_obj)
                     except Warning as e:
-                        raise IOError(f'OpenCV failed to open an image path specified in the parameter image_map: {image_obj}') 
+                        raise DetectorError(DetectorErrorCodes.FILE_NOT_IMAGE, f'The file at {image_obj} is not a valid image', e)
                     except Exception as e:
-                        raise
+                        raise DetectorError(DetectorErrorCodes.FILE_NOT_IMAGE, f'The file at {image_obj} is not a valid image', e)
                 # test if image_obj is a numpy image
                 if type(image_obj) is not np.ndarray:
                     raise AssertionError(f'One of the image objects in the parameter image_map is neither an image path nor a numpy array')
@@ -59,7 +62,8 @@ class ImageMap():
                     self.image_size_full = image_obj.shape[:2][::-1]
                 else:
                     if self.image_size_full[0] != image_obj.shape[1] or self.image_size_full[1] != image_obj.shape[0]:
-                        raise AssertionError(f'An image object (row {row_index} col {col_index}) has a different size from the first image object in the parameter image_map')
+                        raise DetectorError(DetectorErrorCodes.IMAGE_FILES_NOT_SAME_SIZE, 
+                                            f'An image object (row {row_index} col {col_index}) has a different size from the first image object in the parameter image_map',)
                 # resize the image to the work_scale
                 self.image_size_scale = (int(self.image_size_full[0] * self.working_scale), int(self.image_size_full[1] * self.working_scale))
                 image_scaled = cv2.resize(image_obj, self.image_size_scale)

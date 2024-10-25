@@ -15,7 +15,7 @@ from dash import html
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.web.blocks import ResetDBBlock, DiskspaceBlock, FileSpaceSaver, TileInfoImportFileBlock, TileStatBlock, SpawningSeasonChangeBlock, ResetStatDBTableBlock
 
 dash.register_page(__name__)

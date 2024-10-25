@@ -20,7 +20,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 import tools.file_tools as file_tools
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import APP_FILE_MANAGER, AIMSTILE_DAO
 
 
@@ -149,7 +149,7 @@ class TileInfoImportFileBlock():
             else:
                 error_list.append(f'The suffix of {filename} is not xls or xlsx')
         except Exception as e:
-            logger.error(f'Error: {traceback.format_exc()}')
+            global_logger.error(f'Error: {traceback.format_exc()}')
             error_list.append(f'error in reading excel file or worksheet: {e}')
         return error_list
     

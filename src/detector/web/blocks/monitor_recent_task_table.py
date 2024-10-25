@@ -24,7 +24,6 @@ class MonitorRecentTaskTableBlock():
         self.prefix = prefix = prefix + 'mlttb_'
         self.num_rows = page_size
         # --- define widgets
-
         self._columns = [{'name': 'Task Type', 'id': 'task_type', 'type': 'text', 'editable': False},
                          {'name': 'Task Object', 'id': 'task_object', 'type': 'text', 'editable': False},
                          {'name': 'Started', 'id': 'start_time', 'type': 'datetime', 'editable': False},
@@ -36,7 +35,7 @@ class MonitorRecentTaskTableBlock():
         _the_datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_cell={'fontSize': 14})
         
         self._the_panel = dbc.Col([
-                html.H4(dbc.Badge('STATUS OF RECENT TASKS', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('STATUS OF RECENT EXECUTION OF TASKS', className='ms-1 me-2', color='white', text_color='secondary')),
                 dbc.Row([_the_datatable], className='mx-auto col-12'),
             ], className='mx-auto text-center')
         
@@ -56,7 +55,7 @@ class MonitorRecentTaskTableBlock():
         model['status'] = model['status'].apply(lambda x: StatusNames(x).name) 
         return model
         
-    # callback for the tile stat table
+    # callback for the table
     def _update_table(self):
         def update_tile_stat_table(store):
             model = self._update_model()

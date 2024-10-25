@@ -15,7 +15,7 @@ from dash import html, dcc, callback, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import DETECT_DAO
 
 class HealthModelFileImportBlock():

@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, yaml, contextlib, glob, time
+import os, math, yaml, contextlib, glob, time, shutil
 from enum import Enum
 from collections import defaultdict, OrderedDict
 import datetime
@@ -326,6 +326,13 @@ class DetectionTaskModel():
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.COD_MODEL_FILENAME.value, 'coral_object_detect_model.yaml')))
                 for file in glob.glob(os.path.join(logdata_folder, 'object_list_*.yaml')):
                     os.remove(file) 
+                    
+    @staticmethod
+    def delete_cache_folder(tile_sample_id:str):
+        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
+        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
+        with contextlib.suppress(FileNotFoundError, Exception):
+            shutil.rmtree(logdata_folder, ignore_errors=True)        
 
 # ---------------------------------------
 # test functions

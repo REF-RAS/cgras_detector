@@ -18,7 +18,7 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import DETECT_DAO, ObjectClassCategories
 
 
@@ -51,19 +51,20 @@ class CountScatterMapBlock():
                 ], className='mx-auto col-12'),            
             ], className='text-center')
         
+        self.app.callback([Output(self.prefix+f'chart_panel', 'children', allow_duplicate=True)],
+                        [Input(self.prefix+'sample_select_datatable', 'active_cell')], prevent_initial_call=True)(self._update_chart_panel())     
+        
             
     def register_trigger(self, trigger_id:str):
         # build the output list
         output_list = [Output(self.prefix+f'top_panel', 'style', allow_duplicate=True),  
-                    Output(self.prefix+'sample_select_datatable', 'data', allow_duplicate=True),
-                    Output(self.prefix+f'chart_panel', 'children', allow_duplicate=True),      
-                    ]
-        input_list = [Input(trigger_id, 'data'),
-                    Input(self.prefix+'sample_select_datatable', 'active_cell')
-                    ]
+                        Output(self.prefix+'sample_select_datatable', 'data', allow_duplicate=True),
+                        Output(self.prefix+'sample_select_datatable', 'active_cell', allow_duplicate=True),
+                        Output(self.prefix+'sample_select_datatable', 'selected_cells', allow_duplicate=True),]
+        input_list = [Input(trigger_id, 'data') ]
         # define callbacks for the datatable data
-        self.app.callback(output_list, input_list, prevent_initial_call=True, allow_duplicate=True)(self._update_chart_panel())
-            
+        self.app.callback(output_list, input_list, prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
+        
         
     def get_panel(self):
         return self._panel
@@ -99,9 +100,8 @@ class CountScatterMapBlock():
         graph = dcc.Graph(figure=fig, config=self.default_config, style={'visibility': 'visible'})
         return graph, fig
     
-    # callback for the latest chart
-    def _update_chart_panel(self):
-        def update_chart_panel(tile_id, active_cell):
+    def _update_panel(self):
+        def update_panel(tile_id):
             if tile_id is None:
                 raise PreventUpdate
             # the update is due to a new tile_id selected
@@ -109,11 +109,17 @@ class CountScatterMapBlock():
                 self.current_tile_id = tile_id
                 # update the coral_trend_model
                 self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
-                active_cell = None
                 self.latest_graph = None
-
-            compare_to_index = compare_graph = None
-            # update the latest figure
+                
+            if len(self.coral_trend_model) > 0:
+                return [{}, self.output_model.to_dict('records'), None, []]   
+            else:
+                return [{'visibility': 'hidden'}, self.output_model.to_dict('records'), None, []]                 
+        return update_panel
+    
+    def _update_chart_panel(self):
+        def update_chart_panel(active_cell):
+            compare_graph = None
             if len(self.coral_trend_model) > 0:
                 if self.latest_graph is None:
                     latest_index = len(self.coral_trend_model) - 1
@@ -127,11 +133,12 @@ class CountScatterMapBlock():
                     title = f'Objects on the tile on {the_sample["batch_time"]}'
                     compare_graph, fig = self._generate_scatter_plot(the_sample['tile_sample_id'], title)
                     self.figures_list.append(fig)
+                    
                 chart_panel = dbc.Row([
                     dbc.Col(self.latest_graph, className='col-6'),
                     dbc.Col(compare_graph, className='col-6'),
                 ])
-                return [{}, self.output_model.to_dict('records'), chart_panel, ]   
+                return [chart_panel]   
             else:
-                return [{'visibility': 'hidden'}, self.output_model.to_dict('records'), None, ]
+                return [None]              
         return update_chart_panel

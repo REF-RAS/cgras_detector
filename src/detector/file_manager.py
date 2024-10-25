@@ -14,10 +14,12 @@ import os, sys, threading, collections, time, shutil, traceback
 from enum import Enum
 from datetime import datetime
 # project modules
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 
 class ApplicationFileManager():
     SYSTEM_FOLDER = 'system'
+    SYSTEM_SCRIPTS_FOLDER = 'system/scripts'
+    SYSTEM_IMAGES_FOLDER = 'system/images'
     DATA_FOLDER = 'data'
     TEMP_FOLDER = 'temp'
     
@@ -85,15 +87,19 @@ class ApplicationFileManager():
     # --- copy the images in the images folder to the system folder of detector
     def populate_system_assets_folder(self):
         try:
-            source_path = os.path.join(os.path.dirname(__file__), 'web/_system')
             system_folder_path = self.get_detector_folder(self.SYSTEM_FOLDER)
-            logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
-            shutil.rmtree(system_folder_path, ignore_errors=True)
-            shutil.copytree(source_path, system_folder_path, dirs_exist_ok=True)
+            shutil.rmtree(self.get_detector_folder(self.SYSTEM_SCRIPTS_FOLDER), ignore_errors=True)
+            shutil.rmtree(self.get_detector_folder(self.SYSTEM_IMAGES_FOLDER), ignore_errors=True)
+            source_path = os.path.join(os.path.dirname(__file__), 'web/_system/scripts')
+            global_logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_SCRIPTS_FOLDER), dirs_exist_ok=True)
+            source_path = os.path.join(os.path.dirname(__file__), 'web/_system/images')
+            global_logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_IMAGES_FOLDER), dirs_exist_ok=True)            
             # self.generate_pattern_images()
             return True
         except Exception as e:
-            logger.warning(f'ApplicationFileManager.populate_system_assets_folder: {traceback.format_exc()}')
+            global_logger.warning(f'ApplicationFileManager.populate_system_assets_folder: {traceback.format_exc()}')
             return False
 
 

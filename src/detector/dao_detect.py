@@ -19,7 +19,7 @@ from datetime import datetime as dt
 import tools.db_tools as db_tools
 import tools.file_tools as file_tools
 from tools.lock_tools import synchronized
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.database_manager import DBFileManager
 
 # NOTE: The batch_time is an ISO 8601 date time string format '2025-05-29 14:16:00' and the batch_id is derived from the time and cgras_station_id or the importer_id
@@ -159,6 +159,16 @@ DETECT_DDL = {
             FOREIGN KEY (tile_sample_id) REFERENCES tile_sample (id) ON DELETE CASCADE
     );
     """, 
+    
+    'error_flag':
+    """
+    CREATE TABLE IF NOT EXISTS error_flag (
+        id integer PRIMARY KEY,
+        level integer DEFAULT 0,
+        update_time text,
+        remarks text
+    );
+    """,    
 }
 
 # the constants defined for storing task types in the task_record table
@@ -466,8 +476,12 @@ class DetectorDAO():
             max_x, max_y = max(max_x, x), max(max_y, y)
             filepath = yaml_images.get('file', None)
             if x is None or y is None or filepath is None:
-               error_list.append(f'An image entry must include these fields (x, y, file) and one of them is missing at entry {index}') 
-            images_dict[(x, y)] = filepath
+                error_list.append(f'An image entry must include these fields (x, y, file) and one of them is missing at entry {index}') 
+            else:
+                if not os.path.isfile(filepath):
+                    error_list.append(f'The file path given for image at ({x},{y}) does not exist: {filepath}')
+                else: 
+                    images_dict[(x, y)] = filepath
         # adding the images_dict to the yaml data
         # yaml_data['images_dict'] = images_dict
         # validate the images list
@@ -524,7 +538,7 @@ class DetectorDAO():
                 self.add_source_image(capture_id, tile_sample_id, x, y, filepath)
             return True
         except Exception as e:
-            logger.warning(e)
+            global_logger.warning(e)
             return False
         
     # - composite operation: obtain sample info for a tile id
@@ -717,10 +731,10 @@ class DetectorDAO():
                 if self.add_yolo_model(name, model_file_path, species, valid_start_day, valid_end_day, input_image_width, input_image_height, 
                                        coral_classes, dead_coral_classes, remarks) > 0:
                     return True
-            logger.warning(f'Failed to add yolo model to the database')
+            global_logger.warning(f'Failed to add yolo model to the database')
             return False
         except Exception as e:
-            logger.warning(e)
+            global_logger.warning(e)
             return False
         
     # - table: detected_objet
@@ -914,7 +928,7 @@ class DetectorDAO():
                 conn.commit()
                 return True
         except Exception as e:
-            logger.warning(f'Failed to add health model to the database')
+            global_logger.warning(f'Failed to add health model to the database')
             return False
 
     # - table: source_image
@@ -963,8 +977,28 @@ class DetectorDAO():
         if mean_duration is not None:
             model.loc[row_index] = ['DETECT_CORALS Mean Time', f'{mean_duration:.1f} s']
             row_index += 1
-        
         return model
+    
+    # - table: error flag
+    @synchronized
+    def set_error_flag(self, id:int, remarks:str, level:int=0) -> int:
+        sql = 'REPLACE INTO error_flag(id, update_time, remarks, level) VALUES (?, DATETIME("now"), ?, ?)'
+        return db_tools.update(self.db_file, sql, (id, remarks, level,))    
+
+    @synchronized
+    def list_error_flags(self) -> int:
+        sql = 'SELECT * FROM error_flag ORDER BY update_time DESC'
+        return db_tools.query(self.db_file, sql)
+    
+    @synchronized
+    def unset_error_flag(self, id:int) -> int:
+        sql = 'DELETE FROM error_flag WHERE id = ?'
+        return db_tools.update(self.db_file, sql, (id,))       
+
+    @synchronized
+    def clear_error_flags(self) -> int:
+        sql = 'DELETE FROM error_flag'
+        return db_tools.update(self.db_file, sql)  
 
 # ------------------------------------------------
 def manage_tables():
@@ -972,10 +1006,10 @@ def manage_tables():
     DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
     DETECT_DBFM = DBFileManager(DATABASE_FOLDER, 'detector.db', DETECT_DDL)
     DETECT_DAO = DetectorDAO(DETECT_DBFM.db_file)
-    DETECT_DBFM.drop_tables(['task'])
+    # DETECT_DBFM.drop_tables([''])
     tables_name = DETECT_DBFM.list_tables_name()
-    logger.info(f'tables: {tables_name}')
-    DETECT_DBFM.create_tables(['task_record'])
+    global_logger.info(f'tables: {tables_name}')
+    DETECT_DBFM.create_tables(['error_flag'])
     DETECT_DBFM.dump_all_tables()       
 
 # The main program for testing the clearing

@@ -29,9 +29,7 @@ from stitching.seam_finder import SeamFinder
 from stitching.blender import Blender
 
 from detector.models.reconstruct_tools import ImageMap, CameraTransformTools, test_get_cgras_sample_images_as_list
-from detector.models import Constants, logger, ModelsConfigNames
-
-logger.setLevel(logging.INFO)
+from detector.models import Constants, ModelsConfigNames, get_logger
 
 class ImageReconstructModel():
     """ ImageReconstructModel is the wrapper class of the other image reconstruction classes in this module, that provides functions for mapping locations from the space of an individual input image to the 
@@ -45,6 +43,8 @@ class ImageReconstructModel():
         :param images_2d_list: A list of lists of images, each of which can be image paths (str typed) or image pixels (np.ndarray), arranged in a 2D grid
         :type images_2d_list: list
         """
+        # obtain the logger
+        self.logger = kwargs.get('logger', get_logger())
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
             return
@@ -119,30 +119,30 @@ class ImageReconstructModel():
         for point in points:
             # the point is scaled to that was used to compute the camera transform
             if not use_working_scale:
-                logger.debug(f'map location {point} of image {col_index, row_index} at original scale (multiply location by {self.scaling_factor})')
+                self.logger.debug(f'map location {point} of image {col_index, row_index} at original scale (multiply location by {self.scaling_factor})')
                 sx, sy = point[0] * self.working_scale, point[1] * self.working_scale
             else:
-                logger.debug(f'map location {point} at working scale {self.working_scale}')
+                self.logger.debug(f'map location {point} at working scale {self.working_scale}')
             # compute step-by-step for the mapping
             # 1. map the point to (ax2, ay2) which is the location in the row constructed image for row_index using the row reco image wrapper and the output (ax, ay) offseted to find (ax2, ay2).                
             # 2. map (ax2, ay2) to (bx, by) which is the location in the counter-clockwise rotated row reconstructed image
             # 3. map (bx, by) to (cx2, cy2) which is the location in the whole constructed image using the whole image warper and the output (cx, cy) offseted to find (cx2, cy2).
             # 4. map (cx2, cy2) to (dx, dy) which is the location in the clockwise rotated whole reconstructed image  
             ax, ay = self.warper[row_index].warpPoint((sx, sy,), K, camera_transform.R)
-            logger.debug(f'ax, ay = {ax, ay}')
+            self.logger.debug(f'ax, ay = {ax, ay}')
             ax2, ay2 = ax - row_reco_image_origin_offset[0], ay - row_reco_image_origin_offset[1]
-            logger.debug(f'offseted ax, ay = {ax2, ay2} based on {row_reco_image_origin_offset}')
+            self.logger.debug(f'offseted ax, ay = {ax2, ay2} based on {row_reco_image_origin_offset}')
             reco_image_size = self.row_reco_image_sizes[row_index]
             bx, by = ay2, reco_image_size[0] - ax2
-            logger.debug(f'rotated ax, ay = {bx, by}')
+            self.logger.debug(f'rotated ax, ay = {bx, by}')
             camera_transform_between_row = self.camera_transforms_between_rows[row_index]
             K2 = camera_transform_between_row.K().astype(np.float32)
             cx, cy = self.warper_between_rows.warpPoint((bx, by,), K2, camera_transform_between_row.R)
-            logger.debug(f'cx, cy = {cx, cy}')
+            self.logger.debug(f'cx, cy = {cx, cy}')
             cx2, cy2 = cx - self.whole_reco_image_origin_offset[0], cy - self.whole_reco_image_origin_offset[1]
-            logger.debug(f'offseted cx, cy = {cx2, cy2} based on {self.whole_reco_image_origin_offset}')                                
+            self.logger.debug(f'offseted cx, cy = {cx2, cy2} based on {self.whole_reco_image_origin_offset}')                                
             dx, dy = self.whole_reco_image_size[0] - cy2, cx2
-            logger.debug(f'rotated cx, cy = {dx, dy}')  
+            self.logger.debug(f'rotated cx, cy = {dx, dy}')  
             # 5. adjust the reference frame of the location based on the origin_point if available 
             # if hasattr(self, 'tile_origin') and self.tile_origin is not None:
             #     dx, dy = (dx - self.origin_point[0], dy - self.origin_point[1],)
@@ -169,7 +169,7 @@ class ImageReconstructModel():
         """
         camera_transform = self.camera_transforms_row_list[row_index][col_index]
         if print:
-            logger.info(f'Camera matrices for image index {col_index, row_index}:')
+            self.logger.info(f'Camera matrices for image index {col_index, row_index}:')
             self.print_camera_transform(camera_transform)
         return camera_transform
     
@@ -185,7 +185,7 @@ class ImageReconstructModel():
         """
         camera_transform = self.camera_transforms_between_rows[row_index]
         if print:
-            logger.info(f'Camera matrices for row index {row_index}:')
+            self.logger.info(f'Camera matrices for row index {row_index}:')
             self.print_camera_transform(camera_transform)
         return camera_transform
     
@@ -229,43 +229,47 @@ class ImageReconstructModel():
         """
         return (self.whole_reco_image_size[0] * self.scaling_factor, self.whole_reco_image_size[1] * self.scaling_factor,)
     
-    @staticmethod
-    def print_camera_transform(camera_transform:cv2.detail.CameraParams):
-        """ Displays the camera transform parameters to the screen
-
-        :param camera_transform: The camera parameters to be displayed
-        :type camera_transform: cv2.detail.CameraParams
-        """
-        np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-        logger.info(f'K: {camera_transform.K().reshape(1, -1)}')
-        logger.info(f'R: {camera_transform.R.reshape(1, -1)}')
-        logger.info(f"T: {camera_transform.t.tolist()}") 
-        logger.info(f'Aspect: {camera_transform.aspect} Focal: {camera_transform.focal} PPX and PPY: {camera_transform.ppx, camera_transform.ppy}')
-        np.set_printoptions()
-    
     def print_info(self):
         """ Displays the information of this ImageReconstructModel
         """
-        logger.info(f'Image Grid Col x Row: {self.ncols, self.nrows}')
-        logger.info(f'Whole reco image size: {self.whole_reco_image_size}')
-        logger.info(f'Whole reco image origin offset: {self.whole_reco_image_origin_offset}')
-        logger.info(f'Rows Camera Matrices')
+        self.logger.info(f'Image Grid Col x Row: {self.ncols, self.nrows}')
+        self.logger.info(f'Whole reco image size: {self.whole_reco_image_size}')
+        self.logger.info(f'Whole reco image origin offset: {self.whole_reco_image_origin_offset}')
+        self.logger.info(f'Rows Camera Matrices')
         for row_index in range(self.nrows):
             for col_index in range(self.ncols):
-                logger.info(f'Index {col_index, row_index}')
-                self.print_camera_transform(self.camera_transforms_row_list[row_index][col_index])
-        logger.info(f'Between Rows Camera Matrices')
+                self.logger.info(f'Index {col_index, row_index}')
+                ImageReconstructModelHelper.print_camera_transform(self.camera_transforms_row_list[row_index][col_index])
+        self.logger.info(f'Between Rows Camera Matrices')
         for row_index in range(self.nrows):
-            logger.info(f'Index {row_index}')
-            logger.info(f'Reco image size: {self.row_reco_image_sizes[row_index]}')
-            logger.info(f'Reco image origin offset: {self.row_reco_image_origin_offsets_list[row_index]}')
-            self.print_camera_transform(self.camera_transforms_between_rows[row_index])           
+            self.logger.info(f'Index {row_index}')
+            self.logger.info(f'Reco image size: {self.row_reco_image_sizes[row_index]}')
+            self.logger.info(f'Reco image origin offset: {self.row_reco_image_origin_offsets_list[row_index]}')
+            ImageReconstructModelHelper.print_camera_transform(self.camera_transforms_between_rows[row_index])           
                 
 
 class ImageReconstructModelHelper():
     """ ImageReconstructModelHelper provides helper functions for caching ImageReconstructModel to the file system and retrieve the object
 
     """
+
+    @staticmethod
+    def print_camera_transform(camera_transform:cv2.detail.CameraParams, header='', logger=None):
+        """ Displays the camera transform parameters to the screen
+
+        :param camera_transform: The camera parameters to be displayed
+        :type camera_transform: cv2.detail.CameraParams
+        """
+        logger = get_logger() if logger is None else logger
+        np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+        if header:
+            logger.info(f'{header}')
+        logger.info(f'K: {camera_transform.K().reshape(1, -1)}')
+        logger.info(f'R: {camera_transform.R.reshape(1, -1)}')
+        logger.info(f"T: {camera_transform.t.tolist()}") 
+        logger.info(f'Aspect: {camera_transform.aspect} Focal: {camera_transform.focal} PPX and PPY: {camera_transform.ppx, camera_transform.ppy}')
+        np.set_printoptions()    
+
     @staticmethod            
     def to_yaml(reco_model:ImageReconstructModel, object_file:str = None) -> str:
         """ Save an object of ImageReconstructModel to a yaml file
@@ -413,6 +417,7 @@ class ImageReconstruct2DModel():
         :type working_scale: float        
         """
         # input parameters
+        self.logger = kwargs.get('logger', get_logger())
         logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         debug_images_at_original_scale = kwargs.get(ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value, False)
         debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
@@ -432,7 +437,7 @@ class ImageReconstruct2DModel():
         self.ncols, self.nrows = self.image_map.get_image_map_size()
         self.num_steps = (self.ncols + 1) * self.nrows 
 
-        logger.info(f'{type(self).__name__} Step 1: building 1d row reconstruction models for {self.ncols} x {self.nrows} images')
+        self.logger.info(f'{type(self).__name__} Step 1: building 1d row reconstruction models for {self.ncols} x {self.nrows} images')
         # step 1: construct a 1d reconstruction model for each row of images
         for row_index in range(self.nrows):
             images_in_row = self.image_map.get_row_images_at_working_scale(y = row_index)
@@ -449,7 +454,7 @@ class ImageReconstruct2DModel():
             #         cv2.imwrite(image_file, image)
 
         # step 2: generate the reconstructed images row by row at the current scale
-        logger.info(f'{type(self).__name__} Step 2: generating {self.nrows} reconstructed row images')
+        self.logger.info(f'{type(self).__name__} Step 2: generating {self.nrows} reconstructed row images')
         row_recoimages_list = []
         output_file = None
         for row_index in range(self.nrows):
@@ -459,7 +464,7 @@ class ImageReconstruct2DModel():
                                                                                                              images_list_scaling_factor=1.0, output_file=output_file)
             row_recoimages_list.append(row_recoimage)
             if output_file is not None:  # save the images only if output_folder is provided
-                logger.info(f'{type(self).__name__}: Writing 1d row reconstructed image (size: {row_recoimage.shape[:2][::-1]}) to file {output_file}')
+                self.logger.info(f'{type(self).__name__}: Writing 1d row reconstructed image (size: {row_recoimage.shape[:2][::-1]}) to file {output_file}')
                 cv2.imwrite(output_file, row_recoimage)
 
         # step 2A: if there is only one row, skip the rest
@@ -469,11 +474,11 @@ class ImageReconstruct2DModel():
             self.whole_reco_image_origin_offset = self.reco_row_model_list[0].get_reco_image_origin_offset()
         else:
             # step 3: prepare image stitching by rotating each row reco images counterclockwise 
-            logger.info(f'{type(self).__name__} Step 3: Rotate counter-clockwise the {self.nrows} reconstructed row images')
+            self.logger.info(f'{type(self).__name__} Step 3: Rotate counter-clockwise the {self.nrows} reconstructed row images')
             row_recoimages_rotated_list = self._rotate_cw90_images_list(row_recoimages_list, logdata_folder)
             
             # step 4: build the between rows reconstruction model
-            logger.info(f'{type(self).__name__} Step 4: Build the top-level 1d reconstruction model from the {self.nrows} rotated images')
+            self.logger.info(f'{type(self).__name__} Step 4: Build the top-level 1d reconstruction model from the {self.nrows} rotated images')
             reco_whole_model = ImageReconstruct1DModel(row_recoimages_rotated_list, row_index=None, **kwargs)
             # save the debug matching images if the flag is on
             if debug_feature_matching_images:        
@@ -492,7 +497,7 @@ class ImageReconstruct2DModel():
         # save the whole reco images only if output_folder is provided
         if logdata_folder is not None:  
             output_file = os.path.join(logdata_folder, f'whole_reco_image.jpg')
-            logger.info(f'{type(self).__name__}: Writing whole reconstructed image (size: {whole_reco_image.shape[:2][::-1]}) to file {output_file}')
+            self.logger.info(f'{type(self).__name__}: Writing whole reconstructed image (size: {whole_reco_image.shape[:2][::-1]}) to file {output_file}')
             cv2.imwrite(output_file, whole_reco_image)
         self.whole_reco_image_size = whole_reco_image.shape[:2][::-1]
         
@@ -606,8 +611,7 @@ class ImageReconstruct2DModel():
                 cv2.imwrite(os.path.join(debug_folder, f'row_reco_image_{row_index}_rotated.jpg'), image_rotated)
         return images_rotated_list
 
-    @classmethod
-    def _generate_whole_recoimage_with_scaling(cls, images_2d_list:list, camera_transforms_row_list:list, camera_transforms_between_rows:list, images_list_scaling_factor:float=1.0, logdata_folder:str=None) -> np.ndarray:
+    def _generate_whole_recoimage_with_scaling(self, images_2d_list:list, camera_transforms_row_list:list, camera_transforms_between_rows:list, images_list_scaling_factor:float=1.0, logdata_folder:str=None) -> np.ndarray:
         """ Generates and returns the whole reconstructed images from the source images in the given image_2d_list and the camera transforms already computed
 
         :param images_2d_list: The source images to be reonconstructed as a whole image, arranged in a 2D list (list of list of images)
@@ -628,13 +632,13 @@ class ImageReconstruct2DModel():
         nrows = len(images_2d_list)
         for row_index in range(nrows):
             images_list, camera_tranforms_row = images_2d_list[row_index], camera_transforms_row_list[row_index]
-            images_list = cls._load_images(images_list)
+            images_list = self._load_images(images_list)
             
             row_reco_image_original_scale, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(images_list, camera_tranforms_row, 
                                                                                                                                 images_list_scaling_factor)
             if logdata_folder is not None:
                 output_file = os.path.join(logdata_folder, f'row_reco_image_{row_index}_original_scale.jpg')
-                logger.info(f'{cls.__name__}: Writing full-scale row reconstructed image to file {output_file}')
+                self.logger.info(f'{cls.__name__}: Writing full-scale row reconstructed image to file {output_file}')
                 cv2.imwrite(output_file, row_reco_image_original_scale)
             row_reco_image_original_scale = cv2.rotate(row_reco_image_original_scale, cv2.ROTATE_90_COUNTERCLOCKWISE)
             row_recoimages_list.append(row_reco_image_original_scale)
@@ -644,12 +648,11 @@ class ImageReconstruct2DModel():
         whole_reco_image_original_scale = cv2.rotate(whole_reco_image_original_scale, cv2.ROTATE_90_CLOCKWISE)
         if logdata_folder is not None:
             output_file = os.path.join(logdata_folder, f'whole_reco_image_original_scale.jpg')
-            logger.info(f'{cls.__name__}: Writing whole full-scale reconstructed image to file {output_file}')
+            self.logger.info(f'{type(self).__name__}: Writing whole full-scale reconstructed image to file {output_file}')
             cv2.imwrite(output_file, whole_reco_image_original_scale)
         return whole_reco_image_original_scale
         
-    @classmethod
-    def _generate_1d_recoimage_with_scaling(cls, images_list:list, camera_tranforms_row:list, images_list_scaling_factor:float=1.0, output_file:str=None) :
+    def _generate_1d_recoimage_with_scaling(self, images_list:list, camera_tranforms_row:list, images_list_scaling_factor:float=1.0, output_file:str=None) :
         """ Generates and returns a row reconstructed image from a list of images of a row and the corresponding camera transforms 
 
         :param images_list: The source images to be merged into a row reconstructed image as a list
@@ -665,7 +668,7 @@ class ImageReconstruct2DModel():
         """
         row_reco_image, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(images_list, camera_tranforms_row, images_list_scaling_factor)
         if output_file is not None:  # save the images only if output_folder is provided
-            logger.info(f'{cls.__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
+            self.logger.info(f'{type(self).__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
             cv2.imwrite(output_file, row_reco_image)
         return row_reco_image, warped_roi_corners, warped_roi_sizes 
  
@@ -684,13 +687,14 @@ class ImageReconstruct1DModel():
         assert type(images_1d_list[0]) == np.ndarray, 'Parameter images_as_list should contain only numpy images'
         
         # input parameters
+        self.logger = kwargs.get('logger', get_logger())
         logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
         # input parameters and model variables        
         feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTOR.value, 'sift')
         confidence_threshold = kwargs.get(ModelsConfigNames.RECO_MATCHING_CONFIDENCE_THRESHOLD.value, 0.4)
         # get image size
-        logger.info(f'{type(self).__name__}: Number of images: {len(images_1d_list)}')
+        self.logger.info(f'{type(self).__name__}: Number of images: {len(images_1d_list)}')
         self.images_as_list = images_1d_list
         # step 1: extract the keyword parameters
         self.image_sizes, self.image_nchannels = ImageReconstruct1DModel.extract_image_sizes_nchannels(images_1d_list)
@@ -717,6 +721,7 @@ class ImageReconstruct1DModel():
                 self.matches.append(replace_matchinfo)
         
         self.confidence_matrix = self.features_matcher.get_confidence_matrix(self.matches)
+        self.logger.info(f'The confidence matrix:\n{self.confidence_matrix}')
         # step 4: save the images annotated with matching results to a class variables 
         self.debug_images_feature_matching = None
         if debug_feature_matching_images and row_index is not None:
@@ -737,7 +742,6 @@ class ImageReconstruct1DModel():
         camera_estimator = CameraEstimator()
         camera_adjuster = CameraAdjuster(adjuster='ray')
         wave_corrector = WaveCorrector()        
-        logger.warning(f'matches: {self.matches}')
         camera_transforms_row = camera_estimator.estimate(self.features, self.matches)
 
         # self._print_camera_transforms_row(camera_transforms_row)
@@ -746,22 +750,16 @@ class ImageReconstruct1DModel():
         # step 7: compute roi for each image and normalize the locations 
         self.roi_corners, self.roi_sizes = ImageReconstruct1DModel._compute_warp_rois(self.image_sizes, self.camera_transforms_row, scale = 1)
         self.reco_image_origin_offset = self._find_reco_image_origin_offset(self.roi_corners)
-        logger.info(f'ImageID reco_iamge_origin_offset: {self.reco_image_origin_offset}')
+        self.logger.info(f'ImageID reco_iamge_origin_offset: {self.reco_image_origin_offset}')
         self.roi_corners = self._normalize_corners(self.roi_corners, self.reco_image_origin_offset)
         # step 8: estimate roi of the reconstructed image
         self.estimated_reco_image_size = self._estimate_model_outer_roi_size(self.roi_corners, self.roi_sizes)
-        logger.info(f'Estimated reconstructed image size: {self.estimated_reco_image_size} and\ncorners: {self.roi_corners}')
+        self.logger.info(f'Estimated reconstructed image size: {self.estimated_reco_image_size} and\ncorners: {self.roi_corners}')
 
-    @staticmethod
-    def _print_camera_transforms_row(camera_transforms_row):
-        np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+    @classmethod
+    def _print_camera_transforms_row(cls, camera_transforms_row, logger):
         for index, camera_transform in enumerate(camera_transforms_row):
-            logger.info(f'Camera transform matrices for image index {index}:')
-            logger.info(f'K: {camera_transform.K().reshape(1, -1)}')
-            logger.info(f'R: {camera_transform.R.reshape(1, -1)}')
-            logger.info(f"T: {camera_transform.t.tolist()}") 
-            logger.info(f'Aspect: {camera_transform.aspect} Focal: {camera_transform.focal} PPX and PPY: {camera_transform.ppx, camera_transform.ppy}')
-        np.set_printoptions()              
+            ImageReconstructModelHelper.print_camera_transform(camera_transform, f'Camera transform matrices for image index {index}:', logger)
 
     def get_camera_transforms_row(self) -> list:
         """ Returns the camera transforms of this 1D sequence of images
@@ -771,7 +769,7 @@ class ImageReconstruct1DModel():
         """
         return self.camera_transforms_row
 
-    def get_camera_transform(self, index:int, print:bool=False) -> cv2.detail.CameraParams:
+    def get_camera_transform(self, index:int) -> cv2.detail.CameraParams:
         """ Returns the camera transform object of the image at a given index 
 
         :param index: The index of the image 
@@ -783,14 +781,6 @@ class ImageReconstruct1DModel():
         """
         assert index is not None and index >= 0 and index < len(self.camera_transforms_row), 'Parameter index is invalid'
         camera_transform = self.camera_transforms_row[index]
-        if print:
-            np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
-            logger.info(f'Camera transform matrices for image index {index}:')
-            logger.info(f'K: {camera_transform.K().reshape(1, -1)}')
-            logger.info(f'R: {camera_transform.R.reshape(1, -1)}')
-            logger.info(f"T: {camera_transform.t.tolist()}") 
-            logger.info(f'Aspect: {camera_transform.aspect} Focal: {camera_transform.focal} PPX and PPY: {camera_transform.ppx, camera_transform.ppy}')
-            np.set_printoptions()    
         return camera_transform
 
     def get_confidence_matrix(self, print=False) -> np.ndarray:
@@ -802,22 +792,22 @@ class ImageReconstruct1DModel():
         :rtype: np.ndarray
         """
         if print:
-            logger.info(f'Confidence matrix:\n{self.confidence_matrix}')
+            self.logger.info(f'Confidence matrix:\n{self.confidence_matrix}')
         return self.confidence_matrix
 
     def get_reco_image_size(self, print=True):
         if print:
-            logger.info(f'Reconstructed Image Size: {self.estimated_reco_image_size}')
+            self.logger.info(f'Reconstructed Image Size: {self.estimated_reco_image_size}')
         return self.estimated_reco_image_size
     
     def get_roi_corners(self, print=True):
         if print:
-            logger.info(f'ROI Corners of Original Images after Reconstruction: {self.roi_corners}')
+            self.logger.info(f'ROI Corners of Original Images after Reconstruction: {self.roi_corners}')
         return self.roi_corners
     
     def get_reco_image_origin_offset(self, print=True):
         if print:
-            logger.info(f'Origin Offset of Reconstructed Image: {self.reco_image_origin_offset}')
+            self.logger.info(f'Origin Offset of Reconstructed Image: {self.reco_image_origin_offset}')
         return self.reco_image_origin_offset       
 
     def get_debug_images_feature_matching(self):
@@ -847,7 +837,7 @@ class ImageReconstruct1DModel():
         return roi
     
     @staticmethod
-    def _compute_warp_rois(image_sizes:list, camera_tranforms_row:list, scale:float=1.0, print=False):
+    def _compute_warp_rois(image_sizes:list, camera_tranforms_row:list, scale:float=1.0):
         """ Internal function to compute the ROI of images given the sizes and the camera transform parameters as lists
 
         :param image_sizes: a list of sizes of the images of which the ROI of their transformed versions are computed
@@ -869,8 +859,6 @@ class ImageReconstruct1DModel():
             roi = ImageReconstruct1DModel._compute_warp_roi(image_size, camera_transform, median_focals, scale)            
             roi_corners.append(roi[0:2])
             roi_sizes.append(roi[2:4])
-            if print:
-                logger.info(f'ROI for image {index} of size {image_size}: {roi}')
         return roi_corners, roi_sizes
     
     @staticmethod
@@ -961,7 +949,7 @@ class ImageReconstruct1DModel():
         warper.set_scale(camera_tranforms_row)
         # warp every image in the list at the scaling factor and the pre-computed camera transforms
         warped_images_list = list(warper.warp_images(images_as_list, camera_tranforms_row, scaling_factor_of_images))
-        warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel._compute_warp_rois(image_sizes, camera_tranforms_row, scaling_factor_of_images, print=True)
+        warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel._compute_warp_rois(image_sizes, camera_tranforms_row, scaling_factor_of_images)
         print(f'warped image size from calculation: {warped_roi_sizes}')
         print(f'warped corners from calculation: {warped_roi_corners}')
         reco_image_origin_offset = ImageReconstruct1DModel._find_reco_image_origin_offset(warped_roi_corners)
@@ -1007,19 +995,31 @@ def test_get_sample_images_as_list():
     images_2d_list = [image_row]
     return images_2d_list
 
+def test_get_poor_sample_images_as_list():
+    image_row = []
+    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3303-3-1-0-0-240130-1433.jpg')
+    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3304-3-1-1-0-240130-1433.jpg')
+    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3305-3-1-2-0-240130-1433.jpg')
+    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3306-3-1-3-0-240130-1434.jpg')
+    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3307-3-1-4-0-240130-1434.jpg')
+    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3308-3-1-5-0-240130-1435.jpg')
+    images_2d_list = [image_row]
+    return images_2d_list
+
 def test_build_reco_model(params):
     # image_map_as_list = test_get_cgras_sample_images_as_list()    
-    image_map_as_list = test_get_sample_images_as_list()    
+    # image_map_as_list = test_get_sample_images_as_list()    
+    image_map_as_list = test_get_poor_sample_images_as_list()    
     logdata_folder = params['logdata_folder']
     reco_model_file = os.path.join(logdata_folder, params['reco_model_filename'])
     os.makedirs(logdata_folder, exist_ok=True)
     reco_model = ImageReconstructModel(image_map_as_list, working_scale=0.1, **params) 
-    logger.info('Saving object to file')
+    print('Saving object to file')
     ImageReconstructModelHelper.to_yaml(reco_model, reco_model_file)
     return reco_model
 
 def test_load_reco_model(params):
-    logger.info('Loading object from file')
+    print('Loading object from file')
     logdata_folder = params['logdata_folder']
     reco_model_file = os.path.join(logdata_folder, params['reco_model_filename'])
     reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)

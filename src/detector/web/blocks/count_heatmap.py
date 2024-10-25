@@ -18,7 +18,7 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import DETECT_DAO
 from detector.models.visualize import CoralObjectMapModel, CoralObjectMapModelHelper
 from detector.models.heatmap_tools import HeatmapHelper
@@ -57,19 +57,21 @@ class CountHeatmapBlock():
                         [Input(prefix+'reverse_button', 'n_clicks'),
                          State(prefix+'chart_panel', 'children'),], 
             prevent_initial_call=True)(self._reverse_button_pressed()) 
+        
+        self.app.callback([Output(self.prefix+f'chart_panel', 'children', allow_duplicate=True)],
+                        [Input(self.prefix+'class_list_dropdown', 'value'),
+                         Input(self.prefix+'sample_select_datatable', 'active_cell')], prevent_initial_call=True)(self._update_chart_panel())   
             
     def register_trigger(self, trigger_id:str):
         # build the output list
         output_list = [Output(self.prefix+f'top_panel', 'style', allow_duplicate=True),  
                     Output(self.prefix+'sample_select_datatable', 'data', allow_duplicate=True),
-                    Output(self.prefix+f'chart_panel', 'children', allow_duplicate=True),      
+                    Output(self.prefix+'sample_select_datatable', 'active_cell'),
+                    Output(self.prefix+'sample_select_datatable', 'selected_cells'),
                     ]
-        input_list = [Input(trigger_id, 'data'),
-                    Input(self.prefix+'class_list_dropdown', 'value'),
-                    Input(self.prefix+'sample_select_datatable', 'active_cell')
-                    ]
+        input_list = [Input(trigger_id, 'data'),]
         # define callbacks for the datatable data
-        self.app.callback(output_list, input_list, prevent_initial_call=True, allow_duplicate=True)(self._update_chart_panel())
+        self.app.callback(output_list, input_list, prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
         
         self.app.callback([Output(self.prefix+'class_list_dropdown', 'options', allow_duplicate=True),
                             Output(self.prefix+'class_list_dropdown', 'value', allow_duplicate=True)],
@@ -85,7 +87,7 @@ class CountHeatmapBlock():
         coral_trend_model = DETECT_DAO.get_coral_count_trend_as_df(tile_id) 
         coral_trend_model['batch_time'] = pd.to_datetime(coral_trend_model['batch_time']).dt.date
         coral_trend_model['batch_time'] = coral_trend_model.apply(lambda row: f'{row["batch_time"]} ({row["age"]} days old)', axis=1)
-        output_model = coral_trend_model[['batch_time']]
+        output_model = coral_trend_model[['batch_time']].copy()
         output_model.columns = ['Sample Date']
         if len(output_model) > 0:
             output_model.loc[len(output_model) - 1] = ['Whole History']
@@ -136,10 +138,9 @@ class CountHeatmapBlock():
             value = self.class_options[0]['value'] if self.class_options is not None and len(self.class_options) > 0 else None
             return (self.class_options, value,)
         return update_class_dropdown
-    
-    # callback for the latest chart
-    def _update_chart_panel(self):
-        def update_chart_panel(tile_id, filter_class, active_cell):
+
+    def _update_panel(self):
+        def update_panel(tile_id):
             if tile_id is None:
                 raise PreventUpdate
             # the update is due to a new tile_id selected
@@ -147,7 +148,15 @@ class CountHeatmapBlock():
                 self.current_tile_id = tile_id
                 # update the coral_trend_model
                 self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
-                active_cell = None       
+                
+            if len(self.coral_trend_model) > 0:
+                return [{}, self.output_model.to_dict('records'), None, []]   
+            else:
+                return [{'visibility': 'hidden'}, self.output_model.to_dict('records'), None, []]                 
+        return update_panel
+    
+    def _update_chart_panel(self):
+        def update_chart_panel(filter_class, active_cell):
             graph_list = None
             compare_to_index = None
             # update the latest figure
@@ -156,11 +165,11 @@ class CountHeatmapBlock():
                     compare_to_index = active_cell['row']
                 # generate history of heatmaps
                 graph_list, self.heatmap_figures_list = self._generate_figures_list(self.coral_trend_model, filter_class, compare_to_index)
-                return [{}, self.output_model.to_dict('records'), graph_list, ]   
+                return [graph_list]   
             else:
-                return [{'visibility': 'hidden'}, self.output_model.to_dict('records'), graph_list, ]
-        return update_chart_panel
-    
+                return [None,]           
+        return update_chart_panel    
+
     # callback for the reverse button
     def _reverse_button_pressed(self):
         def reverse_button_pressed(n_clicks, graph_list):

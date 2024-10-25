@@ -18,7 +18,7 @@ from datetime import datetime as dt
 import tools.db_tools as db_tools
 import tools.file_tools as file_tools
 from tools.lock_tools import synchronized
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 
  
 # This class models the management and backup of db files and the folder that contains the files
@@ -37,7 +37,7 @@ class DBFileManager():
             self.db_parent_folder = os.path.realpath(database_folder)
             self.db_file = os.path.realpath(os.path.join(database_folder, db_filename))
             
-            logger.info(f'DBFileManager: Setup db_file "{self.db_file}"')
+            global_logger.info(f'DBFileManager: Setup db_file "{self.db_file}"')
             # - test if the db_file exists, if not, create one
             if not os.path.isfile(self.db_file):
                 self.create_tables()
@@ -123,15 +123,15 @@ class DBFileManager():
         for table_name in table_list:
             create_sql = self.ddb_commands.get(table_name, None)
             if create_sql is None:
-                logger.warning(f'{__file__} (create_tables): No DDL SQL script has been specified for the given table name {table_name}')
+                global_logger.warning(f'{__file__} (create_tables): No DDL SQL script has been specified for the given table name {table_name}')
                 continue
             result = db_tools.update_with_script_no_exception(self.db_file, create_sql)
             if result is None:
-                logger.info(f'{__file__} (create_tables): successful in the execution of {create_sql}')
+                global_logger.info(f'{__file__} (create_tables): successful in the execution of {create_sql}')
                 count += 1
             else:
                 error_list.append(result)
-                logger.warning(f'{__file__} (create_tables): error {result} in in the execution of {create_sql}')
+                global_logger.warning(f'{__file__} (create_tables): error {result} in in the execution of {create_sql}')
         if len(error_list) == 0:
             return None
         return '\n'.join(error_list)
@@ -171,8 +171,8 @@ class DBFileManager():
         """
         table_names_list = db_tools.list_table_names(self.db_file)
         for table_name in table_names_list:
-            logger.info(f'Table: {table_name}')
-            logger.info(f'{db_tools.dump_table_df(self.db_file, table_name, limit)}')
+            global_logger.info(f'Table: {table_name}')
+            global_logger.info(f'{db_tools.dump_table_df(self.db_file, table_name, limit)}')
 
 
 

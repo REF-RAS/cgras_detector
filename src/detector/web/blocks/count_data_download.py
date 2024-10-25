@@ -19,7 +19,7 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 from detector.model import APP_FILE_MANAGER, AIMSTILE_DAO, DETECT_DAO
 from detector.models.visualize import CoralObjectMapModel, CoralObjectMapModelHelper
 

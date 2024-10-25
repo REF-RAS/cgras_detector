@@ -22,16 +22,17 @@ from flask import Flask
 # ros modules
 import rospy, message_filters
 # project modules
-from tools.logging_tools import logger
+from tools.logging_tools import global_logger
 import tools.hash_tools as hash_tools
 import detector.model as model
 from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER
-# from detector.web.dash import themes
-from dash_bootstrap_components import themes
+from detector.web.dash import themes
+# from dash_bootstrap_components import themes
 
 SERVER = Flask(__name__)
 APP = dash.Dash(__name__, 
-                external_stylesheets=[themes.BOOTSTRAP],  
+                external_stylesheets=themes.BOOTSTRAP, 
+                external_scripts=themes.BOOTSTRAP_JS, 
                 server=SERVER,
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}],
                 suppress_callback_exceptions=True,
@@ -40,7 +41,7 @@ APP = dash.Dash(__name__,
                 # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js',
                 # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js|bootstrap.min.css',  # this combination stops the annoying refreshing of the UI when online
                 assets_ignore='*.css|*.js',
-                assets_folder=APP_FILE_MANAGER.get_cgras_home()
+                assets_folder=APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.SYSTEM_FOLDER)
                 )
 
 APP.config['suppress_callback_exceptions'] = True
@@ -75,7 +76,7 @@ class DashApplicationMain():
     def _define_app(self):
         # brand_div = html.Div([html.H3('CGRAS Coral Counting and Visualization'), html.H6('Robotics and Autonomous Systems Group, REF, RI, Queensland University of Technology')])    
         brand_div = dbc.Row([
-            html.Img(src='/assets/detector/system/images/QUTLogo.png', height='60', className='col-2'),
+            html.Img(src='/assets/images/QUTLogo.png', height='60', className='col-2'),
             html.Div([html.H3('CGRAS Coral Counting and Visualization'), 
                       html.H6('Robotics and Autonomous Systems Group, REF')
                       ], className='col-10')
@@ -156,7 +157,7 @@ class DashApplicationMain():
                 else: # if redirected to unknown link
                     page_content = '404 Page Error! Please choose a link'
             except Exception as e:
-                logger.error(e)
+                global_logger.error(e)
                 traceback.print_exc()
             return (page_content, nav_content,)
         return display_page
