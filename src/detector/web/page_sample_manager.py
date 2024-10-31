@@ -15,7 +15,7 @@ from dash import html, dcc, callback, Input, Output, State, ctx, dash_table
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.web.blocks import TileSampleImportFileBlock, TileSampleTable, TileSampleSearchBlock, EnableTileSamplesImportBlock
 
 dash.register_page(__name__)
@@ -29,7 +29,7 @@ class SampleManagerPage():
         self.pending_sample_table = TileSampleTable(app, prefix, allow_priority=True, allow_reprocess=False)
         self.tile_sample_retrieve_panel = EnableTileSamplesImportBlock(app, prefix)
         self.tile_sample_search_panel = TileSampleSearchBlock(app, prefix)
-        self.processed_sample_table = TileSampleTable(app, prefix + 'bottom_', allow_priority=False, allow_reprocess=True)
+        self.processed_sample_table = TileSampleTable(app, prefix + 'bottom_', allow_priority=False, allow_reprocess=True, allow_reload=True, allow_view=True)
 
         self._define_page()
     

@@ -19,7 +19,7 @@ from datetime import datetime as dt
 import tools.db_tools as db_tools
 import tools.file_tools as file_tools
 from tools.lock_tools import synchronized
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.database_manager import DBFileManager
 
 # NOTE: The batch_time is an ISO 8601 date time string format '2025-05-29 14:16:00' and the batch_id is derived from the time and cgras_station_id or the importer_id
@@ -526,6 +526,7 @@ class DetectorDAO():
         settle_time = yaml_data.get('settle_time', None)
         importer_id = yaml_data.get('importer_id', 'Unknown')
         operator = yaml_data.get('operator', 'Unknown') 
+        image_files_parent_folder = yaml_data.get('image_files_parent_folder', None)
         yaml_images_list = yaml_data.get('images', None)
         try:
             tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
@@ -534,11 +535,13 @@ class DetectorDAO():
             for index, yaml_images in enumerate(yaml_images_list):
                 x, y = yaml_images.get('x', None), yaml_images.get('y', None)
                 filepath = yaml_images.get('file', None)
+                if image_files_parent_folder is not None:
+                    filepath = os.path.join(image_files_parent_folder, filepath)
                 capture_id = yaml_images.get('capture_id', f'{tile_sample_id}-{x}-{y}')
                 self.add_source_image(capture_id, tile_sample_id, x, y, filepath)
             return True
         except Exception as e:
-            global_logger.warning(e)
+            logger.warning(e)
             return False
         
     # - composite operation: obtain sample info for a tile id
@@ -731,10 +734,10 @@ class DetectorDAO():
                 if self.add_yolo_model(name, model_file_path, species, valid_start_day, valid_end_day, input_image_width, input_image_height, 
                                        coral_classes, dead_coral_classes, remarks) > 0:
                     return True
-            global_logger.warning(f'Failed to add yolo model to the database')
+            logger.warning(f'Failed to add yolo model to the database')
             return False
         except Exception as e:
-            global_logger.warning(e)
+            logger.warning(e)
             return False
         
     # - table: detected_objet
@@ -928,7 +931,7 @@ class DetectorDAO():
                 conn.commit()
                 return True
         except Exception as e:
-            global_logger.warning(f'Failed to add health model to the database')
+            logger.warning(f'Failed to add health model to the database')
             return False
 
     # - table: source_image
@@ -1008,7 +1011,7 @@ def manage_tables():
     DETECT_DAO = DetectorDAO(DETECT_DBFM.db_file)
     # DETECT_DBFM.drop_tables([''])
     tables_name = DETECT_DBFM.list_tables_name()
-    global_logger.info(f'tables: {tables_name}')
+    logger.info(f'tables: {tables_name}')
     DETECT_DBFM.create_tables(['error_flag'])
     DETECT_DBFM.dump_all_tables()       
 

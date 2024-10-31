@@ -14,7 +14,7 @@ from dash import html, dcc, Input, Output
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.model import STATE, SystemStates
 
 from detector.web.blocks import HealthViewTable

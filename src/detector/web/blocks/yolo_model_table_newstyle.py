@@ -17,7 +17,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 
 class YoloModelEditTable():
     def __init__(self, app, prefix, show_column_top=False, show_column_refresh=False):
@@ -145,9 +145,9 @@ class YoloModelEditTable():
             if rows_previous is not None and len(rows_previous) != len(rows):
                 # a row has been deleted
                 row_deleted = [row for row in rows_previous if row not in rows]
-                global_logger.info(f'row_deleted: {row_deleted}')
+                logger.info(f'row_deleted: {row_deleted}')
                 return (row_deleted[0], False, None)
-            global_logger.info(f'cell_edited: {rows} {active_cell}')
+            logger.info(f'cell_edited: {rows} {active_cell}')
             return (None, False, None)
         return table_edited
     

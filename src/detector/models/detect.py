@@ -42,47 +42,56 @@ class CoralObjectDetectModel():
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
             return
-        # progress tracking
+        # setup progress tracking variables
         self.progress_cb = progress_cb
         self.num_images = len(images_2d_list) * len(images_2d_list[0])
         self.count_images_completed = 0
-        # input parameters
+        # keep some input parameters
         self.tile_size = locate_tile_model.get_tile_size() if locate_tile_model is not None else None
         if self.tile_size is None:  # if the tile size is not known from LocateTileModel 
             whole_reco_image_size = reco_model.get_whole_reco_image_size()
             self.tile_size = whole_reco_image_size
-        # other keyword parameters - operational
+        # extract other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
             raise AssertionError(f'{type(self).__name__}: Parameter (mandatory) {ModelsConfigNames.COD_BLOB_SIZE.value} is missing')
         self.blob_overlap_pix = kwargs.get(ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value, 0)
         self.duplicate_max_displacement = kwargs.get(ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES.value, 10)
-        # other keyword parameters - output cached data and debug information
+        # extract other keyword parameters - output cached data and debug information
         self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         self.cod_model_cache_filename = kwargs.get(ModelsConfigNames.COD_MODEL_FILENAME.value, f'coral_object_detect_model.yaml')
-        # model parameters
+        # init model parameters
         self.image_grid_size = reco_model.get_image_map_size()
         self.object_list_of_images = dict()
         self.object_class_names = None
-
+        self.annotated_blob_filename_dict_lists = dict()       # indexed lists of annotated blob filenames with each list indexed by the image location
+        self.annotated_image_filename_dict_list = []      # list of annotated image filenames 
+        # init the current COD model
+        self.cod_model = None
         # model parameters: abort
         self.to_abort = False
         # step 1: iterate through each image in the 2d list of images
-   
         for row_index, row_1d_image_list in enumerate(images_2d_list):
             for col_index, image in enumerate(row_1d_image_list):
+                # if the attribute progress_cb is set, call the progress_cb to record the progress
                 if hasattr(self, 'progress_cb') and self.progress_cb is not None:
                     self.progress_cb((self.count_images_completed, self.num_images))
-                time.sleep(0.1)
-                if self.to_abort:
-                    return   
-                cod_model = CoralObjectDetectImageModel(image, col_index, row_index, reco_model, yolo_model, locate_tile_model, **kwargs)
+                time.sleep(0.1)    # sleep for a short while to release resources
+                if self.to_abort:  # stop processing if abort signal is recieved
+                    return
+                # compute the coral object detect model (long process)
+                self.cod_model = CoralObjectDetectImageModel(image, col_index, row_index, reco_model, yolo_model, locate_tile_model, **kwargs)
                 index = (col_index, row_index)
-                self.object_list_of_images[index] = cod_model.get_object_list(include_invalidated=False)
+                # extract the list of detected objects from the cod_model
+                self.object_list_of_images[index] = self.cod_model.get_object_list(include_invalidated=False)
+                # record the class names if not already known
                 if self.object_class_names is None:
-                    self.object_class_names = cod_model.get_object_class_names() 
+                    self.object_class_names = self.cod_model.get_object_class_names() 
+                # record the list of filenames of the annotated images that have been generated
+                self.annotated_image_filename_dict_list.append(self.cod_model.get_annotated_image_filename_dict())
+                self.annotated_blob_filename_dict_lists[index]  = self.cod_model.get_annotated_blob_filename_dict_list()
+                # increase the counter
                 self.count_images_completed += 1 
-
         # step 2: resolve duplicate objects in the overlapping regions between images
         logger.info(f'DUPLICATE REMOVAL between images in the tile') 
         self.num_invalidated_objects = self._invalidate_duplicate_objects(self.object_list_of_images, self.image_grid_size, self.duplicate_max_displacement)
@@ -94,22 +103,50 @@ class CoralObjectDetectModel():
         """ internal function to return as a single list all the coral objects detected in the 2d grid of images, the duplicated objects due to overlapping regions between neighbouring images are flagged invalidated.
             The parameter include_invalidated controls whether to also return the invalidated object in the list
         """
+        # iterate through lists of detected objects from all the images
         final_objects_list = []
         for index in self.object_list_of_images.keys():
+            # if invlidated objects are included, just merge two lists
             if include_invalidated:
                 final_objects_list.extend(self.object_list_of_images[index])
             else:
+                # iterate through each object
                 for coral_object in self.object_list_of_images[index]:
                     if not coral_object.invalidated:
                         final_objects_list.append(coral_object)
         return final_objects_list
     
     def abort(self):
+        """ call to abort the computing of this CoralObjectDetectModel
+        """
         self.to_abort = True
+        if hasattr(self, 'cod_model'):
+            if self.cod_model:
+                self.cod_model.abort()
 
     def get_progress(self) -> tuple:
+        """ returns the progress of computing this CoralObjectDetectModel
+
+        :return: a tuple of two integers, (the number of images complete, total number of images to analyze)
+        :rtype: tuple
+        """
         if hasattr(self, 'num_images') and hasattr(self, 'count_images_completed'):
             return (self.count_images_completed, self.num_images)
+
+    def get_annotated_blob_filename_dict_lists_as_dict(self) -> dict:
+        """ Returns a dict contains lists of file names of images showing annotation of blobs for debug purpose and the dict is indexed by image location (col, row)
+
+        :return: the list of image file names
+        """
+        return self.annotated_blob_filename_dict_lists
+    
+    def get_annotated_image_filename_dict_list(self) -> list:
+        """ Returns the list of file names of images showing annotation of images for debug purpose
+
+        :return: the file name
+        """
+        return self.annotated_image_filename_dict_list   
+
 
     def get_object_list(self) -> list:
         """ returns the list of CoralObject objects
@@ -174,6 +211,8 @@ class CoralObjectDetectModel():
             'num_duplicate_objects': self.num_invalidated_objects,
             'object_class_names': self.object_class_names,
             'tile_size': self.tile_size,
+            'annotated_blob_filename_dict_lists': self.annotated_blob_filename_dict_lists,
+            'annotated_image_filename_dict_list': self.annotated_image_filename_dict_list,
         }
         with open(cache_file, 'w') as outfile:
             yaml.dump(data, outfile, Dumper=yaml.Dumper)
@@ -193,6 +232,8 @@ class CoralObjectDetectModel():
             self.num_invalidated_objects = data['num_duplicate_objects']
             self.object_class_names = data['object_class_names']
             self.tile_size = data['tile_size']
+            self.annotated_blob_filename_dict_lists =data['annotated_blob_filename_dict_lists']
+            self.annotated_image_filename_dict_list = data['annotated_image_filename_dict_list']
         except (Warning, Exception) as e:
             # logger.warning(f'{type(self).__name__}: Failed to load object list cache file {cache_file}\n{e}')
             raise e
@@ -271,7 +312,9 @@ class CoralObjectDetectImageModel():
         :type yolo_model: YoloObjectDetector        
         :param locate_tile_model: The LocateTileModel model computed for the 2d grid of images, which is used to map locations from reconstruction space to tile space, defaults to None
         :type locate_tile_model: LocateTileModel, optional
-        """       
+        """
+        # model variable for abort
+        self.to_abort = False
         # other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
@@ -279,19 +322,21 @@ class CoralObjectDetectImageModel():
         # the object categories as defined by the yolo model
         self.coral_classes = kwargs.get(ModelsConfigNames.OBJECT_CLASSES_CORAL.value, [])
         self.dead_coral_classes = kwargs.get(ModelsConfigNames.OBJECT_CLASSES_DEAD_CORAL.value, [])
-        # parameters for blob creation and duplicate removal
+        # extract parameters for blob creation and duplicate removal
         self.blob_overlap_pix = kwargs.get(ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value, 0)
         self.duplicate_max_displacement = kwargs.get(ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS.value, 10)
-        # other keyword parameters - output cache and debug information
+        # extract other keyword parameters - output cache and debug information
         self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         # other keyword parameters - use cached detection object list instead of actual detection using the yolo_model
         self.use_cached_object_detection = kwargs.get(ModelsConfigNames.COD_USE_CACHED_OBJECT_DETECTION.value, False)
         self.debug_blob_images = kwargs.get(ModelsConfigNames.COD_DEBUG_BLOB_IMAGES.value, True)
-        # model variables
+        # extract init model variables
         self.object_class_names:dict = None                   # list of class names of the detection model
         self.metadata_of_blobs = dict()                # metadata of the blobs including detection 
         self.raw_object_list_of_blobs = dict()         # data structure for the duplicate removal process
         self.resolved_object_list = None                  # final object list after duplicate removal
+        self.annotated_blob_filename_dict_list = []       # list of annotated blob filenames
+        self.annotated_image_filename_dict = None              # the filename for the annotated image 
         # attempt to load from cache if the flag is true
         if self.use_cached_object_detection and self.logdata_folder is not None:
             cached_file = os.path.join(self.logdata_folder, f'object_list_{image_col_index}_{image_row_index}.yaml')
@@ -313,6 +358,8 @@ class CoralObjectDetectImageModel():
         # start_x and start_y are the top left corner of an image blob
         for start_x in range(0, image_size[0], step_x):
             for start_y in range(0, image_size[1], step_y):
+                if self.to_abort:
+                    return
                 # compute the blob index, the top left and the bottom right corner of an image blob
                 blob_col_index, blob_row_index = start_x // step_x, start_y // step_y 
                 corner = (start_x, start_y,)
@@ -331,7 +378,7 @@ class CoralObjectDetectImageModel():
                     yolo_result:YoloResult = yolo_model.detect(image_blob)
                     if self.object_class_names is None:
                         self.object_class_names = yolo_result.get_class_names()
-                    # extract the processing speed information
+                    # extract the processing speed information and update the metadata about processing this blob
                     speed_as_dict = yolo_result.get_processes_speed_as_dict() 
                     blob_metdata = {
                         'cod_blob_size': image_blob_size,
@@ -339,15 +386,20 @@ class CoralObjectDetectImageModel():
                     }
                     blob_metdata.update(speed_as_dict)
                     self.metadata_of_blobs[cache_index] = blob_metdata   # the data structure is for logdata
+                    # extract the detected objects from the output of the yolo model of this blob
                     object_list = self._extract_objects_from_result(yolo_result, image_col_index, image_row_index, corner, blob_col_index, blob_row_index, reco_model, locate_tile_model)  
                     self.raw_object_list_of_blobs[cache_index] = object_list
                     # if the self.debug_blob_images is True, then generate the annotated image for this image blob and save to the logdata folder
                     if self.debug_blob_images and self.logdata_folder is not None:
                         annotated_image = yolo_result.draw_detection(image_blob, True)
-                        cv2.imwrite(os.path.join(self.logdata_folder, f'annotated_blob_{image_col_index}_{image_row_index}_{blob_col_index}_{blob_row_index}.jpg'), annotated_image)
+                        image_file_name = f'annotated_blob_{image_col_index}_{image_row_index}_{blob_col_index}_{blob_row_index}.jpg'
+                        image_dict = {'title': f'Annotated blob at image ({image_col_index} {image_row_index}) blob ({blob_col_index} {blob_row_index})', 'src': image_file_name}
+                        self.annotated_blob_filename_dict_list.append(image_dict)
+                        cv2.imwrite(os.path.join(self.logdata_folder, image_file_name), annotated_image)
                 else:
                     # if the object_list for the cache_index exists, just get it from the data structure
                     object_list = self.raw_object_list_of_blobs[cache_index]
+                # print the information about the coral objects
                 for coral_object in object_list:
                     logger.info(coral_object)
                 self.blobs_count += 1
@@ -369,7 +421,11 @@ class CoralObjectDetectImageModel():
         if self.debug_blob_images and self.logdata_folder is not None:
             # generate the annotated image for the whole image and save to the logdata folder
             annotated_image = CoralObjectListHelper.annotate_image_with_objects(self.resolved_object_list, image, print_name=True, include_invalidated=False)
-            cv2.imwrite(os.path.join(self.logdata_folder, f'annotated_image_{image_col_index}_{image_row_index}.jpg'), annotated_image)            
+            annotated_image = CoralObjectListHelper.annotate_image_with_blob_bbox(self.metadata_of_blobs, annotated_image)
+            image_file_name = f'annotated_image_{image_col_index}_{image_row_index}.jpg'
+            image_dict = {'title': f'Annotated image ({image_col_index} {image_row_index})', 'src': image_file_name}
+            self.annotated_image_filename_dict = image_dict
+            cv2.imwrite(os.path.join(self.logdata_folder, image_file_name), annotated_image)            
     
     def _merge_into_image_object_list(self) -> list:
         """ internal function to merge the object lists from the blobs into the overall list
@@ -382,6 +438,25 @@ class CoralObjectDetectImageModel():
             all_object_list.extend(self.raw_object_list_of_blobs[index])    
         return all_object_list    
     
+    def abort(self):
+        """ call to abort the computing of this CoralObjectDetectImageModel
+        """
+        self.to_abort = True
+
+    def get_annotated_blob_filename_dict_list(self) -> list:
+        """ Returns the list of file names of images showing annotation of blobs for debug purpose
+
+        :return: the list of image file names
+        """
+        return self.annotated_blob_filename_dict_list
+    
+    def get_annotated_image_filename_dict(self) -> str:
+        """ Returns the file name of images showing annotation for debug purpose
+
+        :return: the file name
+        """
+        return self.annotated_image_filename_dict    
+
     def get_object_list(self, include_invalidated=False) -> list:
         """ returns the coral objects of the image as a list
 
@@ -629,6 +704,16 @@ class CoralObjectListHelper():
                         cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 0, 0), 1)
         return output_image        
 
+    @staticmethod 
+    def annotate_image_with_blob_bbox(blob_meta_dict:dict, output_image:np.ndarray) -> np.ndarray:    
+        for blob_metadata_key in blob_meta_dict.keys():
+            blob_metadata = blob_meta_dict[blob_metadata_key]
+            start_x, start_y, end_x, end_y = blob_metadata['cod_blob_bbox']
+            cv2.rectangle(output_image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0, 0, 255), 1)
+            cv2.putText(output_image, f'{blob_metadata_key}',
+                        (int(start_x + 15), int(start_y + 15)), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 255), 1)           
+        return output_image
+        
     @staticmethod
     def get_index_permutations(sequence:list) -> list:
         """ generate a list of all permutations from the given sequence of objects

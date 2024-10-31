@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
+    <script src="scripts/jquery.min.js" type="text/javascript"></script>
+    <link href="scripts/nanogallery2.min.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="scripts/jquery.nanogallery2.min.js"></script>
+    
+</head>
+
+<body>
+    <div id="ngy2p" data-nanogallery2='{
+        "thumbnailLabel": {
+          "display": false,
+          "openOnStart": "ID1"
+        },
+        "thumbnailAlignment": "center",
+        "displayBreadcrumb": false,
+        "thumbnailOpenImage": true,
+        "viewerGallery ": "none",
+        "viewerTools" : { "topLeft": "", "topRight": "rotateLeft, rotateRight, zoomButton, fullscreenButton,"}
+      }'>
+
+     <a href="[[IMAGE_URL]]" data-ngid="ID1" target="_blank" data-ngdesc=""></a>
+</body>
+
+<script>
+    jQuery(document).ready(function () {
+        $("#ngy2p").on( 'galleryRenderEnd.nanogallery2', function(){
+        window.location.hash = '#nanogallery/ngy2p/0/ID1';
+        });
+    })
+
+</script>
+</html>

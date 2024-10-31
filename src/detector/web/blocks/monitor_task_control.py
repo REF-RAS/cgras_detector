@@ -16,7 +16,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, CALLBACK_MANAGER, CallbackTypes, STATE, SystemStates, global_logger, StatusNames
+from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, CALLBACK_MANAGER, CallbackTypes, STATE, SystemStates, logger, StatusNames
 
 class MonitorTaskControlBlock():
     def __init__(self, app, prefix):

@@ -35,6 +35,8 @@ class ImageReconstructModel():
     """ ImageReconstructModel is the wrapper class of the other image reconstruction classes in this module, that provides functions for mapping locations from the space of an individual input image to the 
         space of the reconstructed image. 
     """
+    FILENAME_WHOLE_RECO_IMAGE = 'whole_reco_image.jpg'
+    FILENAME_WHOLE_RECO_FULL_SCALE_IMAGE = 'whole_reco_image_original_scale.jpg'
     def __init__(self, images_2d_list:list, **kwargs):
         """ The constructor, which accepts a list of lists of images in row-major manner. The top-level list contains lists 
         of images in one row. The images are part of a larger image, and the order of the images in the data structure is consistent
@@ -70,6 +72,8 @@ class ImageReconstructModel():
         # extract the origin offsets of the row reco images and the whole reco image
         self.row_reco_image_origin_offsets_list = self.reco_2d_model.get_row_reco_image_origin_offsets_list()
         self.whole_reco_image_origin_offset = self.reco_2d_model.get_whole_reco_image_origin_offset()
+        # retrieve the sample feature matching image file dict 
+        self.feature_match_image_dict_list = self.reco_2d_model.get_feature_match_image_dict_list()
         # discard the model to save memory
         self.reco_2d_model = None
         # initialize frequently used objects
@@ -228,7 +232,14 @@ class ImageReconstructModel():
         :rtype: tuple
         """
         return (self.whole_reco_image_size[0] * self.scaling_factor, self.whole_reco_image_size[1] * self.scaling_factor,)
-    
+
+    def get_feature_match_image_dict_list(self) -> list:
+        """ Returns the list of file names of images showing feature matching for debug purpose
+
+        :return: the list of image file names
+        """
+        return self.feature_match_image_dict_list
+
     def print_info(self):
         """ Displays the information of this ImageReconstructModel
         """
@@ -355,6 +366,8 @@ class ImageReconstructModelHelper():
         # add the size and the offset (the output location of camera transform is offseted) of the whole reconstructed image
         data['whole_reco_image_size'] = [*reco_model.whole_reco_image_size]  
         data['whole_reco_image_origin_offset'] = [*reco_model.whole_reco_image_origin_offset]  
+        # add the feature matching image dict list
+        data['feature_match_image_dict'] = reco_model.feature_match_image_dict_list
         return data
     
     @staticmethod
@@ -397,6 +410,8 @@ class ImageReconstructModelHelper():
         # add the size and the offset (the output location of camera transform is offseted) of the whole reconstructed image
         reco_model.whole_reco_image_origin_offset = data['whole_reco_image_origin_offset']  
         reco_model.whole_reco_image_size = data['whole_reco_image_size']  
+        # add the feature matching image dict list
+        reco_model.feature_match_image_dict_list = data['feature_match_image_dict']
         # initialize frequently used objects
         reco_model._prepare_objects() 
         return reco_model  
@@ -433,6 +448,9 @@ class ImageReconstruct2DModel():
         self.row_reco_image_origin_offsets_list = []    # a list containing the origin offset of the row reconstructed images for position transformation
         self.whole_reco_image_origin_offset = None      # the origin offset of the whole reconstructed images for position transformation 
         
+        # list of images displaying matching features
+        self.feature_match_image_dict_list = []
+
         # iterate through the rows and construct transformation for each images in a rowrows
         self.ncols, self.nrows = self.image_map.get_image_map_size()
         self.num_steps = (self.ncols + 1) * self.nrows 
@@ -446,12 +464,15 @@ class ImageReconstruct2DModel():
             self.reco_row_model_list.append(reco_row_model)            
             self.camera_transforms_row_list.append(reco_row_model.get_camera_transforms_row())
             self.row_reco_image_origin_offsets_list.append(reco_row_model.get_reco_image_origin_offset())
-            # save the debug matching images if the flag is on
-            # if debug_feature_matching_images:
-            #     debug_images = reco_row_model.get_debug_images_feature_matching()
-            #     for image_index_1, image_index_2, image in debug_images:
-            #         image_file = os.path.join(logdata_folder, f'feature_match_row_images_{image_index_1}_{row_index}_{image_index_2}_{row_index}.jpg')
-            #         cv2.imwrite(image_file, image)
+            # save the feature matching image for debug purpose if the flag is on
+            if debug_feature_matching_images:
+                debug_images = reco_row_model.get_debug_images_feature_matching()
+                for image_index_1, image_index_2, image in debug_images:
+                    image_file_name = f'feature_match_row_images_{image_index_1}_{row_index}_{image_index_2}_{row_index}.jpg'
+                    image_dict = {'title': f'Feature matching between column {image_index_1} and {image_index_2} on row {row_index}', 'src': image_file_name}
+                    self.feature_match_image_dict_list.append(image_dict)
+                    image_file = os.path.join(logdata_folder, image_file_name)
+                    cv2.imwrite(image_file, image)
 
         # step 2: generate the reconstructed images row by row at the current scale
         self.logger.info(f'{type(self).__name__} Step 2: generating {self.nrows} reconstructed row images')
@@ -484,9 +505,12 @@ class ImageReconstruct2DModel():
             if debug_feature_matching_images:        
                 debug_images = reco_whole_model.get_debug_images_feature_matching()
                 for image_index_1, image_index_2, image in debug_images:
-                    image_file = os.path.join(logdata_folder, f'feature_match_between_rows_images_{image_index_1}_{image_index_2}.jpg')
+                    image_file_name = f'feature_match_between_rows_images_{image_index_1}_{image_index_2}.jpg'
+                    image_dict = {'title': f'Feature matching between rows {image_index_1} and {image_index_2}', 'src': image_file_name}
+                    self.feature_match_image_dict_list.append(image_dict)
+                    image_file = os.path.join(logdata_folder, image_file_name)
                     cv2.imwrite(image_file, cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE))
-
+            # using the computed transforms to generate the reconstructed image for the input 2d grid of images
             self.camera_transforms_between_rows = reco_whole_model.get_camera_transforms_row()
             self.whole_reco_image_origin_offset = reco_whole_model.get_reco_image_origin_offset()
             whole_reco_image, warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(row_recoimages_rotated_list, self.camera_transforms_between_rows, 
@@ -496,7 +520,7 @@ class ImageReconstruct2DModel():
         
         # save the whole reco images only if output_folder is provided
         if logdata_folder is not None:  
-            output_file = os.path.join(logdata_folder, f'whole_reco_image.jpg')
+            output_file = os.path.join(logdata_folder, ImageReconstructModel.FILENAME_WHOLE_RECO_IMAGE)
             self.logger.info(f'{type(self).__name__}: Writing whole reconstructed image (size: {whole_reco_image.shape[:2][::-1]}) to file {output_file}')
             cv2.imwrite(output_file, whole_reco_image)
         self.whole_reco_image_size = whole_reco_image.shape[:2][::-1]
@@ -506,7 +530,6 @@ class ImageReconstruct2DModel():
             images_list_scaling_factor = 1 / working_scale
             whole_reco_image_original_scale = self._generate_whole_recoimage_with_scaling(images_2d_list, self.camera_transforms_row_list, self.camera_transforms_between_rows,
                                                                                           images_list_scaling_factor, logdata_folder=logdata_folder)
-
     def get_image_map_size(self) -> tuple:
         """ 
 
@@ -570,6 +593,13 @@ class ImageReconstruct2DModel():
         :rtype: tuple
         """
         return self.whole_reco_image_origin_offset    
+    
+    def get_feature_match_image_dict_list(self) -> list:
+        """ Returns the list of file names of images showing feature matching for debug purpose
+
+        :return: the list of image file names
+        """
+        return self.feature_match_image_dict_list
     
     @staticmethod
     def _load_images(images_list:list) -> list:
@@ -647,7 +677,7 @@ class ImageReconstruct2DModel():
                                                                                                                             images_list_scaling_factor)
         whole_reco_image_original_scale = cv2.rotate(whole_reco_image_original_scale, cv2.ROTATE_90_CLOCKWISE)
         if logdata_folder is not None:
-            output_file = os.path.join(logdata_folder, f'whole_reco_image_original_scale.jpg')
+            output_file = os.path.join(logdata_folder, ImageReconstructModel.FILENAME_WHOLE_RECO_FULL_SCALE_IMAGE)
             self.logger.info(f'{type(self).__name__}: Writing whole full-scale reconstructed image to file {output_file}')
             cv2.imwrite(output_file, whole_reco_image_original_scale)
         return whole_reco_image_original_scale
@@ -724,12 +754,12 @@ class ImageReconstruct1DModel():
         self.logger.info(f'The confidence matrix:\n{self.confidence_matrix}')
         # step 4: save the images annotated with matching results to a class variables 
         self.debug_images_feature_matching = None
-        if debug_feature_matching_images and row_index is not None:
+        if debug_feature_matching_images:
             self.debug_images_feature_matching = self.features_matcher.draw_matches_matrix(images_1d_list, self.features, self.matches, conf_thresh=confidence_threshold, 
                                                    inliers=True, matchColor=(0, 255, 0))
-            for image_index_1, image_index_2, image in self.debug_images_feature_matching:
-                image_file = os.path.join(logdata_folder, f'feature_match_row_images_{image_index_1}_{row_index}_{image_index_2}_{row_index}.jpg')
-                cv2.imwrite(image_file, image)
+            # for image_index_1, image_index_2, image in self.debug_images_feature_matching:
+            #     image_file = os.path.join(logdata_folder, f'feature_match_row_images_{image_index_1}_{row_index}_{image_index_2}_{row_index}.jpg')
+            #     cv2.imwrite(image_file, image)
                 
         # step 5: split the features and matches according to the images
         subsetter = Subsetter(confidence_threshold=confidence_threshold)

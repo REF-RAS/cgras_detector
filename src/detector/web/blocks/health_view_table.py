@@ -18,7 +18,7 @@ from dash.dash_table.Format import Format, Group, Scheme
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 
 class HealthViewTable():
     def __init__(self, app, prefix, page_size=50, refresh_cycle=10):

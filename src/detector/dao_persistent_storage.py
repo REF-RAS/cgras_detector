@@ -18,7 +18,7 @@ from datetime import datetime as dt
 # project modules
 import tools.db_tools as db_tools
 from tools.lock_tools import synchronized
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.database_manager import DBFileManager
 
 PERSISTENT_STORE_DDL = {
@@ -87,7 +87,7 @@ def manage_tables():
     DETECT_DBFM = DBFileManager(DATABASE_FOLDER, 'detector.db', PERSISTENT_STORE_DDL)
     DETECT_DBFM.drop_tables(['general_config'])
     tables_name = DETECT_DBFM.list_tables_name()
-    global_logger.info(f'tables: {tables_name}')
+    logger.info(f'tables: {tables_name}')
     DETECT_DBFM.create_tables(['persistent_store'])
     DETECT_DBFM.dump_all_tables()       
 

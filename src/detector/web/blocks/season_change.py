@@ -17,7 +17,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 import tools.file_tools as file_tools
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.model import AIMSTILE_DAO
 
 

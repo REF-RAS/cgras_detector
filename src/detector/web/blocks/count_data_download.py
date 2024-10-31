@@ -19,7 +19,7 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.model import APP_FILE_MANAGER, AIMSTILE_DAO, DETECT_DAO
 from detector.models.visualize import CoralObjectMapModel, CoralObjectMapModelHelper
 
@@ -97,7 +97,7 @@ class CountResultDownloadBlock():
             image_filename_list = []
             # retrieve figures from the trend panel
             if self.get_trend_figure_func is not None:
-                fig_list = self.get_heatmap_figures_list_func()
+                fig_list = self.get_trend_figure_func()
                 if fig_list:
                     trend_fig = fig_list[0]
                     img_bytes = trend_fig.to_image(format='png')
@@ -114,9 +114,9 @@ class CountResultDownloadBlock():
             # retrieve figures from the scatter plot panel
             if self.get_scatterplot_figures_list_func:
                 fig_list = self.get_scatterplot_figures_list_func()
-                for index, heatmap_fig in enumerate(fig_list):
-                    img_bytes = heatmap_fig.to_image(format='png')
-                    title = heatmap_fig.to_dict()['layout']['title']['text']
+                for index, scatterplot_fig in enumerate(fig_list):
+                    img_bytes = scatterplot_fig.to_image(format='png')
+                    title = scatterplot_fig.to_dict()['layout']['title']['text']
                     image_filebytes_list.append(img_bytes)
                     image_filename_list.append(f'{tile_id}_scatterplot_{index}.png')                      
                     

@@ -17,7 +17,7 @@ from datetime import datetime as dt
 # project modules
 import tools.db_tools as db_tools
 from tools.lock_tools import synchronized
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 from detector.database_manager import DBFileManager
  
 # the DDL for creating tables in the tile.db
@@ -214,7 +214,7 @@ class AIMSTileDAO():
                 row['settle_time'] = None if type(row['settle_time']) != str else row['settle_time']               
                 self.add_tile(row['pit_id'], row['species'], row['spawn_time'], row['settle_time'], row['season'])
             except (Exception, Warning) as e:
-                global_logger.warning(e)
+                logger.warning(e)
                 error_list.append(f'{e.__class__.__name__} at row {index}: {e} ')
         return error_list if len(error_list) > 0 else None
     

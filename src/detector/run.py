@@ -18,7 +18,7 @@ from datetime import datetime
 import rospy, message_filters, actionlib, rospkg
 from std_msgs.msg import String, Header, Bool, Int8, Float32
 # project modules: web and generic
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 import tools.hash_tools as hash_tools
 from detector.web.dashapp_main import DashApplicationMain
 from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, PERSISTENT_STORE_DAO, AIMSTILE_DAO, SystemConfigNames, StatusNames, TaskTypes, CALLBACK_MANAGER, CallbackTypes
@@ -34,7 +34,7 @@ from detector.models.detector_error import DetectorError, DetectorErrorCodes
 class ApplicationCoordinator(object):
     NODE_NAME = 'cgras_detect_viewer'
     def __init__(self):
-        global_logger.info(f'The {ApplicationCoordinator.NODE_NAME} application (pid:{os.getpid()})')
+        logger.info(f'The {ApplicationCoordinator.NODE_NAME} application (pid:{os.getpid()})')
         # create lock for synchronization
         self.state_lock = threading.RLock()
         # create the stop signal handler
@@ -65,15 +65,15 @@ class ApplicationCoordinator(object):
 
         # create the dash application
         try:
-            global_logger.info(f'Starting Dash Server')
+            logger.info(f'Starting Dash Server')
             self.dash_app_operator = DashApplicationMain()
             self.dash_app_operator.start()
         except (Exception, Warning) as e:
-            global_logger.warning(f'{type(self).__name__} (__init__): {e}')
+            logger.warning(f'{type(self).__name__} (__init__): {e}')
             traceback.print_exc()
         
     def stop(self, *args, **kwargs):
-        global_logger.info(f'The application (pid:{os.getpid()}) is being stopped')
+        logger.info(f'The application (pid:{os.getpid()}) is being stopped')
         self.work_to_stop = True
         time.sleep(2)
         sys.exit(0)
@@ -86,7 +86,7 @@ class ApplicationCoordinator(object):
         CAPTURER_STATE.update(CapturerStates(msg.data))
         
     def pub_detector_state(self):
-        global_logger.info(f'pub {STATE.get_state()}')
+        logger.info(f'pub {STATE.get_state()}')
         self.state_pub.publish(Int8(STATE.get_state()))
 
     #  callback from the GUI console
@@ -96,7 +96,7 @@ class ApplicationCoordinator(object):
             if state in [SystemStates.D_INIT, SystemStates.D_RECO, SystemStates.D_LOCTILE, SystemStates.D_OBJECT, SystemStates.D_COLLECT_STAT]:
                 if event == CallbackTypes.PROCESS_TILE_TO_ABORT:
                     the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
-                    global_logger.warning(f'ABORT CALLBACK: {the_detection_task}')
+                    logger.warning(f'ABORT CALLBACK: {the_detection_task}')
                     if the_detection_task:
                         STATE.update_state(SystemStates.D_ABORTED)
                         the_detection_task.abort_task()
@@ -120,7 +120,7 @@ class ApplicationCoordinator(object):
                     STATE.update_state(SystemStates.POLL_DETECT)
    
     def _task_execute_mode_changed_callback(self, event, *args):
-        global_logger.warning(f'_task_execute_mode_changed_callback: {event}')
+        logger.warning(f'_task_execute_mode_changed_callback: {event}')
         with self.state_lock:
             state = STATE.get()
             # if STATE.time_lapsed_since_update() < 3.0:  # demo state change with an arbitrary 3 second period
@@ -172,7 +172,7 @@ class ApplicationCoordinator(object):
                                 STATE.set_var('tile_sample_id', self.next_tile_sample['id'])
                                 STATE.update_state(SystemStates.D_INIT)
                             except Exception as e:
-                                global_logger.error(e)
+                                logger.error(e)
                                 DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.FAILED.value)
                                 STATE.update_state(SystemStates.READY)
                         else:
@@ -229,7 +229,7 @@ class ApplicationCoordinator(object):
                         time.sleep(1.0)
                         try:
                             the_detection_task = STATE.get_var('the_detection_task')
-                            the_detection_task.execute_task_collect_stat()
+                            the_detection_task.execute_task_record()
                             if STATE.is_state(SystemStates.D_ABORTED):
                                 continue
                             STATE.update_state(SystemStates.D_UPDATE_HEALTH_INDEX)
@@ -280,7 +280,7 @@ class ApplicationCoordinator(object):
                         
                 except Exception as e:
                     traceback.print_exc()
-                    global_logger.error(e)
+                    logger.error(e)
                 
                 
 

@@ -18,7 +18,7 @@ import dash_bootstrap_components as dbc
 from dash.dash_table.Format import Format, Padding
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 
 class HealthModelTable():
     def __init__(self, app, prefix):

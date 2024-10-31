@@ -47,7 +47,7 @@ class StateManager():
         self.state_lock = threading.RLock()
         self.state = initial_state
         self.last_state = None
-        self.info = None
+        self.info:object = None
         self.last_update_time = None
         self.last_change_time = None
         if initial_state is not None:
@@ -75,16 +75,16 @@ class StateManager():
         """
         return self.last_state
 
-    def get_with_info(self) -> tuple:
-        """ Returns the current state and attached info as a tuple
+    def get_state_info(self) -> object:
+        """ Returns the info of the state 
         """
         self.state_lock.acquire()
         try:
-            return (self.state, self.info,)
+            return self.info
         finally:
             self.state_lock.release()      
 
-    def update(self, new_state, info=None):
+    def update(self, new_state, info:object=None):
         """ Change the state to a new state, with an option to attach an info object
 
         :param new_state: The new state

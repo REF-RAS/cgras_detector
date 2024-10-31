@@ -59,5 +59,5 @@ def get_logger(name='global', level=logging.INFO, silent:bool=False, logging_fil
     return logger
 
 # The global object to be imported by other modules
-global_logger = get_logger()
+logger = get_logger()
 

@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, yaml, contextlib, glob, time, shutil
+import os, math, yaml, contextlib, glob, time, shutil, traceback
 from enum import Enum
 from collections import defaultdict, OrderedDict
 import datetime
@@ -18,9 +18,11 @@ import numpy as np
 import pandas as pd
 
 from tools.lock_tools import synchronized
+from tools.file_tools import replace_suffix 
 from detector.models import logger, ModelsConfigNames
 from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
+from detector.html.lightbox import LightboxHelper
 from detector.model import AIMSTILE_DAO, DETECT_DAO, APP_FILE_MANAGER, CONFIG, SystemConfigNames     
 
 
@@ -74,6 +76,13 @@ class ProgressModel():
 
 
 class DetectionTaskModel():
+    WHOLE_RECO_HTML_FILENAME = 'whole_reco_image.html'
+    FEATURE_MATCH_HTML_FILENAME = 'feature_match_images.html'
+    ANNOTATED_BLOBS_HTML_FILENAME = 'annotated_blobs_at_{}_{}.html'
+    ANNOTATED_BLOBS_INDEX_HTML_FILENAME = 'annotated_blobs_index.html'
+    ANNOTATED_IMAGES_HTML_FILENAME = 'annotated_images.html'
+    LANDING_HTML_FILENAME = 'index.html'
+    
     def __init__(self, tile_sample_id:str, params:dict=None, **kwargs):
         # progress tracking
         self.progress_model = ProgressModel()
@@ -137,6 +146,9 @@ class DetectionTaskModel():
                 yaml.dump(self.params, outfile, Dumper=yaml.Dumper)
         except Exception as e:
             logger.warning(f'{type(self).__name__}: unable to save detect model parameter to the logdata folder {param_yaml_file}')
+        # copy the script files for the generated html files to the logdata folder of a tile sample
+        scripts_folder = os.path.join(self.logdata_folder, 'scripts')
+        APP_FILE_MANAGER.copy_scripts_folder(scripts_folder)
         # signal the end of the INIT stage
         self.progress_model.end_stage(ProgressStages.INIT)
 
@@ -214,13 +226,6 @@ class DetectionTaskModel():
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached CoralObjectDetectModel')
             self.cod_model = CoralObjectDetectModelHelper.from_yaml_file(cod_model_file)
-            ### NOTE: fix the coral object strucutres
-            # for co in self.cod_model.object_list:
-            #     if co.is_coral:
-            #         co.class_category = ObjectClassCategories.CORAL.value
-            #     else:
-            #         co.class_category = ObjectClassCategories.NOT_CORAL.value
-            # CoralObjectDetectModelHelper.to_yaml_file(self.cod_model, cod_model_file) 
         except:
             logger.info(f'{type(self).__name__}: No cached file. Building the CoralObjectDetectModel from capture images, reco model, loctile model, and yolo model')
             # load the yolo_model first
@@ -246,20 +251,24 @@ class DetectionTaskModel():
         if progress_tuple is not None:
             self.progress_model.update_stage_progress(ProgressStages.OBJECT_DETECT, *progress_tuple)
             
-    def execute_task_collect_stat(self):
+    def execute_task_record(self):
         self.progress_model.start_stage(ProgressStages.COLLECT_STAT)        
         # extract statistics of the tile 
         self.detection_stat['tile_pixel_x'], self.detection_stat['tile_pixel_y'] = self.reco_model.get_whole_reco_image_size()
         # detection of coral objects is completed, save the results to the database
-        logger.info(f'{type(self).__name__}: Saving {self.cod_model.get_num_objects()} coral objects to database')
+        logger.info(f'{type(self).__name__}: Saving all types of {self.cod_model.get_num_objects()} objects to database')
         DETECT_DAO.delete_detected_objects_of_tile_sample(self.tile_sample_id)
         if self.to_abort:
             self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
             return
         stat = self._process_detected_objects(self.cod_model)
+        logger.info(f'{type(self).__name__}: Statistics {stat}')
         self.detection_stat.update(stat)
         # save the statistics to the database
         self._update_detection_stat(self.detection_stat)
+        # generate html files
+        self.generate_html_files()
+        # update the progress model
         self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
         self.progress_model.end_stage(ProgressStages.COMPLETED)
 
@@ -267,12 +276,73 @@ class DetectionTaskModel():
         self.execute_task_reco()
         self.execute_task_loctile()
         self.execute_task_object_detection()
-        self.execute_task_collect_stat()
+        self.execute_task_record()
 
     def abort_task(self):
         self.to_abort = True
         if self.cod_model is not None:
             self.cod_model.abort()
+    
+    def generate_html_files(self):
+        link_dict_list = []
+        try:
+            # generate the html file for viewing the whole reconstructed image
+            whole_reco_image_filename = self.reco_model.FILENAME_WHOLE_RECO_IMAGE
+            html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
+            LightboxHelper.generate_single_image_lightbox(html_output_file, whole_reco_image_filename)
+            link_dict_list.append({'href': whole_reco_image_filename, 'text': 'Reconstructed image of the tile sample'})
+        except Exception as e:
+            logger.warning(f'Failed to generate HTML file for showing the whole reconstructed image')
+            traceback.print_exc()
+        try:
+            # generate the html file for viewing the feature matching images 
+            feature_matching_image_dict_list = self.reco_model.get_feature_match_image_dict_list()
+            html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
+            title = 'Feature Matching Output in the Reconstruction of Tile Image'
+            LightboxHelper.generate_multi_images_lightbox(html_output_file, feature_matching_image_dict_list, title)
+            link_dict_list.append({'href': DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME, 'text': 'Feature matching for image reconstruction'})
+        except:
+            logger.warning(f'Failed to generate HTML file for showing feature matching between images')
+            traceback.print_exc()
+        try:
+            # generate the html file for viewing the annotated blobs
+            annotated_blob_dict_list_as_dict = self.cod_model.get_annotated_blob_filename_dict_lists_as_dict()
+            # iterate through the index of the dict and generate the annotated blobs for each image
+            for image_index in annotated_blob_dict_list_as_dict.keys():
+                col_index, row_index = image_index
+                html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.ANNOTATED_BLOBS_HTML_FILENAME.format(col_index, row_index))
+                title = f'Image Blobs Annotated with Detected Objects in Image {image_index}'
+                LightboxHelper.generate_multi_images_lightbox(html_output_file, annotated_blob_dict_list_as_dict[image_index], title)
+            # generate the annotated blob index page for all images
+            image_index_list = list(annotated_blob_dict_list_as_dict.keys())
+            image_index_list.sort()
+            annotated_blob_index_links_list = []
+            for image_index in image_index_list:
+                col_index, row_index = image_index
+                annotated_blob_index_links_list.append({'href': DetectionTaskModel.ANNOTATED_BLOBS_HTML_FILENAME.format(col_index, row_index), 'text': f'Image Blobs Annotated with Detected Objects in Image {image_index}'}) 
+            
+            html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.ANNOTATED_BLOBS_INDEX_HTML_FILENAME)
+            title = f'Image Blobs Annotated with Detected Objects in Tile Sample {self.tile_sample_id}'
+            LightboxHelper.generate_landing_page(html_output_file, annotated_blob_index_links_list, title)
+                
+            link_dict_list.append({'href': DetectionTaskModel.ANNOTATED_BLOBS_INDEX_HTML_FILENAME, 'text': 'Image Blobs Annotated with Detected Objects'})
+            # generate the html file for viewing the annotated images
+            annotated_image_dict_list = self.cod_model.get_annotated_image_filename_dict_list()
+            html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.ANNOTATED_IMAGES_HTML_FILENAME)
+            title = 'Capture Images Annotated with Detected Objects'
+            LightboxHelper.generate_multi_images_lightbox(html_output_file, annotated_image_dict_list, title)     
+            link_dict_list.append({'href': DetectionTaskModel.ANNOTATED_IMAGES_HTML_FILENAME, 'text': 'Capture Images Annotated with Detected Objects'})     
+        except:
+            logger.warning(f'Failed to generate HTML file for showing annotated images')    
+            traceback.print_exc()
+        # generate the landing page
+        try:
+            html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.LANDING_HTML_FILENAME)
+            title = f'Imagery records for the image reconstruction modelling for the tile sample {self.tile_sample_id}'
+            LightboxHelper.generate_landing_page(html_output_file, link_dict_list, title)
+        except:
+            logger.warning(f'Failed to generate the landing page HTML file')  
+            traceback.print_exc()  
 
     def get_time_since_start(self):
         return time.time() - self.start_time
@@ -315,8 +385,7 @@ class DetectionTaskModel():
 
     @staticmethod
     def delete_cache_files(tile_sample_id:str, delete_reco=False, delete_object_detection=False):
-        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
+        logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)        
         with contextlib.suppress(FileNotFoundError, Exception):
             if delete_reco:
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.RECO_MODEL_FILENAME.value, 'reco_model.yaml')))
@@ -325,14 +394,19 @@ class DetectionTaskModel():
             if delete_object_detection:            
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.COD_MODEL_FILENAME.value, 'coral_object_detect_model.yaml')))
                 for file in glob.glob(os.path.join(logdata_folder, 'object_list_*.yaml')):
-                    os.remove(file) 
+                    os.remove(file)
                     
     @staticmethod
     def delete_cache_folder(tile_sample_id:str):
-        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
+        logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)
         with contextlib.suppress(FileNotFoundError, Exception):
             shutil.rmtree(logdata_folder, ignore_errors=True)        
+
+    @staticmethod
+    def get_cache_folder(tile_sample_id:str):
+        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
+        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
+        return logdata_folder
 
 # ---------------------------------------
 # test functions
@@ -348,9 +422,9 @@ def get_basic_detection_params() -> dict:
         'reco_working_scale': 0.1,
         'cod_model_filename': 'coral_object_detect_model.yaml', 
         'cod_debug_blob_images': True,
-        'cod_blob_overlap_pix': 32,
+        'cod_blob_overlap_pix': 128,
         'cod_use_cached_object_detection': True,
-        'cod_duplicate_max_displacement_images': 16,
+        'cod_duplicate_max_displacement_images': 64,
         'cod_duplicate_max_displacement_blobs': 32, 
         # to be updated in the DetectionTaskModel using the database
         'logdata_folder': None, 
@@ -363,7 +437,8 @@ def get_basic_detection_params() -> dict:
 
 if __name__ == '__main__':
     # tile_sample_id = '2023Dec-P00003-CG1-202311201200'
-    tile_sample_id = '2023Dec-P10001-CG1-202402161404'
+    # tile_sample_id = '2023Dec-P10001-CG1-202402161404'
+    tile_sample_id = '2023Dec-P20000-CG1-202311231200'
     dt_model = DetectionTaskModel(tile_sample_id, get_basic_detection_params())
     dt_model.execute_task()
     

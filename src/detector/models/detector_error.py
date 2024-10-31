@@ -14,7 +14,7 @@ import os, sys, threading, collections, time, shutil, traceback
 from enum import Enum
 from datetime import datetime
 # project modules
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 
 class DetectorErrorCodes(Enum):
     IMAGE_FILE_NOT_FOUND = 1

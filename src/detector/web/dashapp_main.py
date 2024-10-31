@@ -22,7 +22,7 @@ from flask import Flask
 # ros modules
 import rospy, message_filters
 # project modules
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 import tools.hash_tools as hash_tools
 import detector.model as model
 from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER
@@ -36,11 +36,11 @@ APP = dash.Dash(__name__,
                 server=SERVER,
                 meta_tags=[{"name": "viewport", "content": "width=device-width"}],
                 suppress_callback_exceptions=True,
-                include_assets_files=True,
+                include_assets_files=False,
                 # assets_ignore='foundation-renamed.min.css|jquery.nanogallery2.min.js|nanogallery2.min.css',
                 # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js',
                 # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js|bootstrap.min.css',  # this combination stops the annoying refreshing of the UI when online
-                assets_ignore='*.css|*.js',
+                assets_ignore='*.css|*.js|*.jpg|*.html|*.yaml',
                 assets_folder=APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.SYSTEM_FOLDER)
                 )
 
@@ -157,7 +157,7 @@ class DashApplicationMain():
                 else: # if redirected to unknown link
                     page_content = '404 Page Error! Please choose a link'
             except Exception as e:
-                global_logger.error(e)
+                logger.error(e)
                 traceback.print_exc()
             return (page_content, nav_content,)
         return display_page

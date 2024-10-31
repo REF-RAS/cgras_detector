@@ -14,7 +14,7 @@ import os, sys, threading, collections, time, shutil, traceback
 from enum import Enum
 from datetime import datetime
 # project modules
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 
 class ApplicationFileManager():
     SYSTEM_FOLDER = 'system'
@@ -32,12 +32,9 @@ class ApplicationFileManager():
         os.makedirs(self.images_folder, exist_ok=True)
         self.database_folder = os.path.join(self.cgras_data_folder, 'database')
         os.makedirs(self.database_folder, exist_ok=True)        
-        self.coordinator_folder = os.path.join(self.cgras_data_folder, 'coordinator')
-        os.makedirs(self.coordinator_folder, exist_ok=True)
         self.detector_folder = os.path.join(self.cgras_data_folder, 'detector')
         os.makedirs(self.detector_folder, exist_ok=True)
         # create the subfolders under the two platforms
-        self._create_platform_folders(self.coordinator_folder)
         self._create_platform_folders(self.detector_folder)
     
     @staticmethod
@@ -57,10 +54,7 @@ class ApplicationFileManager():
 
     def get_database_folder(self) -> str:
         return self.database_folder
-    
-    def get_capturer_folder(self, *args) -> str:
-        return self.get_subfolder(self.coordinator_folder, *args)
-    
+        
     def get_detector_folder(self, *args) -> str:
         return self.get_subfolder(self.detector_folder, *args)
     
@@ -84,22 +78,31 @@ class ApplicationFileManager():
             os.makedirs(parent_folder, exist_ok=True)
         return parent_folder
 
-    # --- copy the images in the images folder to the system folder of detector
+    # --- copy the images in the images folder and web scripts to the system folder of detector
     def populate_system_assets_folder(self):
         try:
             system_folder_path = self.get_detector_folder(self.SYSTEM_FOLDER)
             shutil.rmtree(self.get_detector_folder(self.SYSTEM_SCRIPTS_FOLDER), ignore_errors=True)
             shutil.rmtree(self.get_detector_folder(self.SYSTEM_IMAGES_FOLDER), ignore_errors=True)
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system/scripts')
-            global_logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
             shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_SCRIPTS_FOLDER), dirs_exist_ok=True)
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system/images')
-            global_logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
             shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_IMAGES_FOLDER), dirs_exist_ok=True)            
             # self.generate_pattern_images()
             return True
         except Exception as e:
-            global_logger.warning(f'ApplicationFileManager.populate_system_assets_folder: {traceback.format_exc()}')
+            logger.warning(f'ApplicationFileManager.populate_system_assets_folder: {traceback.format_exc()}')
             return False
 
-
+    # --- copy the scripts folder to the given destination
+    def copy_scripts_folder(self, destination:str):
+        try:
+            source_path = os.path.join(os.path.dirname(__file__), 'web/_system/scripts')
+            logger.info(f'ApplicationFileManager.copy_scripts_folder: copy {source_path} to {destination}')
+            shutil.copytree(source_path, destination, dirs_exist_ok=True)
+            return True
+        except Exception as e:
+            logger.warning(f'ApplicationFileManager.copy_scripts_folder: {traceback.format_exc()}')
+            return False

@@ -17,7 +17,7 @@ import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 # project modules
-from detector.model import STATE, CAPTURER_STATE, SystemStates, global_logger, CALLBACK_MANAGER, CallbackTypes
+from detector.model import STATE, CAPTURER_STATE, SystemStates, logger, CALLBACK_MANAGER, CallbackTypes
 from detector.task_detection import DetectionTaskModel, ProgressStages
 
 class MonitorExecuteProgressBlock():

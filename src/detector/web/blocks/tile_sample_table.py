@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import shutil
+import os
 import pandas as pd
 # dash modules
 import dash
@@ -19,7 +19,7 @@ from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO
 from detector.dao_detect import StatusNames
 from detector.task_detection import DetectionTaskModel
-from tools.logging_tools import global_logger
+from tools.logging_tools import logger
 
 class TileSampleTable():
     def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_reload=False, allow_view=False):
@@ -57,21 +57,20 @@ class TileSampleTable():
                 
         self._datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, fill_width=True, row_selectable='multi',
                                                style_cell_conditional=self._style_cell_conditional, 
-
                                                cell_selectable=False, row_deletable=False)
 
-        # self._viewdata_modal = dbc.Modal([
-        #             dbc.ModalHeader(dbc.ModalTitle('View processing details of a sample')),
-        #             html.Div([
-        #                 html.B('', id=prefix+'viewdata_modal_message'),
-        #                 html.P(''),
-        #                 dbc.Button('Browse the Scanned Images', target='view_capture', external_link=True,
-        #                         id='dataview_scan_link', color='success',),]
-        #                 , className='d-grid gap-2 col-8 mx-auto', style={'padding': '6px'})
-        #                 ], id=prefix+'viewdata_modal', is_open=False)
+        self._viewdata_modal = dbc.Modal([
+                    dbc.ModalHeader(dbc.ModalTitle('View analysis results of the tile sample')),
+                    html.Div([
+                        html.B('', id=prefix+'view_modal_message'),
+                        html.P(''),
+                        dbc.Button('Reconstructed Image', target='view_image', external_link=False, id=prefix+'view_reconstruct_link', color='primary'),
+                        dbc.Button('Feature Matching Images', target='view_image', external_link=False, id=prefix+'view_feature_match_link', color='primary'),                        
+                        ]
+                        , className='d-grid gap-2 col-8 mx-auto', style={'padding': '6px'})
+                        ], id=prefix+'view_modal', is_open=False)
         
         # define confirm panel in a modal
-        
         self._reprocess_mode_radio = dcc.RadioItems(id=prefix+'reprocess_mode', options={
                                                 '_whole': '  Redo the whole analysis (reconstruction, tile location, object detection and analysis)',
                                                 '_redo_detect': '  Redo from detection (object detection and analysis)',
@@ -103,20 +102,22 @@ class TileSampleTable():
         ]
         if allow_reprocess:
             self._div_panel_children.append(
-                dbc.Button('Redo', id=prefix+'table_reprocess_button', color='primary',className='ms-2', size='sm', style={'width': '100px'}))
+                dbc.Button('Redo', id=prefix+'table_reprocess_button', color='primary',className='ms-2', size='sm', style={'width': '80px'}))
         if allow_priority:
             self._div_panel_children.append(
-                dbc.Button('Prioritize', id=prefix+'table_priority_button', color='primary', className='ms-2', size='sm', style={'width': '100px'}))
+                dbc.Button('Prioritize', id=prefix+'table_priority_button', color='primary', className='ms-2', size='sm', style={'width': '80px'}))
         if allow_view:
             self._div_panel_children.append(
-                dbc.Button('View Details', id=prefix+'table_view_button', color='primary', className='ms-2', size='sm', style={'width': '100px'}))  
-        if allow_reload:
-            dbc.Button('Reload', id=prefix+'table_reload_button', color='warning', className='ms-2', size='sm', style={'width': '100px'}),
-              
+                dbc.Button('Examine', id=prefix+'table_view_button', color='secondary', className='ms-2', size='sm', style={'width': '80px'}))  
+
         self._div_panel_children.extend([         
-            dbc.Button('Invalidate', id=prefix+'table_invalid_button', color='danger', className='ms-2', size='sm', style={'width': '100px'}),
-            dbc.Button('Delete', id=prefix+'table_delete_button', color='danger', className='ms-2', size='sm', style={'width': '100px'}),
+            dbc.Button('Invalidate', id=prefix+'table_invalid_button', color='danger', className='ms-2', size='sm', style={'width': '80px'}),
         ])
+        
+        if allow_reload:
+            self._div_panel_children.append(
+                dbc.Button('Reload', id=prefix+'table_reload_button', color='danger', className='ms-2', size='sm', style={'width': '80px'}))
+            
         self._datatable_panel_children = [html.Div(self._div_panel_children, style={'display':'flex'}), 
                                           self._datatable]
 
@@ -125,27 +126,30 @@ class TileSampleTable():
                 self._message_alert,
                 dcc.Store(id=self.update_table_store_id),
                 dcc.Store(id=prefix+'row_invalid_store'),
-                dcc.Store(id=prefix+'row_delete_store'),
+                dcc.Store(id=prefix+'row_reload_store'),
                 dcc.Store(id=prefix+'row_priority_store'),
                 dcc.Store(id=prefix+'row_reprocess_store'),
                 dcc.Store(id=prefix+'row_view_store'),
                 self._confirm_reprocess_modal,
                 self._deletedata_modal,    
+                self._viewdata_modal,
                 self._invalidate_confirm_dialog,            
                 ], style={'margin-top':'24px'})
         
         # define callback for selecting a scan and open the modal window
-        # self.app.callback([Output('dataview_scan_link', 'href'), 
-        #         Output('dataview_scan_link', 'style'),
-        #         Output('viewdata_modal_message', 'children'),
-        #         Output('viewdata_modal', 'is_open'),],
-        #     [Input('row_priority_store', 'data')], prevent_initial_call=True)(self._browse_scan())
+        self.app.callback([ Output(prefix+'view_modal', 'is_open'),
+                            Output(prefix+'view_modal_message', 'children'), 
+                            Output(prefix+'view_reconstruct_link', 'href'),
+                            Output(prefix+'view_reconstruct_link', 'disabled'),
+                            Output(prefix+'view_feature_match_link', 'href'),
+                            Output(prefix+'view_feature_match_link', 'disabled'),],
+                        [Input(prefix+'row_view_store', 'data')], prevent_initial_call=True)(self._view_row_confirmed())
         
         self.app.callback([Output(prefix+'invalidate_confirm_dialog', 'displayed')],
             [Input(prefix+'row_invalid_store', 'data')], prevent_initial_call=True)(self._invalidate_row_requested())  
         
         self.app.callback([Output(prefix+'delete_confirm_dialog', 'displayed')],
-            [Input(prefix+'row_delete_store', 'data')], prevent_initial_call=True)(self._delete_row_requested())           
+            [Input(prefix+'row_reload_store', 'data')], prevent_initial_call=True)(self._delete_row_requested())           
 
         self.app.callback([Output(prefix+'confirm_reprocess_modal', 'is_open', allow_duplicate=True)],
             [Input(prefix+'row_reprocess_store', 'data')], prevent_initial_call=True)(self._redo_row_requested())     
@@ -171,16 +175,18 @@ class TileSampleTable():
                            Output(prefix+'message_alert', 'children', allow_duplicate=True),
                            Output(self.update_table_store_id, 'data', allow_duplicate=True)],
                             [Input(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
-                            State(prefix+'row_delete_store', 'data'),
+                            State(prefix+'row_reload_store', 'data'),
                             State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._delete_row_confirmed()) 
         
         self.app.callback([Output(prefix+'message_alert', 'is_open', allow_duplicate=True),
                            Output(prefix+'message_alert', 'children', allow_duplicate=True)],
-                            [Input(prefix+'row_priority_store', 'data'),], prevent_initial_call=True)(self._priority_row_confirmed())        
+                            [Input(prefix+'row_priority_store', 'data'),], prevent_initial_call=True)(self._priority_row_confirmed())  
         
         input_list = [State(prefix+'datatable', 'selected_rows'), 
-                      Input(prefix+'table_invalid_button', 'n_clicks'),
-                      Input(prefix+'table_delete_button', 'n_clicks'),]
+                      Input(prefix+'table_invalid_button', 'n_clicks'),]
+        
+        if allow_reload:
+            input_list.append(Input(prefix+'table_reload_button', 'n_clicks'))            
         if allow_reprocess:
             input_list.append(Input(prefix+'table_reprocess_button', 'n_clicks'))
         if allow_priority:
@@ -191,7 +197,7 @@ class TileSampleTable():
         self.app.callback([Output(prefix+'row_reprocess_store', 'data'),
                            Output(prefix+'row_priority_store', 'data'),
                             Output(prefix+'row_invalid_store', 'data'),
-                            Output(prefix+'row_delete_store', 'data'),
+                            Output(prefix+'row_reload_store', 'data'),
                             Output(prefix+'row_view_store', 'data'),
                             Output(prefix+'datatable', 'selected_rows', allow_duplicate=True),
                            ], input_list, prevent_initial_call=True)(self._table_button_pressed())     
@@ -263,7 +269,7 @@ class TileSampleTable():
                 return (None, row_index_list, None, None, None, [])
             elif button_id.endswith('table_invalid_button'):
                 return (None, None, row_index_list, None, None, []) 
-            elif button_id.endswith('table_delete_button'):
+            elif button_id.endswith('table_reload_button'):
                 return (None, None, None, row_index_list, None, [])                 
             elif button_id.endswith('table_view_button'):
                 return (None, None, None, None, row_index_list, [])        
@@ -351,6 +357,29 @@ class TileSampleTable():
             return (True, message) 
         return priority_row_confirmed 
     
+    def _view_row_confirmed(self):
+        def view_row_confirmed(row_index_list):
+            if not row_index_list:
+                raise PreventUpdate
+            id = self._model.iloc[row_index_list[0]]['id']
+            logdata_folder = DetectionTaskModel.get_cache_folder(id)
+            if logdata_folder is None:
+                raise PreventUpdate
+            modal_title = f'Tile Sample ID: {id}'
+            view_reconstruct_link = os.path.join(logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
+            if os.path.isfile(view_reconstruct_link):
+                view_reconstruct_link = 'file://' + view_reconstruct_link
+            else:
+                view_reconstruct_link = None
+
+            view_feature_match_link = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
+            if os.path.isfile(view_feature_match_link):
+                view_feature_match_link = 'file://' + view_feature_match_link
+            else:           
+                view_feature_match_link = None
+            return (True, modal_title, view_reconstruct_link, view_reconstruct_link==None, view_feature_match_link, view_feature_match_link==None,)
+        return view_row_confirmed
+    
     def _style_selected_rows(self):
         def style_selected_rows(row_index_list, model):
             if row_index_list is None:
@@ -368,7 +397,7 @@ class TileSampleTable():
     
     def _selectall_button_pressed(self): 
         def selectall_button_pressed(selectall_button, model, selected_rows):
-            global_logger.warning(f'_selectall: {selectall_button, len(model), selected_rows}')
+            logger.warning(f'_selectall: {selectall_button, len(model), selected_rows}')
             if selectall_button is None:
                 raise PreventUpdate
             if selected_rows is not None and len(selected_rows) == len(model):
