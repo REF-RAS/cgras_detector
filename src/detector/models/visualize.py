@@ -106,17 +106,19 @@ class CoralObjectMapModel():
         self.season_dict = AIMSTILE_DAO.get_season(self.tile_sample_dict['season']) 
         # obtain the dimension of the heatmap from the attributes tab_ncols and tab_nrows in the season definition
         if self.season_dict is None:
-            self.map_size_default = self.params.get('vis_map_size_default', (30, 10))
+            self.map_size_default = self.params.get('vis_map_size_default', (20, 20))
         else:
             self.map_size_default = (self.season_dict['tab_ncols'], self.season_dict['tab_nrows'],) 
         # first check if a cache file exists: compute the location of the cache file
         self.cache_file, _ = CoralObjectMapModelHelper.form_cache_file_path(tile_sample_id, self.map_size_default)      
         # first check if a cache file exists: attempt to load the cache file
-        try:
-            logger.info(f'{type(self).__name__}: Attempting to load cached ObjectCountMap from ({self.cache_file})')
-            self.count_map_cache = CoralObjectMapModelHelper.from_yaml_file(self.cache_file)
-        except:
-            self.count_map_cache = {}
+        # try:
+        #     logger.info(f'{type(self).__name__}: Attempting to load cached ObjectCountMap from ({self.cache_file})')
+        #     self.count_map_cache = CoralObjectMapModelHelper.from_yaml_file(self.cache_file)
+        # except:
+        #     self.count_map_cache = {}
+        # NOTE: Not using the cache file 
+        self.count_map_cache = {}
             
     def compute_object_count_map(self, class_filter:str=None) -> np.ndarray:
         """ return the object count map of a class detected objects on a tile_sample 
@@ -167,8 +169,9 @@ class CoralObjectMapModel():
 def test_generate_heatmap(tile_sample_id:str):
     vt_model = CoralObjectMapModel(tile_sample_id)
     count_map = vt_model.compute_object_count_map()
-    HeatmapHelper.generate_plotly_heatmap(count_map, (1500, 500), output_file='heatmap_test_sample.jpg')
+    HeatmapHelper.generate_plotly_heatmap(count_map, f'tile_sample_id: {tile_sample_id}', (1500, 500), output_file='heatmap_test_sample.jpg')
 
 if __name__ == '__main__':
     tile_sample_id = '2024-Nov-P00001-CG1-202411151200'  # tile_sample_id and the associated source images are assumed in the database
+    tile_sample_id = '2024Oct-T01-CG1-202410312300'
     test_generate_heatmap(tile_sample_id)

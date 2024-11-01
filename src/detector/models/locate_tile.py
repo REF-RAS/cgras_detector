@@ -34,6 +34,9 @@ class LocateTileModel():
         # model variables 
         self.tile_bbox = (0, 0, 21170, 8750)    # hardcode tile size frame bbox for testing  
         self.tile_bbox = (0, 0, 21740, 8764)    # hardcode tile size from the reconstructed image 
+        # hard code
+        whole_reco_image_size = reco_model.get_whole_reco_image_size()
+        self.tile_bbox = (0, 0, whole_reco_image_size[0], whole_reco_image_size[1])
      
     def map_bbox(self, bbox:tuple):
         """ converts a bounding box in the reconstructed image space to the tile space according to a detection of the frame or holder of the tile

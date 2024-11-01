@@ -18,14 +18,14 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from tools.logging_tools import logger
-from detector.model import APP_FILE_MANAGER, DETECT_DAO
+from detector.model import APP_FILE_MANAGER, DETECT_DAO, AIMSTILE_DAO
 from detector.dao_detect import StatusNames
 
 class TileSampleSearchBlock():
     def __init__(self, app, prefix):
         self.app = app 
         self.prefix = prefix = prefix + 'tss_'
-        self.search_trigger_id = prefix + 'tile_sample_list'
+        self.search_trigger_id = prefix + 'search_query_store'
         # define widgets
         tile_id_textbox = dcc.Input(id=prefix+'tile_id_input', type='text', placeholder='Tile ID', className='', style={'width': '240px'})
         batch_id_textbox = dcc.Input(id=prefix+'batch_id_input', type='text', placeholder='Batch ID', className='ms-2', style={'width': '240px'})
@@ -34,9 +34,9 @@ class TileSampleSearchBlock():
             {'label': 'Past Day', 'value': -1},
             {'label': 'Past Week', 'value': -7},
             {'label': 'Past Month', 'value': -31},
-            {'label': 'The Season', 'value': 0},
+            {'label': 'All Time', 'value': 0},
         ]
-        period_dropdown = dcc.Dropdown(options=self.period_options, id=prefix+'period_dropdown', 
+        period_dropdown = dcc.Dropdown(id=prefix+'period_dropdown', 
                                        searchable=False, clearable=False, className='ms-2', maxHeight=80, style={'width': '160px', 'zIndex': 10})
         # the status filter
         self.status_options = [
@@ -73,18 +73,21 @@ class TileSampleSearchBlock():
                     dbc.Button('Reset', id=prefix+'reset_filter_button', n_clicks=0, className='ms-4', color='secondary', size='sm', style={'width': '160px'})
                 ], className='mt-2 mb-5'),
                 
-            ], className='mx-auto text-center')
+            ], id=prefix+'main_panel', className='mx-auto text-center')
         
         self.app.callback([Output(prefix+'tile_id_input', 'value', allow_duplicate=True),
                            Output(prefix+'batch_id_input', 'value', allow_duplicate=True),
+                           Output(prefix+'period_dropdown', 'options', allow_duplicate=True),
                            Output(prefix+'period_dropdown', 'value', allow_duplicate=True),
                            Output(prefix+'pagesize_dropdown', 'value', allow_duplicate=True),
-                           Output(prefix+'status_dropdown', 'value', allow_duplicate=True),],
+                           Output(prefix+'status_dropdown', 'value', allow_duplicate=True),
+                           Output(prefix+'refresh_button', 'n_clicks', allow_duplicate=True),],
                             [
                             Input(prefix+'reset_filter_button', 'n_clicks'),
+                            Input(prefix+'main_panel', 'children'),
                             ], prevent_initial_call='initial_duplicate')(self._reset_filter_button_clicked())  
 
-        self.app.callback([Output(prefix+'tile_sample_list', 'data')],
+        self.app.callback([Output(prefix+'search_query_store', 'data')],
                             [
                             Input(prefix+'refresh_button', 'n_clicks'),
                             State(prefix+'tile_id_input', 'value'),
@@ -92,14 +95,19 @@ class TileSampleSearchBlock():
                             State(prefix+'period_dropdown', 'value'),
                             State(prefix+'pagesize_dropdown', 'value'),
                             State(prefix+'status_dropdown', 'value'),                            
-                            ], prevent_initial_call='initial_duplicate')(self._refresh_table_clicked())  
+                            ], prevent_initial_call=True)(self._refresh_table_clicked())  
 
     def get_search_trigger_id(self):
         return self.search_trigger_id
 
     def _reset_filter_button_clicked(self):
-        def clear_filter_button_clicked(n_clicks):
-            return ('', '', 0, 10, StatusNames.UNKNOWN.value)
+        def clear_filter_button_clicked(n_clicks, _):
+            period_options = self.period_options
+            season_titles_list = AIMSTILE_DAO.get_season_titles_list()
+            for season_title in season_titles_list:
+                period_options.append({'label': f'{season_title} Season', 'value': season_title})
+            value = 0
+            return ('', '', period_options, value, 10, StatusNames.UNKNOWN.value, 1)
         return clear_filter_button_clicked
     
     def _refresh_table_clicked(self):
@@ -107,10 +115,14 @@ class TileSampleSearchBlock():
             button_id = ctx.triggered_id if not None else 'No clicks yet'
             # set default value at initialization
             the_status = None if the_status == StatusNames.UNKNOWN.value or the_status is None else the_status
-            the_period = None if the_period == 0 else the_period
             the_pagesize = 10 if the_pagesize is None else the_pagesize
+            if isinstance(the_period, str):
+                season = the_period
+                the_period = 0
+            else:
+                season = None
             # build the query structure
-            query = [the_status, tile_id, batch_id, the_period, the_pagesize, ]
+            query = [season, the_status, tile_id, batch_id, the_period, the_pagesize,]
             return (query,)
         return refresh_table_clicked
     

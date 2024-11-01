@@ -331,10 +331,18 @@ class DetectorDAO():
     # return a dataframe of records given the season title, the status, and maximum records to return
     @synchronized
     def list_tile_samples(self, season_title:str=None, status:int=StatusNames.PENDING.value, limit=None) -> pd.DataFrame:
-        param_list = [status]
-        sql = 'SELECT * FROM tile_sample WHERE status = ?'
-        if season_title is not None:
-            sql += ' AND season = ?'
+        if status is not None:
+            sql = 'SELECT * FROM tile_sample WHERE status = ?'
+            param_list = [status] 
+        else:
+            sql = 'SELECT * FROM tile_sample'
+            param_list = []                
+        
+        if season_title:
+            if param_list:
+                sql += ' AND season = ?'
+            else:
+                sql += ' WHERE season = ?'
             param_list.append(season_title)
         if limit is None or not isinstance(limit, numbers.Number):
             sql += ' ORDER BY priority ASC'
@@ -389,11 +397,12 @@ class DetectorDAO():
     # update the priority field of a tile_sample record given its id
     @synchronized
     def set_top_priority(self, tile_sample_id:str):
-        sql = 'UPDATE tile_sample SET priority = (SELECT TIME(MIN(priority), "-1 minute") FROM tile_sample WHERE status = ?) WHERE id = ?'
+        sql = 'UPDATE tile_sample SET priority = (SELECT DATETIME(MIN(priority), "-1 minute") FROM tile_sample WHERE status = ?) WHERE id = ?'
         status = StatusNames.PENDING
         return db_tools.update(self.db_file, sql, (status.value, tile_sample_id,))   
     
     # return the records from a query based on search keys including season, status, tile_Id, batch_id, and the period
+    
     @synchronized
     def query_processed_tile_samples(self, season_title:str=None, status:int=None, tile_id:str=None, batch_id:str=None, the_period:int=None, limit:int=None) -> pd.DataFrame:
         # go through each input parameters and, if defined, included in the query
@@ -410,16 +419,16 @@ class DetectorDAO():
             sql = 'SELECT * FROM tile_sample WHERE status NOT IN (?, ?)'
             param_list.append(StatusNames.PENDING.value)
             param_list.append(StatusNames.INVALID.value)
-        if season_title is not None:
+        if season_title:
             sql += ' AND season = ?'
             param_list.append(season_title)            
-        if tile_id is not None:
+        if tile_id:
             sql += ' AND tile_id LIKE ?'
             param_list.append(f'%{tile_id}%')
-        if batch_id is not None:
+        if batch_id:
             sql += ' AND batch_id LIKE ?'
             param_list.append(f'%{batch_id}%')
-        if the_period is not None:
+        if the_period != 0:
             sql += ' AND create_time >= DATE("now", ?)'
             param_list.append(f'{the_period} days')
         sql += ' ORDER BY priority DESC'
@@ -464,6 +473,7 @@ class DetectorDAO():
         importer_id = yaml_data.get('importer_id', 'Unknown')
         operator = yaml_data.get('operator', 'Unknown') 
         images_dict = dict()
+        image_files_parent_folder = yaml_data.get('image_files_parent_folder', None)
         yaml_images_list = yaml_data.get('images', None)
         # validate the first tier data
         if tile_id is None or batch_id is None or yaml_images_list is None:
@@ -475,6 +485,8 @@ class DetectorDAO():
             x, y = yaml_images.get('x', None), yaml_images.get('y', None)
             max_x, max_y = max(max_x, x), max(max_y, y)
             filepath = yaml_images.get('file', None)
+            if image_files_parent_folder:
+                filepath = os.path.join(image_files_parent_folder, filepath)
             if x is None or y is None or filepath is None:
                 error_list.append(f'An image entry must include these fields (x, y, file) and one of them is missing at entry {index}') 
             else:
@@ -809,6 +821,7 @@ class DetectorDAO():
             sql = 'SELECT class_name FROM detected_object WHERE tile_sample_id = ?'
             return db_tools.query_for_list(self.db_file, sql, (tile_sample_id,))         
 
+
     # - table: tile sample stat
     @synchronized
     def update_tile_sample_detect_stat(self, tile_sample_id:str, tile_pixel_x, tile_pixel_y, coral_object_count, dead_coral_object_count, 
@@ -823,7 +836,9 @@ class DetectorDAO():
         sql = 'SELECT * FROM tile_sample_detect_stat WHERE tile_sample_id = ?'
         return db_tools.query_for_dict(self.db_file, sql, (tile_sample_id,))      
 
-    # - composite operation: update cache
+
+    # - composite operation: update cac
+    #he
     @synchronized
     def get_detect_stat_of_tile_id(self, tile_id:str) -> list:
         sql = 'SELECT * FROM tile_sample_detect_stat S LEFT OUTER JOIN tile_sample T ON S.tile_sample_id = T.id WHERE T.tile_id = ? ORDER BY T.batch_time ASC'

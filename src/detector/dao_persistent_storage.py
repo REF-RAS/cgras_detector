@@ -34,6 +34,7 @@ PERSISTENT_STORE_DDL = {
 class PersistentStoreDAO:
     CONFIG_TASK_EXECUTE_MODE = 'task_execute_mode'          # int type
     CONFIG_TILES_IMPORT_ENABLED = 'tiles_import_enabled'    # bool type
+    CONFIG_SELECTED_SEASON = 'selected_season'              # string type
     
     TASK_EXECUTE_MODE_MANUAL = 0
     TASK_EXECUTE_MODE_AUTO = 1

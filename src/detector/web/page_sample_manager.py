@@ -29,7 +29,7 @@ class SampleManagerPage():
         self.pending_sample_table = TileSampleTable(app, prefix, allow_priority=True, allow_reprocess=False)
         self.tile_sample_retrieve_panel = EnableTileSamplesImportBlock(app, prefix)
         self.tile_sample_search_panel = TileSampleSearchBlock(app, prefix)
-        self.processed_sample_table = TileSampleTable(app, prefix + 'bottom_', allow_priority=False, allow_reprocess=True, allow_reload=True, allow_view=True)
+        self.processed_sample_table = TileSampleTable(app, prefix + 'btm_', allow_priority=False, allow_reprocess=True, allow_reload=True, allow_view=True)
 
         self._define_page()
     

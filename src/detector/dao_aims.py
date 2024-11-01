@@ -166,7 +166,8 @@ class AIMSTileDAO():
         model.loc[1] = ['Num Species', self.count_species()]
         model.loc[2] = ['Num Tiles', self.count_tiles()]
         active_season = self.get_active_season()
-        result = self.query_tile_settle_time_range(active_season['title'])
+        # result = self.query_tile_settle_time_range(active_season['title'])
+        result = self.query_tile_settle_time_range()
         model.loc[3] = ['Oldest Tile', result['MIN(settle_time)']]
         model.loc[4] = ['Latest Tile', result['MAX(settle_time)']]
         species_list = self.list_species()
@@ -203,7 +204,7 @@ class AIMSTileDAO():
         # ignore the other columns except these five keys
         tile_df = tile_df[['pit_id', 'species', 'season', 'settle_time', 'spawn_time']]
         # normalize the data
-        tile_df['species_name'] = tile_df['species_name'].str.lower()
+        tile_df['species'] = tile_df['species'].str.lower()
         tile_df['spawn_time'] = tile_df['spawn_time'].astype('string')
         tile_df['settle_time'] = tile_df['settle_time'].astype('string')
         # iterate through each row of the dataframe, this is inefficient but necessary for gracefully ignore duplicate rows
@@ -236,7 +237,7 @@ class AIMSTileDAO():
     
     # return a list of titles of the seasons in the table
     @synchronized
-    def list_seasons(self) -> list:
+    def get_season_titles_list(self) -> list:
         sql = 'SELECT title FROM season ORDER BY title DESC'
         result = db_tools.query_for_list(self.db_file, sql,)
         return result 

@@ -34,7 +34,7 @@ class SpawningSeasonChangeBlock():
         # define create new spawning season modal
         season_title_input = dbc.Row([
             dbc.Label('Season Title', html_for=prefix+'title_input', width=2),
-            dbc.Col(dbc.Input(type='text', id=prefix+'title_input', placeholder='Enter season title (e.g. 2024-Nov)'), width=10),
+            dbc.Col(dbc.Input(type='text', id=prefix+'title_input', placeholder='Enter season title (e.g. 2024Nov)'), width=10),
         ], className='mb-3',)
         
         season_date_range_input = dbc.Row([
@@ -138,7 +138,7 @@ class SpawningSeasonChangeBlock():
         return self.prefix+'tile_import_success'
     
     def query_spawning_seasons(self):
-        season_list = AIMSTILE_DAO.list_seasons()
+        season_list = AIMSTILE_DAO.get_season_titles_list()
         active_season_title = AIMSTILE_DAO.get_active_season_title()
         return (season_list, active_season_title)
 

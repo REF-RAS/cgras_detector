@@ -16,7 +16,7 @@ import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO
+from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, AIMSTILE_DAO
 from detector.dao_detect import StatusNames
 from detector.task_detection import DetectionTaskModel
 from tools.logging_tools import logger
@@ -24,7 +24,7 @@ from tools.logging_tools import logger
 class TileSampleTable():
     def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_reload=False, allow_view=False):
         self.app = app 
-        self.prefix = prefix = prefix + 'tse_'
+        self.prefix = prefix = prefix + 'tst_'
         self.allow_priority = allow_priority
         self.allow_reprocess = allow_reprocess
         self.update_table_store_id = prefix + 'update_table_store'
@@ -43,8 +43,8 @@ class TileSampleTable():
 
         self._columns = [{'name': 'Tile Sample ID', 'id': 'id', 'type': 'text', 'editable': False},
                          {'name': 'Capture Time', 'id': 'batch_time', 'type': 'datetime', 'editable': False},
+                         {'name': 'Season', 'id': 'season', 'type': 'text', 'editable': False},
                          {'name': 'Importer', 'id': 'importer_id', 'type': 'text', 'editable': False},
-                        #  {'name': 'Operator', 'id': 'operator', 'type': 'text', 'editable': False},
                          {'name': 'Import Time', 'id': 'create_time', 'type': 'text', 'editable': False},  
                          {'name': 'Status', 'id': 'status', 'type': 'text', 'editable': False},    
                          {'name': 'Remarks', 'id': 'remarks', 'type': 'text', 'editable': False},                                                                         
@@ -97,8 +97,6 @@ class TileSampleTable():
 
         self._div_panel_children = [
             dbc.Button('Select All', id=prefix+'table_selectall_button', color='light', className='mb-1 me-5', size='sm', style={'width': '100px'}),
-            dcc.Dropdown(id=prefix+'season_list_dropdown', 
-                                       searchable=False, clearable=False, className='', maxHeight=80, style={'width': '200px'}),
         ]
         if allow_reprocess:
             self._div_panel_children.append(
@@ -116,7 +114,7 @@ class TileSampleTable():
         
         if allow_reload:
             self._div_panel_children.append(
-                dbc.Button('Reload', id=prefix+'table_reload_button', color='danger', className='ms-2', size='sm', style={'width': '80px'}))
+                dbc.Button('Delete', id=prefix+'table_reload_button', color='danger', className='ms-2', size='sm', style={'width': '80px'}))
             
         self._datatable_panel_children = [html.Div(self._div_panel_children, style={'display':'flex'}), 
                                           self._datatable]
@@ -133,8 +131,9 @@ class TileSampleTable():
                 self._confirm_reprocess_modal,
                 self._deletedata_modal,    
                 self._viewdata_modal,
-                self._invalidate_confirm_dialog,            
-                ], style={'margin-top':'24px'})
+                self._invalidate_confirm_dialog,
+                self._delete_confirm_dialog,       
+                ], id=prefix+'main_panel', style={'margin-top':'24px'})
         
         # define callback for selecting a scan and open the modal window
         self.app.callback([ Output(prefix+'view_modal', 'is_open'),
@@ -207,44 +206,40 @@ class TileSampleTable():
                              State(prefix+'datatable', 'data')])(self._style_selected_rows())
         
         self.app.callback([Output(self.prefix+'datatable', 'data')],
-            [Input(self.update_table_store_id, 'data'),
-             Input(self.prefix+'season_list_dropdown', 'value')], prevent_initial_call=True, allow_duplicate=True)(self._update_datatable())       
+            [Input(self.update_table_store_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_datatable())       
         
         self.app.callback([Output(self.prefix+'datatable', 'selected_rows')],
             [Input(self.prefix+'table_selectall_button', 'n_clicks'),
              State(self.prefix+'datatable', 'data'),
-             State(self.prefix+'datatable', 'selected_rows')], prevent_initial_call=True, allow_duplicate=True)(self._selectall_button_pressed())               
+             State(self.prefix+'datatable', 'selected_rows')], prevent_initial_call=True, allow_duplicate=True)(self._selectall_button_pressed())  
+                             
     
     def register_trigger(self, trigger_id:str):
         # define callbacks for the datatable data
         self.app.callback([Output(self.update_table_store_id, 'data', allow_duplicate=True)],
             [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
 
-        self.app.callback([Output(self.prefix+'season_list_dropdown', 'options', allow_duplicate=True),
-                            Output(self.prefix+'season_list_dropdown', 'value', allow_duplicate=True)],
-                         [Input(trigger_id, 'data'),], prevent_initial_call=True)(self._update_season_dropdown())  
         
     def get_panel(self):
         return self.the_panel
     
-    def get_default_datatable_model(self, season_title):
-        model = DETECT_DAO.list_tile_samples(season_title=season_title, status=StatusNames.PENDING.value)
+    def get_default_datatable_model(self):
+        model = DETECT_DAO.list_tile_samples(season_title=None, status=StatusNames.PENDING.value)
         return model
     
     def refine_datatable_model(self, model, show_column_top=True, show_column_refresh=False):
         model['status'] = model['status'].apply(lambda x: StatusNames(x).name) 
-        model = model[['id', 'batch_time', 'importer_id', 'operator', 'create_time', 'status', 'remarks']]
+        model = model[['id', 'batch_time', 'season', 'importer_id', 'operator', 'create_time', 'status', 'remarks']]
         return model
     
     # the callback for updating the datatable
     def _update_datatable(self):
-        def update_datatable(store, season_title):
+        def update_datatable(store):
             # if the store contains a dict, a query triggers table refresh 
             if isinstance(store, list): 
-                store.insert(0, season_title)
                 self._model = DETECT_DAO.query_processed_tile_samples(*store)
             else:
-                self._model = self.get_default_datatable_model(season_title)
+                self._model = self.get_default_datatable_model()
             self._model = self.refine_datatable_model(self._model, self.allow_priority, self.allow_reprocess)
             return (self._model.to_dict('records'),)
         return update_datatable
@@ -252,8 +247,11 @@ class TileSampleTable():
     def _update_season_dropdown(self):
         def update_season_dropdown(tile_id):
             # get options for the dropdown
-            options = DETECT_DAO.list_seasons_in_tile_sample()
-            value = options[0] if options is not None and len(options) > 0 else None
+            # options = DETECT_DAO.list_seasons_in_tile_sample()
+            options = AIMSTILE_DAO.get_season_titles_list()
+            logger.warning(f'update season: {options}')
+            value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
+            value = options[0] if value is None and options is not None and len(options) > 0 else None
             return (options, value,)
         return update_season_dropdown
     
@@ -263,6 +261,7 @@ class TileSampleTable():
                 raise PreventUpdate
             row_index_list = list(selected_rows)
             button_id = ctx.triggered_id if not None else 'No clicks yet'
+
             if button_id.endswith('table_reprocess_button'):
                 return (row_index_list, None, None, None, None, [])
             elif button_id.endswith('table_priority_button'):
@@ -311,7 +310,7 @@ class TileSampleTable():
                     tile_sample_id = self._model.iloc[row_index]['id']
                     DETECT_DAO.clear_tile_sample_data(tile_sample_id)
                     DetectionTaskModel.delete_cache_folder(tile_sample_id)
-                    DETECT_DAO.delete_tile_sample(id)
+                    DETECT_DAO.delete_tile_sample(tile_sample_id)
                 message = f'The tile sample(s) {row_index_list} deleted'
                 return (True, message, store)
             return (False, '', store)
@@ -397,7 +396,6 @@ class TileSampleTable():
     
     def _selectall_button_pressed(self): 
         def selectall_button_pressed(selectall_button, model, selected_rows):
-            logger.warning(f'_selectall: {selectall_button, len(model), selected_rows}')
             if selectall_button is None:
                 raise PreventUpdate
             if selected_rows is not None and len(selected_rows) == len(model):
