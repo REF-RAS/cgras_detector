@@ -14,7 +14,7 @@ import numpy as np
 
 from detector.models import logger
 from detector.models.heatmap_tools import HeatmapHelper
-from detector.model import AIMSTILE_DAO, DETECT_DAO, APP_FILE_MANAGER, CONFIG
+from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG
 
 class CoralObjectMapModelHelper():
     """ a collection of tools for the CoralObjectMapModel class
@@ -33,7 +33,7 @@ class CoralObjectMapModelHelper():
         :return: a tuple of (filename, path)
         """
         tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
+        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_SUBFOLDER, tile_sample_dict['season'], tile_sample_id)
         cache_filename = f'countmap_{tile_sample_id}_{map_size[0]}_{map_size[1]}.yaml' 
         cache_file = os.path.join(logdata_folder, cache_filename)         
         return cache_file, logdata_folder
@@ -103,12 +103,7 @@ class CoralObjectMapModel():
         self.params = kwargs
         # gather information about the tile_sample_id from the database
         self.tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        self.season_dict = AIMSTILE_DAO.get_season(self.tile_sample_dict['season']) 
-        # obtain the dimension of the heatmap from the attributes tab_ncols and tab_nrows in the season definition
-        if self.season_dict is None:
-            self.map_size_default = self.params.get('vis_map_size_default', (20, 20))
-        else:
-            self.map_size_default = (self.season_dict['tab_ncols'], self.season_dict['tab_nrows'],) 
+        self.map_size_default = (self.tile_sample_dict['tab_ncols'], self.tile_sample_dict['tab_nrows'],) 
         # first check if a cache file exists: compute the location of the cache file
         self.cache_file, _ = CoralObjectMapModelHelper.form_cache_file_path(tile_sample_id, self.map_size_default)      
         # first check if a cache file exists: attempt to load the cache file

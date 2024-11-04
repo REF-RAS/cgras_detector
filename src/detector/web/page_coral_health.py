@@ -23,21 +23,20 @@ dash.register_page(__name__)
 
 # -- define the GUI components of this page
 class CoralHealthPage():
-    def __init__(self, app, refresh_cycle=5):
+    def __init__(self, app, refresh_cycle=20):
         self.app = app
         prefix = self.prefix = 'coral_health_'
         self.dashapp_interval_store_id = prefix + 'update_store'
         # model variables
         self.refresh_cycle = refresh_cycle
         if self.refresh_cycle is None or type(self.refresh_cycle) not in (float, int):
-            self.refresh_cycle = 5
+            self.refresh_cycle = 20
         # the component blocks
         self.health_view_table_panel = HealthViewTable(app, prefix)
         # define the page
         self._define_page()
     
     def layout(self):
-        self.health_view_table_panel.refresh()
         return self._layout
 
     def _define_page(self):
@@ -59,8 +58,8 @@ class CoralHealthPage():
 
     # the callback for all update
     def _update_all(self):
-        def update_all(n):
-            if (n-1) % self.refresh_cycle != 0:
+        def update_all(timer):
+            if timer is None or (timer-1) % self.refresh_cycle != 0:
                 raise PreventUpdate
-            return (1,)
+            return (timer,)
         return update_all  

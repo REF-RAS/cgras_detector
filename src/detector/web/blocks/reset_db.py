@@ -15,7 +15,7 @@ import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DBFM, AIMSTILE_DBFM
+from detector.model import DETECT_DBFM
 
  
 class ResetDBBlock():
@@ -77,12 +77,9 @@ class ResetDBBlock():
             if submit_n_clicks <= 2:
                 return (True, False, '', submit_n_clicks, False)
             else:
+                # drop all the tables and then create them again
                 DETECT_DBFM.drop_tables()
-                AIMSTILE_DBFM.drop_tables()
-                
-                error_str = DETECT_DBFM.create_tables()     
-                if error_str is None:
-                   error_str = AIMSTILE_DBFM.create_tables()    
+                error_str = DETECT_DBFM.create_tables()       
                 if error_str is None:
                     return (False, True, f'Successfully reset the database tables to a blank state', 0, True)
                 else:

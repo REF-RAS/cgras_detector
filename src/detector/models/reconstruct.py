@@ -54,6 +54,7 @@ class ImageReconstructModel():
         self.working_scale = kwargs.get(ModelsConfigNames.RECO_WORKING_SCALE.value, 0.1)   # the scale to reduce image size for which the transforms are calculated to speed up execution 
         self.scaling_factor = 1 / self.working_scale                                 # the scaling factor to restore locations at the original scale
         # build the model
+        self.logger.info(f'ImageReconstructModel working_scale: {self.working_scale}')
         self.reco_2d_model = ImageReconstruct2DModel(images_2d_list, **kwargs)       
         # retrieve major parameters from the model
         self.ncols, self.nrows = self.reco_2d_model.get_image_map_size()               # the number of rows and columns in the 2d grid of images
@@ -668,7 +669,7 @@ class ImageReconstruct2DModel():
                                                                                                                                 images_list_scaling_factor)
             if logdata_folder is not None:
                 output_file = os.path.join(logdata_folder, f'row_reco_image_{row_index}_original_scale.jpg')
-                self.logger.info(f'{cls.__name__}: Writing full-scale row reconstructed image to file {output_file}')
+                self.logger.info(f'{self.__name__}: Writing full-scale row reconstructed image to file {output_file}')
                 cv2.imwrite(output_file, row_reco_image_original_scale)
             row_reco_image_original_scale = cv2.rotate(row_reco_image_original_scale, cv2.ROTATE_90_COUNTERCLOCKWISE)
             row_recoimages_list.append(row_reco_image_original_scale)

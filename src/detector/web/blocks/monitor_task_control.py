@@ -24,21 +24,21 @@ class MonitorTaskControlBlock():
         self.prefix = prefix = prefix + 'ptc'
         self.update_store_id = prefix + 'update_store'
         # model variables
-        current_task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL)
+        current_task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF)
         # define widgets 
         message_alert = dbc.Alert( id=prefix+'message_alert', dismissable=True, duration=5000, is_open=False, className='col-12', color='light')
         self.task_execute_mode_options = [
-                {'label': 'Manual', 'value': PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL},
-                {'label': 'Automated', 'value': PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_AUTO},]
+                {'label': 'OFF', 'value': PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF},
+                {'label': 'ON', 'value': PERSISTENT_STORE_DAO.AUTO_EXECUTE_ON},]
         
         task_execute_mode_select = dcc.Dropdown(self.task_execute_mode_options, value=current_task_execute_mode, id=prefix+'mode_dropdown', 
-                                                className='mx-auto col-8', searchable=False, clearable=False)
+                                                className='mx-auto col-8 fs-4', searchable=False, clearable=False)
 
         # database reset panel
         self._panel = dbc.Col([
                 dcc.Store(id=self.update_store_id),
                 dcc.Store(id=prefix+'task_execute_mode_store'),
-                html.H4(dbc.Badge('TASK EXECUTION MODE', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('AUTOMATED TASK EXECUTION', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.Div([task_execute_mode_select], className='mt-3 mx-auto'),
                 html.P(id=prefix+'mode_message', className='mt-2 mx-auto col-12'),
                 html.Div([
@@ -111,15 +111,15 @@ class MonitorTaskControlBlock():
     
     def _main_panel_loaded(self):
         def main_panel_loaded(children):
-            task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL)
+            task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF)
             return (task_execute_mode, )
         return main_panel_loaded
     
     def _update_content(self):
         def update_content(timer):
-            task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL)
+            task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF)
             is_menu_appear = STATE.get_state() in [SystemStates.CLICK_START]
-            if is_menu_appear and task_execute_mode == PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL:
+            if is_menu_appear and task_execute_mode == PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF:
                 style = {'visibility': 'visible'}
                 message = 'Execute a task manually by clicking on a button below'
             elif task_execute_mode == 0:

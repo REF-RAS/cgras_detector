@@ -11,25 +11,29 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import sys
+import os, sys
 from tools import db_tools
-from detector.model import AIMSTILE_DAO, DETECT_DAO
+from detector.model import APP_FILE_MANAGER
+
+COORDINATOR_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'coordinator.db')
+DETECT_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'detect.db')
+
 
 # The function that supports interactive execution of sql statements 
 def run_db():
     while True:
         print(f'''
         (E): Exit
-        (1): AIMSTILE_DAO
-        (2): DETECT_DAO
+        (1): COORDINATOR
+        (2): DETECT
         ''')
         command = input('Select DB: ')
         if command == 'E':
             sys.exit(0)
         elif command == '1':
-            db_file = AIMSTILE_DAO.db_file
+            db_file = COORDINATOR_DBFILE
         elif command == '2':
-            db_file = DETECT_DAO.db_file
+            db_file = DETECT_DBFILE
 
         print(f'''
         (E): Exit

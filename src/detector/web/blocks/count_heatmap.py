@@ -90,7 +90,7 @@ class CountHeatmapBlock():
         output_model = coral_trend_model[['batch_time']].copy()
         output_model.columns = ['Sample Date']
         if len(output_model) > 0:
-            output_model.loc[len(output_model) - 1] = ['Whole History']
+            output_model.loc[len(output_model)] = ['Whole History']
         return coral_trend_model, output_model
 
     def _generate_heatmap(self, tile_sample_id, filter_class, title:str=None):

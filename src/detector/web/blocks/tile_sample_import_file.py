@@ -17,7 +17,7 @@ import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
 from tools.logging_tools import logger
-from detector.model import AIMSTILE_DAO, DETECT_DAO
+from detector.model import DETECT_DAO
 
 
 class TileSampleImportFileBlock():
@@ -106,26 +106,13 @@ class TileSampleImportFileBlock():
             content_type, content_string = contents.split(',')
             decoded = base64.b64decode(content_string)
             yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
-            # add season and species from the tile db if not in the import file
-            tile_id = yaml_data.get('tile_id', None)
-            tile_info = AIMSTILE_DAO.get_tile(tile_id)
-            if tile_info is None:
-                message = f'The tile_id {tile_id} is not found in the AIMS tile identification list'
-                return (True, 'Error in the uploaded file', None, message, {'display': 'none'}, yaml_data, None, None,)  
             
-            species = yaml_data.get('species', None)
-            if species is None:
-                yaml_data['species'] = tile_info['species']
-            season = yaml_data.get('season', None)
-            if season is None:
-                yaml_data['season'] = tile_info['season'] 
-            yaml_data['settle_time'] = tile_info['settle_time']
-            yaml_data['age'] = (yaml_data['batch_time'] - pd.to_datetime(tile_info['settle_time'])).days
             # validate the input and obtain the model for the confirm dialog
             is_valid, model = DETECT_DAO.validate_tile_sample_import(yaml_data)
             if not is_valid:
                 message = 'One or more problems have been found in the tile sample spec yaml file.'
                 return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
             else:
+                yaml_data['age'] = (yaml_data['batch_time'] - pd.to_datetime(yaml_data['settle_time'])).days
                 return (True, 'Confirm to import this tile sample', model.to_dict('records'), None, {'display': 'block'}, yaml_data, None, None,) 
         return file_import_received 

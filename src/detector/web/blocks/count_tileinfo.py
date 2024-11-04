@@ -16,7 +16,7 @@ import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import AIMSTILE_DAO, DETECT_DAO
+from detector.model import DETECT_DAO
 
 class CoralCountTileInfoBlock():
     def __init__(self, app, prefix):
@@ -56,7 +56,7 @@ class CoralCountTileInfoBlock():
         return self._panel
     
     def _get_model(self, tile_id):
-        tile_model = AIMSTILE_DAO.get_tile_info_as_df(tile_id) 
+        tile_model = DETECT_DAO.get_tile_info_from_tile_sample_as_df(tile_id)
         tile_sample_stat_model = DETECT_DAO.get_tile_sample_stat_as_df(tile_id)
         message = f'TILE ID: {tile_id}'
         return tile_model, tile_sample_stat_model, message

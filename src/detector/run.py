@@ -21,7 +21,7 @@ from std_msgs.msg import String, Header, Bool, Int8, Float32
 from tools.logging_tools import logger
 import tools.hash_tools as hash_tools
 from detector.web.dashapp_main import DashApplicationMain
-from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, PERSISTENT_STORE_DAO, AIMSTILE_DAO, SystemConfigNames, StatusNames, TaskTypes, CALLBACK_MANAGER, CallbackTypes
+from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, PERSISTENT_STORE_DAO, SystemConfigNames, StatusNames, TaskTypes, CALLBACK_MANAGER, CallbackTypes
 from detector.model import CAPTURER_STATE, CapturerStates
 from detector.task_detection import DetectionTaskModel
 from detector.task_health import HealthEvaluateTaskModel
@@ -145,8 +145,8 @@ class ApplicationCoordinator(object):
                         STATE.del_var('tile_sample_id')
                         STATE.del_var('the_detection_task')
                         
-                        task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_MANUAL)
-                        if task_execute_mode == PERSISTENT_STORE_DAO.TASK_EXECUTE_MODE_AUTO:
+                        task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF)
+                        if task_execute_mode == PERSISTENT_STORE_DAO.AUTO_EXECUTE_ON:
                             STATE.update(SystemStates.AUTO_START)
                         else:
                             STATE.update(SystemStates.CLICK_START)

@@ -23,7 +23,7 @@ from detector.models import logger, ModelsConfigNames
 from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.html.lightbox import LightboxHelper
-from detector.model import AIMSTILE_DAO, DETECT_DAO, APP_FILE_MANAGER, CONFIG, SystemConfigNames     
+from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG, SystemConfigNames     
 
 
 class ProgressStages(Enum):
@@ -103,12 +103,8 @@ class DetectionTaskModel():
             logger.warning(f'{type(self).__name__}: The tile_sample_id ({self.tile_sample_id}) not found')
             raise AssertionError(f'Invalid parameter (tile_sample_id)')        
         self.tile_id, self.batch_id, self.batch_time = self.tile_sample_dict['tile_id'], self.tile_sample_dict['batch_id'], self.tile_sample_dict['batch_time']
-        # extract information about the tile
-        self.tile_dict = AIMSTILE_DAO.get_tile(self.tile_id)
-        if self.tile_dict is None:
-            logger.warning(f'{type(self).__name__}: The tile_id ({self.tile_id}) recorded in the tile sample ({self.tile_sample_id}) not found')
-            raise AssertionError(f'Invalid parameter (tile_id)') 
-        self.species, self.settle_time, self.season = self.tile_dict['species'], self.tile_dict['settle_time'], self.tile_dict['season']
+
+        self.species, self.settle_time, self.season = self.tile_sample_dict['species'], self.tile_sample_dict['settle_time'], self.tile_sample_dict['season']
         # evaluate the number of days since settlement
         self.settle_date_dt, self.capture_date_dt = pd.to_datetime(self.settle_time, utc=True), pd.to_datetime(self.batch_time, utc=True)
         self.days_since_settle = (self.capture_date_dt - self.settle_date_dt).days
@@ -124,7 +120,7 @@ class DetectionTaskModel():
             self.params = params
         else:
             self.params = CONFIG.to_params([SystemConfigNames, ModelsConfigNames])
-        self.logdata_folder = self.params[ModelsConfigNames.LOGDATA_FOLDER.value] = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, self.season, self.tile_sample_id)
+        self.logdata_folder = self.params[ModelsConfigNames.LOGDATA_FOLDER.value] = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_SUBFOLDER, self.season, self.tile_sample_id)
         self.params[ModelsConfigNames.YOLO_MODEL_FILE.value] = self.yolo_model_dict['model_file_path']
         self.params[ModelsConfigNames.COD_BLOB_SIZE.value] = (self.yolo_model_dict['input_image_width'], self.yolo_model_dict['input_image_height'], )
         self.params[ModelsConfigNames.OBJECT_CLASSES_CORAL.value] = self.yolo_model_dict['coral_classes']
@@ -405,8 +401,14 @@ class DetectionTaskModel():
     @staticmethod
     def get_cache_folder(tile_sample_id:str):
         tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_FOLDER, tile_sample_dict['season'], tile_sample_id)
+        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_SUBFOLDER, tile_sample_dict['season'], tile_sample_id)
         return logdata_folder
+    
+    @staticmethod
+    def get_partial_cache_folder(tile_sample_id:str):
+        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
+        partial_logdata_folder = os.path.join(tile_sample_dict['season'], tile_sample_id)
+        return partial_logdata_folder    
 
 # ---------------------------------------
 # test functions

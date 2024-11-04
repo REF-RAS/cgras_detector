@@ -827,3 +827,19 @@ class DrawTools():
         overlay = cv2.line(overlay, (cx-size, cy-size), (cx+size, cy+size), color, thickness)
         overlay = cv2.line(overlay, (cx-size, cy+size), (cx+size, cy-size), color, thickness)
         return overlay
+
+    @staticmethod
+    def draw_ribbon_triangle(image:np.ndarray, color=(0, 0, 255), size:float=0.3):
+        """ Draw a triangle on the top left hand corner of an image
+
+        :param image: An opencv image
+        :param color: the colour of hte ribbon, defaults to (0, 0, 255)
+        :param size: the size of the ribbon with reference to the minimum of width/height, defaults to 0.3
+        :return: The image annotated with a ribbon
+        """
+        assert(image is not None)
+        height, width = image.shape[:2]
+        pos = int(min(height, width) * size)
+        points = np.array([[0, 0], [0, pos], [pos, 0]])
+        cv2.fillPoly(image, pts=[points], color=color)
+        return image

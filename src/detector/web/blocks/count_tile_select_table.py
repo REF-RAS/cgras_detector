@@ -16,17 +16,18 @@ import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, AIMSTILE_DAO
+from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO
 from tools.logging_tools import logger
 
 class CountTileSelectTable():
     def __init__(self, app, prefix, page_size=25):
         self.app = app 
         self.prefix = prefix = prefix + 'ctst_'
+        self.update_panel_store_id = self.prefix + 'update_panel_store'
+        self.update_datatable_store_id = self.prefix + 'update_datatable_store'
         self.row_selected_trigger_id = self.prefix + 'row_selected_store'
         # define model variables
         self._model = None
-        self._model_last_updated = None
         # define widgets 
         self._operators = [['ge ', '>='],
                     ['le ', '<='],
@@ -50,31 +51,43 @@ class CountTileSelectTable():
                 dcc.Dropdown(id=prefix+'season_list_dropdown', 
                                        searchable=False, clearable=False, className='ms-2 small mb-2', maxHeight=80, style={'width': '200px'}),
                 dbc.Row(html.Div(self._datatable)),
+                dcc.Store(id=self.update_panel_store_id),
+                dcc.Store(id=self.update_datatable_store_id),
                 dcc.Store(id=self.row_selected_trigger_id),     
             ], id=prefix+'main_panel', style={'margin-top':'24px'})     
         
         self.app.callback([Output(self.row_selected_trigger_id, 'data'),
                             Output(prefix+'datatable', 'style_data_conditional'),
-                            Output(prefix+'datatable', 'selected_rows')],
+                            Output(prefix+'datatable', 'selected_rows', allow_duplicate=True)],
             [Input(prefix+'datatable', 'selected_rows'),
              State(self.prefix+'datatable', 'data'),
              State(self.prefix+'datatable', 'page_current'),
              State(self.prefix+'datatable', 'page_size'),
              ], prevent_initial_call=True)(self._row_selected())
     
-        self.app.callback([Output(self.prefix+'datatable', 'data'),],
+        self.app.callback([Output(self.prefix+'datatable', 'data'),
+                           Output(prefix+'datatable', 'selected_rows', allow_duplicate=True)],
             [Input(self.prefix+'datatable', 'page_current'),
              Input(self.prefix+'datatable', 'page_size'),
              Input(self.prefix+'datatable', 'sort_by'),
              Input(self.prefix+'datatable', 'filter_query'),
-             Input(self.prefix+'season_list_dropdown', 'value'),
-             ], prevent_initial_call=False)(self._update_datatable())
+             State(self.prefix+'season_list_dropdown', 'value'),
+             Input(self.update_datatable_store_id, 'data'),
+             ], prevent_initial_call='initial_duplicate')(self._update_datatable())
         
         # define callback for the season
         self.app.callback([Output(self.prefix+'season_list_dropdown', 'options', allow_duplicate=False),
                             Output(self.prefix+'season_list_dropdown', 'value', allow_duplicate=False)],
-                         [Input(self.prefix+'main_panel', 'children'),], prevent_initial_call=False)(self._update_season_dropdown())       
-            
+                         [Input(self.prefix+'main_panel', 'children'),], prevent_initial_call='initial_duplicate')(self._update_season_dropdown())       
+
+        self.app.callback([Output(self.update_datatable_store_id, 'data', allow_duplicate=True)],
+                         [Input(self.prefix+'season_list_dropdown', 'value'),], prevent_initial_call='initial_duplicate')(self._season_dropdown_changed())    
+        
+        # define callback for the season dropdown
+        self.app.callback([Output(self.prefix+'season_list_dropdown', 'options', allow_duplicate=True),
+                            Output(self.prefix+'season_list_dropdown', 'value', allow_duplicate=True)],
+                         [Input(self.prefix+'main_panel', 'children'),], prevent_initial_call='initial_duplicate')(self._update_season_dropdown())  
+
     def get_panel(self):
         return self.the_panel
     
@@ -83,7 +96,7 @@ class CountTileSelectTable():
     
     def _get_default_datatable_model(self, season_title):
         # model = DETECT_DAO.list_tiles_in_cache_tile_health(season_title)
-        model = DETECT_DAO.list_tile_samples(season_title=season_title, status=None)
+        model = DETECT_DAO.list_tiles_in_tile_sample(season_title=season_title)
         return model
     
     def refine_datatable_model(self, model):
@@ -114,22 +127,24 @@ class CountTileSelectTable():
     def _update_season_dropdown(self):
         def update_season_dropdown(timer):
             # get options for the dropdown
-            # options = DETECT_DAO.list_seasons_in_tile_sample()
-            options = AIMSTILE_DAO.get_season_titles_list()
+            options = DETECT_DAO.list_seasons_in_tile_sample()
             value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
-            value = options[0] if value is None and options else None
+            value = options[0] if value is None and options else value
             options = [{'label': f'{x} Season', 'value': x} for x in options]           
             return (options, value,)
         return update_season_dropdown
 
+    def _season_dropdown_changed(self):
+        def season_dropdown_changed(season_title):
+            if not season_title:
+                raise PreventUpdate
+            # update the selected season in the persistent storage
+            PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
+            return (season_title,)
+        return season_dropdown_changed
+
     def _update_datatable(self):
-        def update_datatable(page_current, page_size, sort_by, filter, season_title):
-            # current_time = time.time()
-            # if self._model is None or self._model_last_updated is None or current_time - self._model_last_updated > 10:  # update once every minute at most
-            #     self._model = self._get_default_datatable_model(season_title)
-            #     self._model = self.refine_datatable_model(self._model)
-            #     self._model_last_updated = current_time
-            
+        def update_datatable(page_current, page_size, sort_by, filter, season_title, store):
             self._model = self._get_default_datatable_model(season_title)
             self._model = self.refine_datatable_model(self._model)            
             model = self._model
@@ -149,8 +164,7 @@ class CountTileSelectTable():
                     model = model.loc[model[col_name].str.startswith(filter_value)]
             # update the selected season in the persistent storage
             PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
-            return (model.iloc[page_current * page_size:(page_current + 1) * page_size].to_dict('records'),)
-            # return (self._model.to_dict('records'),)
+            return (model.iloc[page_current * page_size:(page_current + 1) * page_size].to_dict('records'), [], )
         return update_datatable 
     
     def _row_selected(self):

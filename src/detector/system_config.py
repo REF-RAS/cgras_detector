@@ -24,6 +24,11 @@ class SystemConfigNames(Enum):
     WEB_HOST = 'web_host'
     WEB_PORT = 'web_port'
     WEB_DEBUG_MODE = 'web_debug_mode'
+    WEB_DEBUG_HOT_RELOAD = 'web_debug_hot_reload'
+    # aux web server
+    AUX_WEB_HOST = 'aux_web_host'
+    AUX_WEB_PORT = 'aux_web_port'
+    AUX_WEB_DIRECTORY = 'aux_web_directory'
     # timer for refresh the system and GUI
     SYSTEM_TIMER = 'system_timer'
     DASHBOARD_TIMER = 'dashboard_timer'

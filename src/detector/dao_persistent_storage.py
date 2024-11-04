@@ -19,7 +19,7 @@ from datetime import datetime as dt
 import tools.db_tools as db_tools
 from tools.lock_tools import synchronized
 from tools.logging_tools import logger
-from detector.database_manager import DBFileManager
+from detector.database_file import DBFile
 
 PERSISTENT_STORE_DDL = {
     'persistent_store':
@@ -36,8 +36,8 @@ class PersistentStoreDAO:
     CONFIG_TILES_IMPORT_ENABLED = 'tiles_import_enabled'    # bool type
     CONFIG_SELECTED_SEASON = 'selected_season'              # string type
     
-    TASK_EXECUTE_MODE_MANUAL = 0
-    TASK_EXECUTE_MODE_AUTO = 1
+    AUTO_EXECUTE_OFF = 0
+    AUTO_EXECUTE_ON = 1
     
     def __init__(self, db_file:str, **kwargs):
         self.db_file = db_file
@@ -85,7 +85,7 @@ class PersistentStoreDAO:
 def manage_tables():
     CGRAS_HOME = '/home/qcr/cgras_data'
     DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
-    DETECT_DBFM = DBFileManager(DATABASE_FOLDER, 'detector.db', PERSISTENT_STORE_DDL)
+    DETECT_DBFM = DBFile(DATABASE_FOLDER, 'detector.db', PERSISTENT_STORE_DDL)
     DETECT_DBFM.drop_tables(['general_config'])
     tables_name = DETECT_DBFM.list_tables_name()
     logger.info(f'tables: {tables_name}')

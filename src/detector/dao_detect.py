@@ -20,7 +20,7 @@ import tools.db_tools as db_tools
 import tools.file_tools as file_tools
 from tools.lock_tools import synchronized
 from tools.logging_tools import logger
-from detector.database_manager import DBFileManager
+from detector.database_file import DBFile
 
 # NOTE: The batch_time is an ISO 8601 date time string format '2025-05-29 14:16:00' and the batch_id is derived from the time and cgras_station_id or the importer_id
 
@@ -36,7 +36,10 @@ DETECT_DDL = {
         age integer DEFAULT -1,
         species text,
         season text,   
-        settle_time text,   
+        settle_time text,  
+        spawn_time text,
+        tab_ncols integer DEFAULT -1,
+        tab_nrows integer DEFAULT -1,
         importer_id text,
         operator text,
         create_time text,
@@ -209,15 +212,18 @@ class CoralObject():
         self.image_col_index = kwargs.get('image_col_index', None)
         self.cls_id =  kwargs.get('cls_id', None)                   # the class id of the coral object as specified in the detection model
         self.cls_name = kwargs.get('cls_name', None)                # the class name of the coral object
-        self.class_category = kwargs.get('class_category', 0)                   # the object is considered a coral 
+        self.class_category = kwargs.get('class_category', 0)       # the object is considered a coral 
         self.bbox_in_blob = kwargs.get('bbox_in_blob', None)        # the bounding box of the coral object in the image blob space (x1, y1, x2, y2)
-        self.bbox = kwargs.get('bbox', None)                        # the bounding box of the coral object in the tile space
+        self.bbox_in_image = kwargs.get('bbox_in_image', None)      # the bounding box of the coral object in the image space
+        self.bbox_in_tile = kwargs.get('bbox_in_tile', None)        # the bounding box of the coral object in the tile space
+        self.bbox = self.bbox_in_tile
         self.centre = kwargs.get('centre', None)                    # the centre of the coral object in the file space
         self.size = kwargs.get('size', None)                        # the size of the coral object (xdim, ydim)
         self.bbox_normalized = kwargs.get('bbox_normalized', None)  # the normalized bounding box of the coral object in the tile space
         self.centre_normalized = kwargs.get('centre_normalized', None) # the normalized centre of the coral object in the tile space    
         self.size_normalized = kwargs.get('size_normalized', None) # the normalized size of the coral object in the tile space              
         self.invalidated = False
+        self.index_str = f'{self.image_col_index, self.image_row_index, self.blob_col_index, self.blob_row_index}'
         if not preserve_fraction:
             self._convert_to_int()
         
@@ -283,10 +289,12 @@ class DetectorDAO():
     
     # add a record to the tile_sample table, with species normalized to lower case
     @synchronized
-    def add_tile_sample(self, tile_id:str, batch_id:str, batch_time:str, age:int, species:str, season:str, settle_time:str, importer_id:str='', operator:str='', status:int=StatusNames.PENDING.value):
-        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, settle_time, importer_id, operator, status, create_time, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now"), DATETIME("now"))'
+    def add_tile_sample(self, tile_id:str, batch_id:str, batch_time:str, age:int, species:str, season:str, tab_ncols:int, tab_nrows:int, settle_time:str, spawn_time:str='', importer_id:str='', operator:str='', 
+                        status:int=StatusNames.PENDING.value):
+        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status, create_time, priority) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now"), DATETIME("now"))'
         tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, settle_time, importer_id, operator, status))
+        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status))
     
     # return True if a record of tile_sample exists given the tile_id and the batch_id
     @synchronized
@@ -315,7 +323,47 @@ class DetectorDAO():
     @synchronized
     def list_seasons_in_tile_sample(self) -> list:
         sql = 'SELECT DISTINCT(season) FROM tile_sample ORDER BY batch_time DESC'
-        return db_tools.query_for_list(self.db_file, sql)              
+        return db_tools.query_for_list(self.db_file, sql)     
+    
+    @synchronized
+    def list_species_in_tile_sample(self) -> list:
+        sql = 'SELECT DISTINCT(species) FROM tile_sample ORDER BY species ASC'
+        return db_tools.query_for_list(self.db_file, sql)                  
+
+    @synchronized
+    def exist_species_in_tile_sample(self, species) -> list:
+        sql = 'SELECT COUNT(*) FROM tile_sample WHERE species = ?'
+        result = db_tools.query_for_object(self.db_file, sql, (species,))
+        return result >= 1  
+    
+    @synchronized
+    def list_tiles_in_tile_sample(self, season_title:str=None) -> list:
+        if season_title is None:
+            sql = 'SELECT tile_id, season, species, settle_time FROM tile_sample GROUP BY tile_id'
+            return db_tools.query(self.db_file, sql)        
+        else:
+            sql = 'SELECT tile_id, season, species, settle_time FROM tile_sample WHERE season = ? GROUP BY tile_id'
+            return db_tools.query(self.db_file, sql, (season_title,))                    
+    
+    @synchronized
+    def get_tile_info_from_tile_sample(self, tile_id:str, to_dataframe:bool=False) -> pd.DataFrame:
+        sql = 'SELECT tile_id, species, season, settle_time, spawn_time, tab_ncols, tab_nrows FROM tile_sample WHERE tile_id = ? LIMIT 1'
+        if to_dataframe:
+            return db_tools.query(self.db_file, sql, (tile_id,))                
+        return db_tools.query_for_dict(self.db_file, sql, (tile_id,))     
+    
+    @synchronized
+    def get_tile_info_from_tile_sample_as_df(self, tile_id:str) -> pd.DataFrame:
+        tile_info = self.get_tile_info_from_tile_sample(tile_id)
+        model = pd.DataFrame(columns=('Tile ID', tile_id))
+        if tile_info is not None:
+            model.loc[1] = ['Species', tile_info['species']]
+            model.loc[2] = ['Season', tile_info['season']]                
+            model.loc[3] = ['Settled On', tile_info['settle_time']]
+            model.loc[4] = ['Spawned On', tile_info['spawn_time']]
+            num_tabs = f"{tile_info['tab_ncols']} x {tile_info['tab_nrows']}"
+            model.loc[5] = ['Tabs', num_tabs]
+        return model
 
     # return a list of records of tile sample of which the tile id is as given, and the number of records is bounded by the limit parameter
     @synchronized
@@ -467,9 +515,10 @@ class DetectorDAO():
         tile_id = yaml_data.get('tile_id', None)
         batch_id = yaml_data.get('batch_id', None)
         batch_time = yaml_data.get('batch_time', None)
-        age = yaml_data.get('age', -1)
         species = yaml_data.get('species', None)
         season = yaml_data.get('season', None)
+        settle_time = yaml_data.get('settle_time', None)
+        num_tabs = yaml_data.get('num_tabs', None)
         importer_id = yaml_data.get('importer_id', 'Unknown')
         operator = yaml_data.get('operator', 'Unknown') 
         images_dict = dict()
@@ -478,7 +527,10 @@ class DetectorDAO():
         # validate the first tier data
         if tile_id is None or batch_id is None or yaml_images_list is None:
             error_list.append(f'One of the mandatory fields (tile_id, batch_id, and images) is missing in the yaml file')
-            return error_list
+        if species is None or season is None or settle_time is None:
+            error_list.append(f'One of the mandatory fields (species, season, settle_time) is missing in the yaml file')       
+        if num_tabs is None or type(num_tabs) not in (list, tuple) or len(num_tabs) != 2 or not all(n > 0 and isinstance(n, numbers.Number) for n in num_tabs):
+            error_list.append(f'One of the mandatory fields (num_tabs) is not a tuple of 2 positive integers')        
         # iterate through the images list in the yaml file
         max_x, max_y = -1, -1
         for index, yaml_images in enumerate(yaml_images_list):
@@ -533,16 +585,19 @@ class DetectorDAO():
         batch_id = yaml_data.get('batch_id', None)
         batch_time = yaml_data.get('batch_time', None)
         age = yaml_data.get('age', -1)
-        species = yaml_data.get('species', None)
+        species = yaml_data.get('species').lower()
+        
         season = yaml_data.get('season', None)
         settle_time = yaml_data.get('settle_time', None)
+        num_tabs = yaml_data.get('num_tabs', None)
+        spawn_time = yaml_data.get('spawn_time', None)
         importer_id = yaml_data.get('importer_id', 'Unknown')
         operator = yaml_data.get('operator', 'Unknown') 
         image_files_parent_folder = yaml_data.get('image_files_parent_folder', None)
         yaml_images_list = yaml_data.get('images', None)
         try:
             tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-            self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, settle_time, importer_id, operator)
+            self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator)
             self.delete_source_images_of_tile_sample(tile_sample_id)
             for index, yaml_images in enumerate(yaml_images_list):
                 x, y = yaml_images.get('x', None), yaml_images.get('y', None)
@@ -815,10 +870,10 @@ class DetectorDAO():
     @synchronized
     def list_detected_classes(self, tile_sample_id:str=None) -> pd.DataFrame:
         if tile_sample_id is None:
-            sql = 'SELECT class_name FROM detected_object'
+            sql = 'SELECT DISTINCT(class_name) FROM detected_object'
             return db_tools.query_for_list(self.db_file, sql)          
         else:
-            sql = 'SELECT class_name FROM detected_object WHERE tile_sample_id = ?'
+            sql = 'SELECT DISTINCT(class_name) FROM detected_object WHERE tile_sample_id = ?'
             return db_tools.query_for_list(self.db_file, sql, (tile_sample_id,))         
 
 
@@ -868,10 +923,12 @@ class DetectorDAO():
     @synchronized
     def list_all_cache_tile_health(self, season:str=None) -> list:
         if season is None:
-            sql = 'SELECT * FROM cache_tile_health_stat ORDER BY tile_id ASC'
+            sql = 'SELECT tile_id, species, settle_time, num_samples, coral_count_latest, age_latest, loss_rate_whole, loss_rate_recent, health_index \
+                    FROM cache_tile_health_stat GROUP BY tile_id ORDER BY tile_id ASC'
             return db_tools.query(self.db_file, sql,) 
         else:
-            sql = 'SELECT * FROM cache_tile_health_stat WHERE season = ? ORDER BY tile_id ASC'
+            sql = 'SELECT tile_id, species, settle_time, num_samples, coral_count_latest, age_latest, loss_rate_whole, loss_rate_recent, health_index \
+                    FROM cache_tile_health_stat WHERE season = ? GROUP BY tile_id ORDER BY tile_id ASC'
             return db_tools.query(self.db_file, sql, (season,))
         
     @synchronized
@@ -1022,7 +1079,7 @@ class DetectorDAO():
 def manage_tables():
     CGRAS_HOME = '/home/qcr/cgras_data'
     DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
-    DETECT_DBFM = DBFileManager(DATABASE_FOLDER, 'detector.db', DETECT_DDL)
+    DETECT_DBFM = DBFile(DATABASE_FOLDER, 'detector.db', DETECT_DDL)
     DETECT_DAO = DetectorDAO(DETECT_DBFM.db_file)
     # DETECT_DBFM.drop_tables([''])
     tables_name = DETECT_DBFM.list_tables_name()

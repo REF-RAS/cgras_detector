@@ -1,10 +1,12 @@
 <launch>
     <arg name="namespace" default="cgras" doc="The namespace for the project" />
     <arg name="detector" default="true" />
+    <arg name="aux_server" default="true" />
     <arg name="cgras_data_folder" default="/home/qcr/cgras_data" />
 
     <group ns="$(arg namespace)">
         <param name="detector" type="boolean" value="$(arg detector)" /> 
+        <param name="aux_server" type="boolean" value="$(arg aux_server)" /> 
         <param name="cgras_data_folder" type="string" value="$(arg cgras_data_folder)" />
 
         <!-- launch the detector node -->
@@ -13,6 +15,11 @@
             </node>
         </group>
 
+        <!-- launch the aux server -->
+        <group if="$(arg aux_server)">
+            <node pkg="cgras_detector" type="run_aux_server.py" name="aux_server_node" output="log">
+            </node>
+        </group>
     </group>
 
 </launch>   

@@ -1,4 +1,9 @@
 tile_id: 2024Oct-T02
+species: Montipora aequituberculata
+settle_time: 2024-10-30
+spawning_time: 2024-10-15
+season: 2024Oct
+num_tabs: [20, 20]
 batch_id: CG1-202410312300
 batch_time: 2024-10-31 23:00:00
 importer_id: YAML

@@ -18,7 +18,7 @@ import pandas as pd
 
 from tools import db_tools
 from detector.models import logger
-from detector.model import AIMSTILE_DAO, DETECT_DAO, APP_FILE_MANAGER, CONFIG
+from detector.model import DETECT_DAO
 
 class HealthEvaluateTaskHelper():
     @staticmethod
@@ -190,8 +190,7 @@ def test_update_cache_tile_health_model():
     health_task_model = HealthEvaluateTaskModel()
     health_task_model.detect_stat_to_cache_tile_health(season='2023Dec')
 
-    tile_df = AIMSTILE_DAO.list_all_tiles_of_active_season()
-
+    tile_df = DETECT_DAO.list_tiles_in_tile_sample()
     DETECT_DAO.add_tile_df_to_cache_tile_health(tile_df)
     logger.info(f'cache health: {DETECT_DAO.list_all_cache_tile_health()}')  
 

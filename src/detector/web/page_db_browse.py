@@ -17,14 +17,14 @@ import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate 
 # project modules
 from tools import db_tools, type_tools
-from detector.model import DETECT_DAO, AIMSTILE_DAO
+from detector.model import DETECT_DAO
 
 dash.register_page(__name__)
 
 class DBTableBrowsePage():
     def __init__(self, app):
         # model variables
-        self.dao_map = {'Detector DB': DETECT_DAO, 'Tile DB': AIMSTILE_DAO}
+        self.dao_map = {'Detector DB': DETECT_DAO}
         self.dao_selected = 'Detector DB'
         self.sql_list = []
         self._error_placeholder = None

@@ -4,6 +4,11 @@ cgras_detector:
   web_host: 0.0.0.0
   web_port: 8023
   web_debug_mode: True
+  web_debug_hot_reload: False
+  # auxillary web server
+  aux_web_host: 0.0.0.0
+  aux_web_port: 8024
+  aux_web_directory: /home/qcr/cgras_data/detector/data
   # timers for driving the system and refresh the GUI
   system_timer: 1  # seconds
   dashboard_timer: 1  # seconds
@@ -21,11 +26,11 @@ cgras_detector:
   reco_working_scale: 0.1
   reco_debug_images_at_original_scale: False
   reco_debug_feature_matching_images: True
-  reco_feature_detector: sift
+  reco_feature_detector: brisk               # sift, orb, brisk, akaze
   reco_matching_confidence_threshold: 0.4
   cod_model_filename: coral_object_detect_model.yaml 
   cod_debug_blob_images: True
-  cod_blob_overlap_pix: 32
+  cod_blob_overlap_pix: 128
   cod_use_cached_object_detection: True
-  cod_duplicate_max_displacement_images: 16
+  cod_duplicate_max_displacement_images: 32
   cod_duplicate_max_displacement_blobs: 32 

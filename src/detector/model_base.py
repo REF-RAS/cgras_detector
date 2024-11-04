@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, sys, threading, collections, time
+import os, sys, threading, math, time
 
 # --------------------------------------------
 # The class models callbacks and manages
@@ -124,7 +124,7 @@ class StateManager():
         :return: The time in seconds as a float
         """
         if self.last_update_time is None:
-            return None
+            return math.inf
         return time.time() - self.last_update_time
     
     def time_lapsed_since_change(self):
@@ -133,7 +133,7 @@ class StateManager():
         :return: The time in seconds as a float
         """
         if self.last_change_time is None:
-            return None
+            return math.inf
         return time.time() - self.last_change_time    
     
     # -- passing variables between states

@@ -22,22 +22,30 @@ from tools.logging_tools import logger
 
  
 # This class models the management and backup of db files and the folder that contains the files
-class DBFileManager():
-    def __init__(self, database_folder:str, db_filename:str, ddb_commands:dict):
+class DBFile():
+    def __init__(self, database_folder:str, db_filename:str, ddl_commands:dict):
         assert database_folder is not None and db_filename is not None, 'Parameters either (database_folder, db_filename) is None'
-        assert ddb_commands is not None, 'Parameter (ddb_comamnds) is None'
-        assert ddb_commands is not None, 'Parameter (ddb_commands) is not the expected dict type with table names as keys and DDL commands as values'
+        assert ddl_commands is not None, 'Parameter (ddl_commands) is None'
+        assert type(ddl_commands) in (list, dict), 'Parameter (ddl_commands) is not the expected dict type with table names as keys and DDL commands as values'
         if not os.path.isdir(database_folder):
             raise AssertionError(f'{type(self).__name__}: Parameter (database_folder) is not an existing directory')
+        # input parameters: convert ddl commands in a list to a single dict
+        if isinstance(ddl_commands, list):
+            self.ddl_commands = dict()
+            for ddl_dict in self.ddl_commands:
+                if not isinstance(ddl_dict, dict):
+                    raise AssertionError(f'Parameter (ddl_commands) is a list but one of the list item is not a dict')
+                self.ddl_commands.update(ddl_dict)
+        else:
+            self.ddl_commands = ddl_commands
         # input parameters
-        self.ddb_commands = ddb_commands
-        self.table_names = ddb_commands.keys()
+        self.table_names = self.ddl_commands.keys()
         self.db_filename = db_filename
         try:
             self.db_parent_folder = os.path.realpath(database_folder)
             self.db_file = os.path.realpath(os.path.join(database_folder, db_filename))
             
-            logger.info(f'DBFileManager: Setup db_file "{self.db_file}"')
+            logger.info(f'DBFile: setup db_file "{self.db_file}"')
             # - test if the db_file exists, if not, create one
             if not os.path.isfile(self.db_file):
                 self.create_tables()
@@ -46,7 +54,7 @@ class DBFileManager():
                 # self._make_daily_backup()
                 ...
         except Exception as e:
-            raise AssertionError(f'system database setup error: {e}')
+            raise AssertionError(f'DBFile: system database setup error: {e}')
     
     # ------- manage the sqlite3 database files    
     def _make_daily_backup(self):
@@ -206,6 +214,6 @@ TEST_DDL = {
 if __name__ == '__main__':  
     CGRAS_HOME = '/home/qcr/cgras_data'
     DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
-    DETECTOR_DBFM = DBFileManager(DATABASE_FOLDER, 'detector.db', TEST_DDL)
+    DETECTOR_DBFM = DBFile(DATABASE_FOLDER, 'detector.db', TEST_DDL)
     DETECTOR_DBFM.dump_all_tables()
 

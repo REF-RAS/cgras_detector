@@ -1,4 +1,8 @@
 tile_id: 2023Dec-P00003
+species: Acropora palmata
+settle_time: 2023-11-13
+season: 2023Dec
+num_tabs: [20, 8]
 batch_id: CG1-202311201200
 batch_time: 2023-11-20 12:00:00
 importer_id: YAML

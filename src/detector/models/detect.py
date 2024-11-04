@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, yaml, numbers, pickle, time
+import os, math, yaml, numbers, random, time
 from enum import Enum
 from collections import defaultdict
 from datetime import datetime
@@ -72,7 +72,7 @@ class CoralObjectDetectModel():
         self.to_abort = False
         # step 1: iterate through each image in the 2d list of images
         for row_index, row_1d_image_list in enumerate(images_2d_list):
-            for col_index, image in enumerate(row_1d_image_list):
+            for col_index, image in enumerate(row_1d_image_list):                
                 # if the attribute progress_cb is set, call the progress_cb to record the progress
                 if hasattr(self, 'progress_cb') and self.progress_cb is not None:
                     self.progress_cb((self.count_images_completed, self.num_images))
@@ -274,20 +274,20 @@ class CoralObjectDetectModel():
                 object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
                 total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2}: {num_duplicates_removed}')
+                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
                 if row_index >= images_grid_size[1] - 1:
                     continue
                 # resolve diplicate between (col_index, row_index) and (col_index, row_index + 1)
                 object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index, row_index + 1)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
                 total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2}: {num_duplicates_removed}') 
+                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}') 
                 total_duplicates_removed += num_duplicates_removed  
                 # resolve diplicate between (col_index, row_index) and (col_index + 1, row_index + 1)
                 object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index + 1)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
                 total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2}: {num_duplicates_removed}')  
+                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')  
                 total_duplicates_removed += num_duplicates_removed     
         logger.info(f'Total number of duplicates removed from overlapping regions between images: {total_duplicates_removed}')    
         return total_duplicates_removed     
@@ -366,7 +366,7 @@ class CoralObjectDetectImageModel():
                 end_x, end_y = start_x + self.blob_size[0], start_y + self.blob_size[1]
                 end_x, end_y = min(end_x, image_size[0]), min(end_y, image_size[1]) 
                 # extract the image blob from the numpy image
-                image_blob = image[start_y:end_y, start_x:end_x]
+                image_blob = image[start_y:end_y, start_x:end_x].copy()
                 image_blob_size = image_blob.shape[:2][::-1]
                 # compute the cache index
                 cache_index = (image_col_index, image_row_index, blob_col_index, blob_row_index,)
@@ -391,7 +391,7 @@ class CoralObjectDetectImageModel():
                     self.raw_object_list_of_blobs[cache_index] = object_list
                     # if the self.debug_blob_images is True, then generate the annotated image for this image blob and save to the logdata folder
                     if self.debug_blob_images and self.logdata_folder is not None:
-                        annotated_image = yolo_result.draw_detection(image_blob, True)
+                        annotated_image = yolo_result.draw_detection(image_blob, True)  # making a copy before annotation so that the original image is intact
                         image_file_name = f'annotated_blob_{image_col_index}_{image_row_index}_{blob_col_index}_{blob_row_index}.jpg'
                         image_dict = {'title': f'Annotated blob at image ({image_col_index} {image_row_index}) blob ({blob_col_index} {blob_row_index})', 'src': image_file_name}
                         self.annotated_blob_filename_dict_list.append(image_dict)
@@ -404,15 +404,17 @@ class CoralObjectDetectImageModel():
                     logger.info(coral_object)
                 self.blobs_count += 1
  
-        # save the raw_object_list_of_blobs to cache file
-        if self.to_update_cache or (not self.use_cached_object_detection and self.logdata_folder is not None):
-            cache_data_file = os.path.join(self.logdata_folder, f'object_list_{image_col_index}_{image_row_index}.yaml')        # save the object list and metadata to the cache file
-            logger.info(f'{type(self).__name__}: Save object list and metadata for {self.blobs_count} image blobs to {cache_data_file}')
-            self._save_raw_object_list_of_blobs(cache_data_file)
+
         
         # step 3: iterate through each pair of neighbour blobs
         logger.info(f'DUPLICATE REMOVAL between image blobs in the image ({image_col_index, image_row_index})') 
         self._invalidate_duplicate_objects(self.raw_object_list_of_blobs, image_col_index, image_row_index, self.image_blob_grid_size, self.duplicate_max_displacement)
+    
+        # save the raw_object_list_of_blobs to cache file
+        if self.to_update_cache or (not self.use_cached_object_detection and self.logdata_folder is not None):
+            cache_data_file = os.path.join(self.logdata_folder, f'object_list_{image_col_index}_{image_row_index}.yaml')        # save the object list and metadata to the cache file
+            logger.info(f'{type(self).__name__}: Save object list and metadata for {self.blobs_count} image blobs to {cache_data_file}')
+            self._save_raw_object_list_of_blobs(cache_data_file)    
     
         # step 4: merge object lists of every blob into final object list
         self.resolved_object_list = self._merge_into_image_object_list()
@@ -573,6 +575,7 @@ class CoralObjectDetectImageModel():
                 centre = centre,
                 size = yolo_result.size,
                 bbox_in_blob = bbox_in_blob,
+                bbox_in_image = bbox_in_image,
                 bbox_in_tile = bbox_in_tile,
                 bbox_normalized = bbox_in_tile_normalized,
                 centre_normalized = centre_normalized,
@@ -607,22 +610,22 @@ class CoralObjectDetectImageModel():
                 object_list_index_2 = (image_col_index, image_row_index, blob_col_index + 1, blob_row_index)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], raw_object_list_of_blobs[object_list_index_2], max_displacement)
                 total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2}: {num_duplicates_removed}')
+                # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
                 if blob_row_index >= image_blob_grid_size[1] - 1:
                     continue
                 # resolve diplications between (blob_col_index, blob_row_index) and (blob_col_index, blob_row_index + 1)
                 object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
                 object_list_index_2 = (image_col_index, image_row_index, blob_col_index, blob_row_index + 1)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], raw_object_list_of_blobs[object_list_index_2], max_displacement)
-                logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2}: {num_duplicates_removed}')
+                # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
                 total_duplicates_removed += num_duplicates_removed
                 # resolve diplicate between (blob_col_index, blob_row_index) and (blob_col_index + 1, blob_row_index + 1)
                 object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
                 object_list_index_2 = (image_col_index, image_row_index, blob_col_index + 1, blob_row_index + 1)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], raw_object_list_of_blobs[object_list_index_2], max_displacement)
-                logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2}: {num_duplicates_removed}')
+                # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
                 total_duplicates_removed += num_duplicates_removed     
-        logger.info(f'Total number of duplicates removed from overlapped regions between blobs: {total_duplicates_removed}')    
+        logger.info(f'Total number of duplicates removed from overlapped regions between blobs: {total_duplicates_removed}')  
         return total_duplicates_removed     
     
 
@@ -646,6 +649,8 @@ class CoralObjectListHelper():
         object_1:CoralObject
         object_2:CoralObject
         nearest_match_list = [None] * len(object_list_1)
+        # distance calculated below is squared distance, so max_displacement is squared
+        max_displacement = max_displacement * max_displacement
         # for every object in object_list_1
         for index_1, object_1 in enumerate(object_list_1):
             if object_1.invalidated:
@@ -669,7 +674,7 @@ class CoralObjectListHelper():
         num_duplicates = 0
         for index_1, index_2 in enumerate(nearest_match_list):
             if index_2 is not None:
-                object_list_2[index_2].invalidate = True
+                object_list_2[index_2].invalidated = True
                 if verbose:
                     logger.info(f'Duplicate: {object_list_1[index_1]}\n{object_list_2[index_2]}')
                 num_duplicates += 1
@@ -693,14 +698,13 @@ class CoralObjectListHelper():
         palette = YoloResult._get_palette()
         coral_object:CoralObject
         for coral_object in object_list:
-            if not include_invalidated and coral_object.invalidated:
+            if (not include_invalidated) and coral_object.invalidated:
                 continue
             color = palette[int(coral_object.cls_id)]
-            cv2.rectangle(output_image, (int(coral_object.bbox[0]), int(coral_object.bbox[1])),
-                        (int(coral_object.bbox[2]), int(coral_object.bbox[3])), color, 3)            
+            cv2.rectangle(output_image, (int(coral_object.bbox_in_image[0]), int(coral_object.bbox_in_image[1])), (int(coral_object.bbox_in_image[2]), int(coral_object.bbox_in_image[3])), color, 3)          
             if print_name:
                 cv2.putText(output_image, f'{coral_object.cls_name}',
-                        (int(coral_object.bbox[0]), int(coral_object.bbox[1]) - 10),
+                        (int(coral_object.bbox_in_image[0]) + random.randint(0, 20), int(coral_object.bbox_in_image[1]) - 10 + random.randint(0, 20)),
                         cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 0, 0), 1)
         return output_image        
 

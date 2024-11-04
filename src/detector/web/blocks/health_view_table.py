@@ -17,20 +17,18 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 from dash.dash_table.Format import Format, Group, Scheme
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO
+from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO
 from tools.logging_tools import logger
 
 class HealthViewTable():
-    def __init__(self, app, prefix, page_size=50, refresh_cycle=10):
+    def __init__(self, app, prefix, page_size=50):
         self.app = app 
         self.prefix = prefix = prefix + 'atb_'
-        self.update_store_id = self.prefix + 'update_store'
+        self.update_panel_store_id = self.prefix + 'update_panel_store'
+        self.update_datatable_store_id = self.prefix + 'update_datatable_store'
         self.row_selected_trigger_id = self.prefix + 'row_selected_store'
         # define model variables
         self._model = None
-        self._model_last_updated = None
-        self.to_refresh = False
-        self.refresh_cycle = refresh_cycle
         # define widgets 
         self._operators = [['ge ', '>='],
                     ['le ', '<='],
@@ -107,26 +105,21 @@ class HealthViewTable():
                 html.H4([dbc.Badge('TILES IN THE SELECTED SEASON', color='white', text_color='secondary'), ]),
                 # html.P('Click to view results', className='ms-4'),
                 self._datatable_panel,
-                dcc.Store(id=self.update_store_id),
+                dcc.Store(id=self.update_panel_store_id),
+                dcc.Store(id=self.update_datatable_store_id),
                 dcc.Store(id=self.row_selected_trigger_id),
                 self._legend_modal,     
-                ], style={'margin-top': '24px'})     
-
-        # self.app.callback([Output(self.row_selected_trigger_id, 'data'),
-        #                     Output(prefix+'datatable', 'active_cell'),
-        #                     Output(prefix+'datatable', 'selected_cells')],
-        #     [Input(prefix+'datatable', 'active_cell'),
-        #      State(self.prefix+'datatable', 'page_current'),
-        #      State(self.prefix+'datatable', 'page_size'),
-        #      ], prevent_initial_call=True)(self._row_selected())
+                ], id=prefix+'main_panel', style={'margin-top': '24px'})     
     
-        self.app.callback([Output(self.prefix+'datatable', 'data')],
+        self.app.callback([Output(self.prefix+'datatable', 'data'),
+                           Output(prefix+'datatable', 'selected_rows', allow_duplicate=True),],
             [Input(self.prefix+'datatable', 'page_current'),
              Input(self.prefix+'datatable', 'page_size'),
              Input(self.prefix+'datatable', 'sort_by'),
              Input(self.prefix+'datatable', 'filter_query'),
-             Input(self.prefix+'season_list_dropdown', 'value'),
-             ], prevent_initial_call=False)(self._update_datatable())
+             State(self.prefix+'season_list_dropdown', 'value'),
+             Input(self.update_datatable_store_id, 'data'),
+             ], prevent_initial_call=True)(self._update_datatable())
         
         self.app.callback([Output(prefix+'view_modal', 'is_open', allow_duplicate=True)],
                     [Input(prefix+'table_legend_button', 'n_clicks')], prevent_initial_call=True)(self._table_legend_button_pressed())  
@@ -134,31 +127,28 @@ class HealthViewTable():
         self.app.callback([Output(prefix+'table_view_button', 'href', allow_duplicate=True),
                            Output(prefix+'table_view_button', 'disabled', allow_duplicate=True),
                            Output(prefix+'datatable', 'style_data_conditional'),
-                           Output(prefix+'datatable', 'selected_rows'),],
+                           Output(prefix+'datatable', 'selected_rows', allow_duplicate=True),],
                     [Input(prefix+'datatable', 'selected_rows'),
                      State(self.prefix+'datatable', 'page_current'),
                      State(self.prefix+'datatable', 'page_size'),
                      State(prefix+'datatable', 'data')], prevent_initial_call=True)(self._row_selected())      
         
-        # define callback for the season
+        self.app.callback([Output(self.update_datatable_store_id, 'data', allow_duplicate=True)],
+                         [Input(self.prefix+'season_list_dropdown', 'value'),], prevent_initial_call='initial_duplicate')(self._season_dropdown_changed())    
+        
+        # define callback for the season dropdown
         self.app.callback([Output(self.prefix+'season_list_dropdown', 'options', allow_duplicate=True),
                             Output(self.prefix+'season_list_dropdown', 'value', allow_duplicate=True)],
-                         [Input(self.update_store_id, 'data'),], prevent_initial_call=True)(self._update_season_dropdown())              
-        
-        # self.app.callback(Output(prefix+'datatable', 'style_data_conditional'),
-        #                     [Input(prefix+'datatable', 'derived_viewport_selected_rows'),
-        #                      State(prefix+'datatable', 'data')])(self._style_selected_rows())  
-        
+                         [Input(self.prefix+'main_panel', 'children'),], prevent_initial_call='initial_duplicate')(self._update_season_dropdown())  
+                
     def get_panel(self):
         return self.the_panel
     
-    def refresh(self):
-        self.to_refresh = True
-    
     def register_trigger(self, trigger_id:str):
         # define callback for the datatable data
-        self.app.callback([Output(self.update_store_id, 'data')],
-            [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
+        self.app.callback([Output(self.prefix+'main_panel', 'children')],
+            [Input(trigger_id, 'data'),
+             State(self.prefix+'main_panel', 'children')], prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
 
     
     def get_row_selected_trigger_id(self) -> str:
@@ -195,23 +185,28 @@ class HealthViewTable():
         return [None] * 3
 
     def _update_season_dropdown(self):
-        def update_season_dropdown(timer):
+        def update_season_dropdown(main_panel):
             # get options for the dropdown
             options = DETECT_DAO.list_seasons_in_tile_sample()
-            value = options[0] if options is not None and len(options) > 0 else None
-            options = [{'label': f'{x} Season', 'value': x} for x in options]           
+            value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
+            value = options[0] if value is None and options is not None else value
+            options = [{'label': f'{x} Season', 'value': x} for x in options]              
             return (options, value,)
         return update_season_dropdown
+    
+    def _season_dropdown_changed(self):
+        def season_dropdown_changed(season_title):
+            if not season_title:
+                raise PreventUpdate
+            # update the selected season in the persistent storage
+            PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
+            return (season_title,)
+        return season_dropdown_changed
 
     def _update_datatable(self):
-        def update_datatable(page_current, page_size, sort_by, filter, season_title):
-            if not self.to_refresh:
-                raise PreventUpdate
-            current_time = time.time()
-            if self._model is None or self._model_last_updated is None or current_time - self._model_last_updated > 60:  # update once every minute at most
-                self._model = self._get_default_datatable_model(season_title)
-                self._model = self.refine_datatable_model(self._model)
-                self._model_last_updated = current_time
+        def update_datatable(page_current, page_size, sort_by, filter, season_title, store):
+            self._model = self._get_default_datatable_model(season_title)
+            self._model = self.refine_datatable_model(self._model)                
             model = self._model
             filtering_expressions = filter.split(' && ')            
             for filter_part in filtering_expressions:
@@ -228,15 +223,15 @@ class HealthViewTable():
                     # only works with complete fields in standard format
                     model = model.loc[model[col_name].str.startswith(filter_value)]
 
-            return (model.iloc[page_current * page_size:(page_current + 1) * page_size].to_dict('records'),)
+            return (model.iloc[page_current * page_size:(page_current + 1) * page_size].to_dict('records'), [])
             # return (self._model.to_dict('records'),)
         return update_datatable 
     
     def _update_panel(self):
-        def update_panel(timer):
-            if (timer-1) % self.refresh_cycle != 0:
+        def update_panel(timer, main_panel):
+            if not timer:
                 raise PreventUpdate
-            return (timer,)
+            return (main_panel,)
         return update_panel
     
     def _table_legend_button_pressed(self):

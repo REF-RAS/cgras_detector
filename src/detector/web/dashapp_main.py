@@ -41,7 +41,7 @@ APP = dash.Dash(__name__,
                 # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js',
                 # assets_ignore='foundation-renamed.min.css|foundation-renamed.min.js|bootstrap.min.css',  # this combination stops the annoying refreshing of the UI when online
                 assets_ignore='*.css|*.js|*.jpg|*.html|*.yaml',
-                assets_folder=APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.SYSTEM_FOLDER)
+                assets_folder=APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.SYSTEM_SUBFOLDER)
                 )
 
 APP.config['suppress_callback_exceptions'] = True
@@ -118,6 +118,9 @@ class DashApplicationMain():
                
     def start(self):
         rospy.loginfo(f'{type(self).__name__}: starting the dash flask server')
+        # switch off the hot reload
+        self.app.enable_dev_tools(dev_tools_hot_reload=CONFIG.get(SystemConfigNames.WEB_DEBUG_HOT_RELOAD, True))
+        # start the server
         self.app.run_server(host=self.DASH_HOST, port=self.DASH_PORT, debug=CONFIG.get(SystemConfigNames.WEB_DEBUG_MODE, True))
 
     def stop(self, *args, **kwargs):

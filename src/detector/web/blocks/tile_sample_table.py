@@ -16,7 +16,7 @@ import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, AIMSTILE_DAO
+from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, CONFIG, SystemConfigNames
 from detector.dao_detect import StatusNames
 from detector.task_detection import DetectionTaskModel
 from tools.logging_tools import logger
@@ -247,8 +247,7 @@ class TileSampleTable():
     def _update_season_dropdown(self):
         def update_season_dropdown(tile_id):
             # get options for the dropdown
-            # options = DETECT_DAO.list_seasons_in_tile_sample()
-            options = AIMSTILE_DAO.get_season_titles_list()
+            options = DETECT_DAO.list_seasons_in_tile_sample()
             logger.warning(f'update season: {options}')
             value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
             value = options[0] if value is None and options is not None and len(options) > 0 else None
@@ -360,23 +359,29 @@ class TileSampleTable():
         def view_row_confirmed(row_index_list):
             if not row_index_list:
                 raise PreventUpdate
-            id = self._model.iloc[row_index_list[0]]['id']
-            logdata_folder = DetectionTaskModel.get_cache_folder(id)
+            # retrieve the tile_sample_id of the selected row
+            tile_sample_id = self._model.iloc[row_index_list[0]]['id']
+            logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)
             if logdata_folder is None:
                 raise PreventUpdate
-            modal_title = f'Tile Sample ID: {id}'
-            view_reconstruct_link = os.path.join(logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
-            if os.path.isfile(view_reconstruct_link):
-                view_reconstruct_link = 'file://' + view_reconstruct_link
+            # build the href based on the aux server configuration
+            href = f'http://{CONFIG.get(SystemConfigNames.AUX_WEB_HOST, "localhost")}:{CONFIG.get(SystemConfigNames.AUX_WEB_PORT, "8024")}'
+            # generate the title
+            modal_title = f'Tile Sample ID: {tile_sample_id}'
+            # evalate if the file exists
+            view_reconstruct_path = os.path.join(logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
+            if os.path.isfile(view_reconstruct_path):
+                view_reconstruct_href = f'{href}/{DetectionTaskModel.get_partial_cache_folder(tile_sample_id)}/{DetectionTaskModel.WHOLE_RECO_HTML_FILENAME}' 
             else:
-                view_reconstruct_link = None
+                view_reconstruct_href = None
 
-            view_feature_match_link = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
-            if os.path.isfile(view_feature_match_link):
-                view_feature_match_link = 'file://' + view_feature_match_link
+            # evaluate if the file exists
+            view_feature_match_path = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
+            if os.path.isfile(view_feature_match_path):
+                view_feature_match_href = f'{href}/{DetectionTaskModel.get_partial_cache_folder(tile_sample_id)}/{DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME}' 
             else:           
-                view_feature_match_link = None
-            return (True, modal_title, view_reconstruct_link, view_reconstruct_link==None, view_feature_match_link, view_feature_match_link==None,)
+                view_feature_match_href = None
+            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_feature_match_href, view_feature_match_href==None,)
         return view_row_confirmed
     
     def _style_selected_rows(self):

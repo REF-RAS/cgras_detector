@@ -52,9 +52,7 @@ class HeatmapHelper():
             if class_filter is not None and coral_object.cls_name not in class_filter:
                 continue
             # compute the cell index based on the object normalized location
-            logger.warning(f'x, y = {coral_object.centre_normalized[0], coral_object.centre_normalized[1]}')
             x, y = int(coral_object.centre_normalized[0] * map_size[0]), int(coral_object.centre_normalized[1] * map_size[1])
-            
             x, y = min(x, map_size[0] - 1), min(y, map_size[1] - 1)
             count_map_array[y, x] += 1
         return count_map_array  

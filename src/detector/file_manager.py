@@ -17,33 +17,39 @@ from datetime import datetime
 from tools.logging_tools import logger
 
 class ApplicationFileManager():
-    SYSTEM_FOLDER = 'system'
-    SYSTEM_SCRIPTS_FOLDER = 'system/scripts'
-    SYSTEM_IMAGES_FOLDER = 'system/images'
-    DATA_FOLDER = 'data'
-    TEMP_FOLDER = 'temp'
+    # top level folders
+    IMAGES_FOLDER = 'images'
+    DATABASE_FOLDER = 'database'
+    DETECTOR_FOLDER = 'detector'
+    
+    # platform subfolders
+    SYSTEM_SUBFOLDER = 'system'
+    SYSTEM_SCRIPTS_SUBFOLDER = 'system/scripts'
+    SYSTEM_IMAGES_SUBFOLDER = 'system/images'
+    DATA_SUBFOLDER = 'data'
+    TEMP_SUBFOLDER = 'temp'
     
     def __init__(self, cgras_data_folder):
         self.log_lock = threading.Lock()
         self.user_home = os.path.expanduser('~') 
         self.cgras_data_folder = cgras_data_folder
         # crate subfolders
-        self.images_folder = os.path.join(self.cgras_data_folder, 'images')
+        self.images_folder = os.path.join(self.cgras_data_folder, ApplicationFileManager.IMAGES_FOLDER)
         os.makedirs(self.images_folder, exist_ok=True)
-        self.database_folder = os.path.join(self.cgras_data_folder, 'database')
+        self.database_folder = os.path.join(self.cgras_data_folder, ApplicationFileManager.DATABASE_FOLDER)
         os.makedirs(self.database_folder, exist_ok=True)        
-        self.detector_folder = os.path.join(self.cgras_data_folder, 'detector')
+        self.detector_folder = os.path.join(self.cgras_data_folder, ApplicationFileManager.DETECTOR_FOLDER)
         os.makedirs(self.detector_folder, exist_ok=True)
         # create the subfolders under the two platforms
-        self._create_platform_folders(self.detector_folder)
+        self._create_platform_subfolders(self.detector_folder)
     
     @staticmethod
-    def _create_platform_folders(platform_home):
-        system_folder = os.path.join(platform_home, ApplicationFileManager.SYSTEM_FOLDER)
+    def _create_platform_subfolders(platform_home):
+        system_folder = os.path.join(platform_home, ApplicationFileManager.SYSTEM_SUBFOLDER)
         os.makedirs(system_folder, exist_ok=True)
-        data_folder = os.path.join(platform_home, ApplicationFileManager.DATA_FOLDER)
+        data_folder = os.path.join(platform_home, ApplicationFileManager.DATA_SUBFOLDER)
         os.makedirs(data_folder, exist_ok=True)       
-        temp_folder = os.path.join(platform_home, ApplicationFileManager.TEMP_FOLDER)
+        temp_folder = os.path.join(platform_home, ApplicationFileManager.TEMP_SUBFOLDER)
         os.makedirs(temp_folder, exist_ok=True)                   
     
     def get_cgras_home(self) -> str:
@@ -59,7 +65,7 @@ class ApplicationFileManager():
         return self.get_subfolder(self.detector_folder, *args)
     
     def get_detector_subfolder(self, subfolder, *args) -> str:
-        if subfolder not in [ApplicationFileManager.SYSTEM_FOLDER, ApplicationFileManager.DATA_FOLDER, ApplicationFileManager.TEMP_FOLDER]:
+        if subfolder not in [ApplicationFileManager.SYSTEM_SUBFOLDER, ApplicationFileManager.DATA_SUBFOLDER, ApplicationFileManager.TEMP_SUBFOLDER]:
             raise AssertionError(f'{type(self).__name__}: invalid parameter (subfolder): {subfolder} ')
         return self.get_subfolder(self.detector_folder, subfolder, *args)   
     
@@ -81,15 +87,15 @@ class ApplicationFileManager():
     # --- copy the images in the images folder and web scripts to the system folder of detector
     def populate_system_assets_folder(self):
         try:
-            system_folder_path = self.get_detector_folder(self.SYSTEM_FOLDER)
-            shutil.rmtree(self.get_detector_folder(self.SYSTEM_SCRIPTS_FOLDER), ignore_errors=True)
-            shutil.rmtree(self.get_detector_folder(self.SYSTEM_IMAGES_FOLDER), ignore_errors=True)
+            system_folder_path = self.get_detector_folder(self.SYSTEM_SUBFOLDER)
+            shutil.rmtree(self.get_detector_folder(self.SYSTEM_SCRIPTS_SUBFOLDER), ignore_errors=True)
+            shutil.rmtree(self.get_detector_folder(self.SYSTEM_IMAGES_SUBFOLDER), ignore_errors=True)
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system/scripts')
             logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
-            shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_SCRIPTS_FOLDER), dirs_exist_ok=True)
+            shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_SCRIPTS_SUBFOLDER), dirs_exist_ok=True)
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system/images')
             logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
-            shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_IMAGES_FOLDER), dirs_exist_ok=True)            
+            shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_IMAGES_SUBFOLDER), dirs_exist_ok=True)            
             # self.generate_pattern_images()
             return True
         except Exception as e:

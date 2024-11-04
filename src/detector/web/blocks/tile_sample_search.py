@@ -18,7 +18,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from tools.logging_tools import logger
-from detector.model import APP_FILE_MANAGER, DETECT_DAO, AIMSTILE_DAO
+from detector.model import DETECT_DAO
 from detector.dao_detect import StatusNames
 
 class TileSampleSearchBlock():
@@ -103,7 +103,7 @@ class TileSampleSearchBlock():
     def _reset_filter_button_clicked(self):
         def clear_filter_button_clicked(n_clicks, _):
             period_options = self.period_options
-            season_titles_list = AIMSTILE_DAO.get_season_titles_list()
+            season_titles_list = DETECT_DAO.list_seasons_in_tile_sample()
             for season_title in season_titles_list:
                 period_options.append({'label': f'{season_title} Season', 'value': season_title})
             value = 0

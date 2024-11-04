@@ -20,7 +20,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
 from tools.logging_tools import logger
-from detector.model import APP_FILE_MANAGER, AIMSTILE_DAO, DETECT_DAO
+from detector.model import DETECT_DAO
 from detector.models.visualize import CoralObjectMapModel, CoralObjectMapModelHelper
 
 class CountResultDownloadBlock():
@@ -143,7 +143,7 @@ class CountResultDownloadBlock():
             with io.BytesIO() as output:
                 writer = pd.ExcelWriter(output, engine='xlsxwriter')
                 # retrieve the tile info
-                tile_info_df = AIMSTILE_DAO.get_tile(tile_id, to_dataframe=True)
+                tile_info_df = DETECT_DAO.get_tile_info_from_tile_sample(tile_id, to_dataframe=True)
                 tile_info_df.to_excel(writer, sheet_name='TileInfo', index=False)
                 
                 coral_count_trend_df = DETECT_DAO.get_coral_count_trend_as_df(tile_id)

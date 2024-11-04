@@ -18,10 +18,9 @@ from detector.system_config import SystemConfig, SystemConfigNames
 from tools.logging_tools import logger
 import catkin_pkg.package
 
-from detector.database_manager import DBFileManager
+from detector.database_file import DBFile
 from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ObjectClassCategories, StatusNames, TaskTypes
-from detector.dao_persistent_storage import PersistentStoreDAO
-from detector.dao_aims import AIMSTILE_DDL, AIMSTileDAO
+from detector.dao_persistent_storage import PERSISTENT_STORE_DDL, PersistentStoreDAO
 from detector.file_manager import ApplicationFileManager
 
 # --- System-wide definitions and variables 
@@ -74,9 +73,7 @@ APP_FILE_MANAGER:ApplicationFileManager = ApplicationFileManager(CGRAS_DATA_FOLD
 APP_FILE_MANAGER.populate_system_assets_folder()
 
 # global variables for managing database tables
-AIMSTILE_DBFM = DBFileManager(APP_FILE_MANAGER.database_folder, 'tile.db', AIMSTILE_DDL)
-AIMSTILE_DAO:AIMSTileDAO = AIMSTileDAO(AIMSTILE_DBFM.db_file)
-DETECT_DBFM = DBFileManager(APP_FILE_MANAGER.database_folder, 'detector.db', DETECT_DDL)
+DETECT_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'detector.db', [DETECT_DDL, PERSISTENT_STORE_DDL])
 DETECT_DAO:DetectorDAO = DetectorDAO(DETECT_DBFM.db_file)
 PERSISTENT_STORE_DAO:PersistentStoreDAO = PersistentStoreDAO(DETECT_DBFM.db_file)
 

@@ -76,7 +76,8 @@ class YoloModelRangeChartBlock():
                 fig.update_xaxes(title='Age Range Covered by the Model (Days)', visible=True, showticklabels=True)
                 fig.update_layout(yaxis_visible=False, yaxis_showticklabels=False, plot_bgcolor='rgb(225, 225, 225)')
                 fig.update_traces(textposition='top center')
-                fig.data[0].error_x.thickness = 12
+                for i in range(len(fig.data)):
+                    fig.data[i].error_x.thickness = 12
                 return (fig, config, {'visibility': 'visible'})
             else:
                 return (fig, config, {'visibility': 'hidden'})

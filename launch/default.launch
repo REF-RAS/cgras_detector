@@ -1,9 +1,11 @@
 <launch>
     <arg name="cgras_data_folder" default="/home/qcr/cgras_data" />
     <arg name="detector" default="true" />
+    <arg name="aux_server" default="true" />
     <include file="$(find cgras_detector)/launch/main.launch">
         <arg name="namespace" default="cgras" doc="The namespace for the project" />
         <arg name="detector" default="$(arg detector)" />
+        <arg name="aux_server" default="$(arg aux_server)" />
         <arg name="cgras_data_folder" default="$(arg cgras_data_folder)" />
     </include>
 </launch>

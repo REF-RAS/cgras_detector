@@ -17,7 +17,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.dash_table.Format import Format, Padding
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, AIMSTILE_DAO
+from detector.model import DETECT_DAO
 from tools.logging_tools import logger
 
 class YoloModelEditTable():
@@ -137,8 +137,8 @@ class YoloModelEditTable():
             # logger.info(f'cell_edited: {rows[row]}')
             species = the_row['Species']
             message = ''
-            if not AIMSTILE_DAO.exist_species(species):
-                message = '(The species is not found in the imported tiles)'
+            if not DETECT_DAO.exist_species_in_tile_sample(species):
+                message = '(The species is not found in any tile sample)'
             start_day = the_row['Period Start (Day #)']
             end_day = the_row['Period End (Day #)']
             start_day = None if start_day.strip() == '' else start_day

@@ -16,7 +16,7 @@ import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
 from tools.logging_tools import logger
-from detector.model import DETECT_DAO, AIMSTILE_DAO, CONFIG
+from detector.model import DETECT_DAO, CONFIG
 
 class YoloModelFileImportBlock():
     def __init__(self, app, prefix, default_max_end_day=120):
@@ -115,10 +115,10 @@ class YoloModelFileImportBlock():
             yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
             is_valid, model = DETECT_DAO.validate_yolo_model_file_import(yaml_data)
             species = yaml_data['species']
-            species_list = AIMSTILE_DAO.list_species()
+            # extract species list from the 
             note = ''
-            if species not in species_list:
-                note = f' (Note: the species {species} is new)'
+            if not DETECT_DAO.exist_species_in_tile_sample(species):
+                note = f' (Note: the species {species} is new and not found in any tile sample)'
             if not is_valid:
                 message = 'One or more problems have been found in the tile sample spec yaml file.'
                 return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
