@@ -19,7 +19,7 @@ import pandas as pd
 
 from tools.lock_tools import synchronized
 from tools.file_tools import replace_suffix 
-from detector.models import logger, ModelsConfigNames
+from detector.models import logger, ModelsConfigNames, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.html.lightbox import LightboxHelper
@@ -71,6 +71,9 @@ class ProgressModel():
                 total_time += self.end_time[stage] - self.start_time[stage]
         return total_time
     
+    def get_current_stage(self):
+        return self.current_stage
+    
     def get_progress_at_stage(self, stage):
         return self.progress[stage]
 
@@ -101,18 +104,22 @@ class DetectionTaskModel():
         self.tile_sample_dict = DETECT_DAO.get_tile_sample(self.tile_sample_id)
         if self.tile_sample_dict is None:
             logger.warning(f'{type(self).__name__}: The tile_sample_id ({self.tile_sample_id}) not found')
-            raise AssertionError(f'Invalid parameter (tile_sample_id)')        
+            raise AssertionError(f'Invalid parameter (tile_sample_id)')   
+             
         self.tile_id, self.batch_id, self.batch_time = self.tile_sample_dict['tile_id'], self.tile_sample_dict['batch_id'], self.tile_sample_dict['batch_time']
-
         self.species, self.settle_time, self.season = self.tile_sample_dict['species'], self.tile_sample_dict['settle_time'], self.tile_sample_dict['season']
         # evaluate the number of days since settlement
-        self.settle_date_dt, self.capture_date_dt = pd.to_datetime(self.settle_time, utc=True), pd.to_datetime(self.batch_time, utc=True)
-        self.days_since_settle = (self.capture_date_dt - self.settle_date_dt).days
+        try:
+            self.settle_date_dt, self.capture_date_dt = pd.to_datetime(self.settle_time, utc=True), pd.to_datetime(self.batch_time, utc=True)
+            self.days_since_settle = (self.capture_date_dt - self.settle_date_dt).days
+        except Exception as e:
+            raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Invalid date/time format in batch time or settle time', e = e)
+        
         # resolve the suitable yolo model for this tile
         self.yolo_model_list = DETECT_DAO.query_yolo_model(self.species, self.days_since_settle)
         if self.yolo_model_list is None or len(self.yolo_model_list) == 0:
             logger.warning(f'{type(self).__name__}: No suitable yolo model for species ({self.species}) and days_since_settlement ({self.days_since_settle}) is found')
-            raise AssertionError(f'No suitable yolo model for tile_sample_id ({self.tile_sample_id})') 
+            raise DetectorAbortError(DetectorErrorCodes.YOLO_MODEL_UNDEFINED, f'No suitable yolo model: species ({self.species}) and days_since_settlement ({self.days_since_settle})') 
         # just pick the first one if more than one yolo model is suitable
         self.yolo_model_dict = self.yolo_model_list[0]
         # build parameters for the detection process
@@ -142,6 +149,7 @@ class DetectionTaskModel():
                 yaml.dump(self.params, outfile, Dumper=yaml.Dumper)
         except Exception as e:
             logger.warning(f'{type(self).__name__}: unable to save detect model parameter to the logdata folder {param_yaml_file}')
+            raise OSError(f'Failed to save detect model parameter to the logdata folder {param_yaml_file}')
         # copy the script files for the generated html files to the logdata folder of a tile sample
         scripts_folder = os.path.join(self.logdata_folder, 'scripts')
         APP_FILE_MANAGER.copy_scripts_folder(scripts_folder)
@@ -181,7 +189,7 @@ class DetectionTaskModel():
             for x in range(grid_size_x + 1):
                 if (x, y) not in capture_image_grid:
                     logger.warning(f'DetectionTaskModel._build_image_map_as_list: One or more images are missing in the 2d grid of images')
-                    raise AssertionError('Unable to build image_map_as_list')
+                    raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid')
                 row_images.append(capture_image_grid[(x, y)])
             image_map_as_list.append(row_images)
         return image_map_as_list, (grid_size_x, grid_size_y,)
@@ -189,15 +197,21 @@ class DetectionTaskModel():
     def execute_task_reco(self):
         self.progress_model.start_stage(ProgressStages.INIT)
         # build image_map_as_list from the captured images
-        self.image_map_as_list, self.image_grid_dim = self._build_image_map_as_list(self.tile_sample_id)
+        try:
+            self.image_map_as_list, self.image_grid_dim = self._build_image_map_as_list(self.tile_sample_id)
+        except Exception as e:
+            raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
         # load the cached ImageReconstructModel if exists, or build a new model from captured images
         reco_model_file = os.path.join(self.logdata_folder, self.params.get('reco_model_filename', 'reco_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached ImageReconstructModel')
             self.reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)
-        except:
+        except Exception as e:
             logger.info(f'{type(self).__name__}: No cached file. Building the ImageReconstructModel from capture images')
+        
+        if self.reco_model is None:
             self.reco_model = ImageReconstructModel(self.image_map_as_list, working_scale=0.1, **self.params) 
+            self.reco_model.build()
             ImageReconstructModelHelper.to_yaml(self.reco_model, reco_model_file)
         self.progress_model.end_stage(ProgressStages.RECO)
         
@@ -210,7 +224,10 @@ class DetectionTaskModel():
             self.loctile_model:LocateTileModel = LocateTileModelHelper.from_yaml_file(loctile_model_file)
         except:
             logger.info(f'{type(self).__name__}: No cached file. Building the loctile_model_file from capture images')
+            
+        if self.loctile_model is None:
             self.loctile_model = LocateTileModel(self.image_map_as_list, reco_model=self.reco_model, **self.params)
+            self.loctile_model.build()
             LocateTileModelHelper.to_yaml(self.loctile_model, loctile_model_file)
         self.progress_model.end_stage(ProgressStages.LOCTILE)
                 
@@ -224,23 +241,29 @@ class DetectionTaskModel():
             self.cod_model = CoralObjectDetectModelHelper.from_yaml_file(cod_model_file)
         except:
             logger.info(f'{type(self).__name__}: No cached file. Building the CoralObjectDetectModel from capture images, reco model, loctile model, and yolo model')
+            
+        if self.cod_model is None:
             # load the yolo_model first
             yolo_model_file=self.params.get(ModelsConfigNames.YOLO_MODEL_FILE.value)
             if self.to_abort:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
-                return
+                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
             try:
                 logger.info(f'{type(self).__name__}: Attempting to load the yolo_model_file at {yolo_model_file}')
                 yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file)
             except Exception as e:
                 logger.info(f'{type(self).__name__}: Failed to load the yolo model file: {e}')
-                raise AssertionError(f'The yolo model file is invalid or not present')
+                raise DetectorAbortError(DetectorErrorCodes.YOLO_MODEL_FILE_ERROR, f'Failed to load the yolo model file ({yolo_model_file})', e = e)
             # build the cod model
             if self.to_abort:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
-                return
+                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
             self.cod_model = CoralObjectDetectModel(self.image_map_as_list, self.reco_model, yolo_model, self.loctile_model, self._execute_task_object_detection_cb, **self.params)
-            CoralObjectDetectModelHelper.to_yaml_file(self.cod_model, cod_model_file)  
+            self.cod_model.build()
+            try:
+                CoralObjectDetectModelHelper.to_yaml_file(self.cod_model, cod_model_file)  
+            except Exception as e:
+                raise OSError(f'Failed to write cod model to yaml file {cod_model_file}')
         self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)        
 
     def _execute_task_object_detection_cb(self, progress_tuple:tuple):
@@ -253,26 +276,28 @@ class DetectionTaskModel():
         self.detection_stat['tile_pixel_x'], self.detection_stat['tile_pixel_y'] = self.reco_model.get_whole_reco_image_size()
         # detection of coral objects is completed, save the results to the database
         logger.info(f'{type(self).__name__}: Saving all types of {self.cod_model.get_num_objects()} objects to database')
-        DETECT_DAO.delete_detected_objects_of_tile_sample(self.tile_sample_id)
+        
+        DETECT_DAO.delete_detected_objects_of_tile_sample(self.tile_sample_id)  # DB operation
+         
         if self.to_abort:
             self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
-            return
-        stat = self._process_detected_objects(self.cod_model)
+            raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+        stat = self._process_detected_objects(self.cod_model)    # DB operation
         logger.info(f'{type(self).__name__}: Statistics {stat}')
         self.detection_stat.update(stat)
         # save the statistics to the database
-        self._update_detection_stat(self.detection_stat)
+        try:
+            self._update_detection_stat(self.detection_stat)     # DB opration
+        except Exception:
+            raise DetectorAbortError(DetectorErrorCodes.DB_ERROR, 'Failed to write detection results to the database')
         # generate html files
-        self.generate_html_files()
+        try:
+            self.generate_html_files()
+        except Exception as e:
+            raise OSError(f'Unable to write html files: {e}')
         # update the progress model
         self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
         self.progress_model.end_stage(ProgressStages.COMPLETED)
-
-    def execute_task(self):
-        self.execute_task_reco()
-        self.execute_task_loctile()
-        self.execute_task_object_detection()
-        self.execute_task_record()
 
     def abort_task(self):
         self.to_abort = True
@@ -290,6 +315,7 @@ class DetectionTaskModel():
         except Exception as e:
             logger.warning(f'Failed to generate HTML file for showing the whole reconstructed image')
             traceback.print_exc()
+            raise
         try:
             # generate the html file for viewing the feature matching images 
             feature_matching_image_dict_list = self.reco_model.get_feature_match_image_dict_list()
@@ -300,6 +326,7 @@ class DetectionTaskModel():
         except:
             logger.warning(f'Failed to generate HTML file for showing feature matching between images')
             traceback.print_exc()
+            raise
         try:
             # generate the html file for viewing the annotated blobs
             annotated_blob_dict_list_as_dict = self.cod_model.get_annotated_blob_filename_dict_lists_as_dict()
@@ -331,6 +358,7 @@ class DetectionTaskModel():
         except:
             logger.warning(f'Failed to generate HTML file for showing annotated images')    
             traceback.print_exc()
+            raise
         # generate the landing page
         try:
             html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.LANDING_HTML_FILENAME)
@@ -339,6 +367,7 @@ class DetectionTaskModel():
         except:
             logger.warning(f'Failed to generate the landing page HTML file')  
             traceback.print_exc()  
+            raise
 
     def get_time_since_start(self):
         return time.time() - self.start_time
@@ -347,6 +376,7 @@ class DetectionTaskModel():
         return self.progress_model
 
     def _update_detection_stat(self, detection_stat:dict):
+        # convert the dict into yaml format
         yaml_data = yaml.dump(detection_stat)
         DETECT_DAO.update_tile_sample_detect_stat(self.tile_sample_id, detection_stat['tile_pixel_x'], detection_stat['tile_pixel_y'], 
                             detection_stat['coral_object_count'], detection_stat['dead_coral_object_count'], detection_stat['other_object_count'], 
@@ -381,8 +411,8 @@ class DetectionTaskModel():
 
     @staticmethod
     def delete_cache_files(tile_sample_id:str, delete_reco=False, delete_object_detection=False):
-        logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)        
         with contextlib.suppress(FileNotFoundError, Exception):
+            logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)        
             if delete_reco:
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.RECO_MODEL_FILENAME.value, 'reco_model.yaml')))
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.LOCTILE_MODEL_FILENAME.value, 'loctile_model.yaml')))
@@ -394,21 +424,27 @@ class DetectionTaskModel():
                     
     @staticmethod
     def delete_cache_folder(tile_sample_id:str):
-        logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)
         with contextlib.suppress(FileNotFoundError, Exception):
+            logdata_folder = DetectionTaskModel.get_cache_folder(tile_sample_id)
             shutil.rmtree(logdata_folder, ignore_errors=True)        
 
     @staticmethod
     def get_cache_folder(tile_sample_id:str):
-        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_SUBFOLDER, tile_sample_dict['season'], tile_sample_id)
-        return logdata_folder
+        try:
+            tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
+            logdata_folder = APP_FILE_MANAGER.get_detector_subfolder(APP_FILE_MANAGER.DATA_SUBFOLDER, tile_sample_dict['season'], tile_sample_id)
+            return logdata_folder
+        except:
+            return None
     
     @staticmethod
     def get_partial_cache_folder(tile_sample_id:str):
-        tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        partial_logdata_folder = os.path.join(tile_sample_dict['season'], tile_sample_id)
-        return partial_logdata_folder    
+        try:
+            tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
+            partial_logdata_folder = os.path.join(tile_sample_dict['season'], tile_sample_id)
+            return partial_logdata_folder    
+        except:
+            return None
 
 # ---------------------------------------
 # test functions
@@ -420,7 +456,8 @@ def get_basic_detection_params() -> dict:
         'reco_debug_images_at_original_scale': False,
         'reco_debug_feature_matching_images': True,
         'reco_feature_detector': 'sift',
-        'reco_matching_confidence_threshold': 0.4,
+        'reco_feature_matching_confidence_threshold': 1.0,
+        'reco_image_matching_min_confidence': 1.5,
         'reco_working_scale': 0.1,
         'cod_model_filename': 'coral_object_detect_model.yaml', 
         'cod_debug_blob_images': True,
@@ -442,6 +479,9 @@ if __name__ == '__main__':
     # tile_sample_id = '2023Dec-P10001-CG1-202402161404'
     tile_sample_id = '2023Dec-P20000-CG1-202311231200'
     dt_model = DetectionTaskModel(tile_sample_id, get_basic_detection_params())
-    dt_model.execute_task()
+    dt_model.execute_task_reco()
+    dt_model.execute_task_loctile()
+    dt_model.execute_task_object_detection()
+    dt_model.execute_task_record()    
     
     # DetectionTaskModel.delete_cache_files(tile_sample_id, True, True)

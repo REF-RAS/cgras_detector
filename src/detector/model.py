@@ -19,7 +19,7 @@ from tools.logging_tools import logger
 import catkin_pkg.package
 
 from detector.database_file import DBFile
-from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ObjectClassCategories, StatusNames, TaskTypes
+from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ObjectClassCategories, TaskStatusNames, TaskTypes, SampleStatusNames
 from detector.dao_persistent_storage import PERSISTENT_STORE_DDL, PersistentStoreDAO
 from detector.file_manager import ApplicationFileManager
 
@@ -35,32 +35,34 @@ class CallbackTypes(Enum):
 
 # The states of the system for tracking the current task
 class SystemStates(Enum):
-    D_ABORTED = 19
-    WARNING = -2
-    ERROR = -3
+    SUSPENDED = -1
+    # WARNING = -2
+    # ERROR = -3
     READY = 0
     AUTO_START = 1        
     CLICK_START = 2
     POLL_DETECT = 3
-    D_INIT = 11
-    D_RECO = 12   
-    D_LOCTILE = 13
-    D_OBJECT = 14
-    D_COLLECT_STAT = 15
-    D_UPDATE_HEALTH_INDEX = 16
+    DETECT = 10
     D_SUCCESS = 17
     D_FAILED = 18
-    POLL_UPDATE_HEALTH_INDEX = 31
-    H_UPDATE_INDEX_ALL = 32
+    D_ABORTED = 19
     POLL_SAMPLE = 41
-    S_NEW_SAMPLE = 42
+    # SAMPLE_IMPORT = 42
     
 # The states of the Image Acquisition system 
-# the global variable for the light state
-class CapturerStates(Enum):
-    UNKNOWN = -1
-    IDLE = 0
-    ACTIVE = 1
+class CoordinatorStates(Enum):
+    ERROR = -1
+    UNKNOWN = 0
+    SAFE = 1
+    UNSAFE = 2
+    
+# General Class for synchronized set to a value 
+class ValueHolder:
+    value = None
+    value_lock = threading.RLock()
+    def set_value(self, value):
+        with self.value_lock:
+            self.value = value
 
 # global variable for accessing the system configuration
 CONFIG:SystemConfig = SystemConfig(os.path.join(os.path.dirname(__file__), '../../config/system_config.yaml'))
@@ -71,6 +73,8 @@ CALLBACK_MANAGER:model_base.CallbackManager = model_base.CallbackManager()      
 # create the application file manager and populate the system asset folder that contains js libraries and images for web pages
 APP_FILE_MANAGER:ApplicationFileManager = ApplicationFileManager(CGRAS_DATA_FOLDER)      # the object manages the data folders for the application
 APP_FILE_MANAGER.populate_system_assets_folder()
+# global variable for system configuration states
+AUTOMATED_TASK_EXECUTION = ValueHolder()
 
 # global variables for managing database tables
 DETECT_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'detector.db', [DETECT_DDL, PERSISTENT_STORE_DDL])
@@ -78,4 +82,4 @@ DETECT_DAO:DetectorDAO = DetectorDAO(DETECT_DBFM.db_file)
 PERSISTENT_STORE_DAO:PersistentStoreDAO = PersistentStoreDAO(DETECT_DBFM.db_file)
 
 # the states of other components
-CAPTURER_STATE = model_base.StateManager(CapturerStates.UNKNOWN)
+COORDINATOR_STATE = model_base.StateManager(CoordinatorStates.UNKNOWN)

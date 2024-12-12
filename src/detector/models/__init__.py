@@ -14,9 +14,6 @@ from datetime import datetime
 from enum import Enum
 from tools.logging_tools import get_logger
 from .models_config import ModelsConfigNames
-
-class Constants(Enum):
-    SCALE_ORIGINAL = 0
-    SCALE_WORKING = 1
+from .detector_error import DetectorError, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 
 logger = get_logger()

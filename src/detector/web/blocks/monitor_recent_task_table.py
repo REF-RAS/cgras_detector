@@ -16,7 +16,7 @@ import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, StatusNames, TaskTypes
+from detector.model import DETECT_DAO, TaskStatusNames, TaskTypes
 
 class MonitorRecentTaskTableBlock():
     def __init__(self, app, prefix, page_size=10):
@@ -32,7 +32,7 @@ class MonitorRecentTaskTableBlock():
                          {'name': 'Remarks', 'id': 'remarks', 'type': 'text', 'editable': False},                                                 
                          ]
        
-        _the_datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_cell={'fontSize': 14})
+        _the_datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_cell={'fontSize': 14}, cell_selectable=False, row_selectable=False)
         
         self._the_panel = dbc.Col([
                 html.H4(dbc.Badge('STATUS OF RECENT EXECUTION OF TASKS', className='ms-1 me-2', color='white', text_color='secondary')),
@@ -52,7 +52,7 @@ class MonitorRecentTaskTableBlock():
     
     def _refine_model(self, model):
         model['task_type'] = model['task_type'].apply(lambda x: TaskTypes(x).name) 
-        model['status'] = model['status'].apply(lambda x: StatusNames(x).name) 
+        model['status'] = model['status'].apply(lambda x: TaskStatusNames(x).name) 
         return model
         
     # callback for the table

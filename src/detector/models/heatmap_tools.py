@@ -44,6 +44,7 @@ class HeatmapHelper():
             class_filter = [class_filter]
         # initialize a numpy array of the dimension for the heatmap
         count_map_array = np.zeros(shape=(map_size[1], map_size[0]), dtype=np.uint16)
+        count_map_label_array = np.full(shape=(map_size[1], map_size[0]), fill_value=' ')
         # iterates through the object list
         coral_object:CoralObject
         for coral_object in object_list:
@@ -55,10 +56,11 @@ class HeatmapHelper():
             x, y = int(coral_object.centre_normalized[0] * map_size[0]), int(coral_object.centre_normalized[1] * map_size[1])
             x, y = min(x, map_size[0] - 1), min(y, map_size[1] - 1)
             count_map_array[y, x] += 1
-        return count_map_array  
+            count_map_label_array[y, x] = str(count_map_array[y, x])
+        return count_map_array, count_map_label_array
     
     @staticmethod
-    def generate_plotly_heatmap(count_map_array:np.ndarray, title:str=None, fig_size:tuple=None, show_fig:bool=False, output_file:str=None):
+    def generate_plotly_heatmap(count_map_array:np.ndarray, count_map_label_array:np.ndarray=None, title:str=None, fig_size:tuple=None, show_fig:bool=False, output_file:str=None):
         """ returns a plotly figure object containing the heatmap generated from the given object count map
 
         :param count_map_array: the coral object count map to be converted into a graphical heatmap
@@ -75,9 +77,13 @@ class HeatmapHelper():
         title = ' ' if title is None else title
         # generate the heatmap as a figure
         fig = px.imshow(count_map_array, text_auto=True, title=title)
+        # set the labels of the cells in the heatmap
+        if count_map_label_array is not None:
+            fig.update_traces(text=count_map_label_array, texttemplate="%{text}")
         # adjust the figure size if given fig_size
         if fig_size is not None and type(fig_size) in (list, tuple) and len(fig_size) >= 2:
             fig.update_layout(width=fig_size[0], height=fig_size[1])
+        
         # write the figure to an image file if required
         if output_file is not None:
             fig.write_image(output_file)
@@ -106,6 +112,6 @@ if __name__ == '__main__':
 
     map_size = (120, 40)
     fig_size = (3600, 1200)
-    count_map_array = HeatmapHelper.compute_object_count_map(object_list, map_size, None)
-    fig = HeatmapHelper.generate_plotly_heatmap(count_map_array, fig_size=(1200, 800), output_file=output_file)
+    count_map_array, count_map_label_array = HeatmapHelper.compute_object_count_map(object_list, map_size, None)
+    fig = HeatmapHelper.generate_plotly_heatmap(count_map_array, count_map_label_array, fig_size=(1200, 800), output_file=output_file)
     input('Press Enter to Quit ')

@@ -13,7 +13,7 @@ import shutil
 import pandas as pd
 # dash modules
 import dash
-from dash import html, dcc, Input, Output, State, dash_table, ctx
+from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
 import dash_bootstrap_components as dbc
 from dash.dash_table.Format import Format, Padding
 from dash.exceptions import PreventUpdate
@@ -27,11 +27,19 @@ class YoloModelTable():
         self.default_max_end_day = CONFIG.get(SystemConfigNames.MAX_CORAL_AGE)
         self.updated_success_trigger_id = prefix + 'updated_datatable_trigger'
         # model variable
-        # define widgets 
-        self._delete_confirm_dialog = dcc.ConfirmDialog(id=prefix+'delete_confirm_dialog',
-            message='Are you sure to delete the model?',)  
+        # define the modal for confirmation of user actions
+        self._user_confirm_modal = dbc.Modal([
+                    dbc.ModalHeader(dbc.ModalTitle(id=prefix+'confirm_modal_title')),
+                    html.Div([html.P(id=prefix+'confirm_modal_message'),
+                                dbc.Button('Confirm', id={'type': prefix+'action', 'index': 'confirm'},), 
+                                dbc.Button('Cancel', id={'type': prefix+'action', 'index': 'cancel'}, color='secondary')
+                            ]
+                        , className='d-grid gap-2 col-8 mx-auto', style={'padding': '6px'})
+                        ], id=prefix+'confirm_modal', is_open=False)
         
-        self._message_alert = dbc.Alert('', id=prefix+'message_alert', duration=3000, is_open=False, className='mx-auto mt-4 col-8', color='primary')
+        # define a toast for feedback  
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
+                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         
         self._model, self._model_column = self.get_default_datatable_model()
         self._datatable = dash_table.DataTable(data=self._model, columns=self._model_column,
@@ -67,8 +75,8 @@ class YoloModelTable():
                                         html.P('Make the changes and Press Confirm', className='mb-3', style={}),
                                         define_yolo_model_form,
                                         html.Div(children=[
-                                            dbc.Button('Confirm', id=prefix+'edit_confirm_button', n_clicks=0, className='me-3'), 
-                                            dbc.Button('Cancel', id=prefix+'edit_cancel_button', n_clicks=0, color='secondary'),], 
+                                            dbc.Button('Confirm', id={'type': prefix+'edit_action', 'index': 'confirm'}, n_clicks=0, className='me-3'), 
+                                            dbc.Button('Cancel', id={'type': prefix+'edit_action', 'index': 'cancel'}, n_clicks=0, color='secondary'),], 
                                         className='text-center, mt-3', style={'display': 'block'}),
                                         ]),
             ], size='xl', is_open=False,)  
@@ -81,21 +89,20 @@ class YoloModelTable():
 
         self.the_panel = html.Div([
                 dbc.Row(html.Div([
-                    dbc.Button('Modify', id=prefix+'table_edit_button', n_clicks=0, color='secondary', className='mb-1 me-1', size='sm'), 
-                    dbc.Button('Delete', id=prefix+'table_delete_button', n_clicks=0, color='danger', className='mb-1', size='sm'),
-                    self._datatable], className='p-2', style={'background-color': 'rgb(225, 225, 225)'})),
-                self._message_alert,
+                    dbc.Button('Update', id={'type': prefix+'table', 'index': 'update'}, n_clicks=0, color='secondary', className='mb-1 me-1', size='sm'), 
+                    dbc.Button('Delete', id={'type': prefix+'table', 'index': 'delete'}, n_clicks=0, color='danger', className='mb-1', size='sm'),
+                    
+                    self._datatable], className='p-2', style={'background-color': 'rgb(225, 225, 225)'})
+                ),
                 dcc.Store(id=prefix+'row_edit_store'),
                 dcc.Store(id=prefix+'row_delete_store'),
                 dcc.Store(id=prefix+'update_datatable_trigger'),
                 dcc.Store(id=self.updated_success_trigger_id),
+                self._toast,
                 self._editdata_modal,    
-                self._delete_confirm_dialog,            
+                self._user_confirm_modal,            
                 ], style={'margin-top':'24px'})
-                
-        # self.app.callback([Output(prefix+'delete_confirm_dialog', 'displayed'),
-        #                    Output(prefix+'row_edit_store', 'data'),],
-        #     [Input(prefix+'datatable', 'active_cell')], prevent_initial_call=True)(self._cell_clicked())    
+                  
     
         self.app.callback([Output(prefix+'edit_modal', 'is_open', allow_duplicate=True),
                            Output(prefix+'name_label', 'children'),
@@ -106,27 +113,26 @@ class YoloModelTable():
                            Output(prefix+'range_input', 'value'),],
             [Input(prefix+'row_edit_store', 'data')], prevent_initial_call=True)(self._edit_row_received())    
 
-        self.app.callback([Output(prefix+'message_alert', 'is_open'),
-                           Output(prefix+'message_alert', 'children'),
+        self.app.callback([Output(prefix+'toast', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'children', allow_duplicate=True),
                            Output(prefix+'edit_modal', 'is_open', allow_duplicate=True),
                            Output(self.prefix+'update_datatable_trigger', 'data', allow_duplicate=True),
                            Output(self.updated_success_trigger_id, 'data', allow_duplicate=True),],
-                        [Input(prefix+'edit_confirm_button', 'n_clicks'),
-                        Input(prefix+'edit_cancel_button', 'n_clicks'),
-                        State(prefix+'species_input', 'value'),
+                        [State(prefix+'species_input', 'value'),
                         State(prefix+'range_input', 'value'),
-                        State(prefix+'row_edit_store', 'data')], prevent_initial_call=True)(self._edit_row_confirmed()) 
+                        State(prefix+'row_edit_store', 'data'),
+                        Input({'type': prefix+'edit_action', 'index': ALL}, 'n_clicks')], prevent_initial_call=True)(self._edit_row_confirmed()) 
         
-        self.app.callback([Output(prefix+'datatable', 'data', allow_duplicate=True),
-                           Output(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
-                            Output(prefix+'delete_confirm_dialog', 'cancel_n_clicks'),
+        self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'children', allow_duplicate=True),
+                            Output(prefix+'datatable', 'data', allow_duplicate=True),
                             Output(self.updated_success_trigger_id, 'data', allow_duplicate=True),
                            ],
-                            [Input(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
-                             Input(prefix+'delete_confirm_dialog', 'cancel_n_clicks'),
-                            State(prefix+'datatable', 'data_previous'),
+                            [State(prefix+'datatable', 'data_previous'),
                             State(prefix+'datatable', 'data'),
-                            State(prefix+'row_delete_store', 'data'),], prevent_initial_call=True)(self._delete_row_confirmed())   
+                            State(prefix+'row_delete_store', 'data'),
+                            Input({'type': prefix+'action', 'index': ALL}, 'n_clicks')], prevent_initial_call=True)(self._delete_row_confirmed())   
         
         self.app.callback([Output(self.prefix+'datatable', 'data'),
                            Output(self.prefix+'datatable', 'columns'),
@@ -134,15 +140,16 @@ class YoloModelTable():
             [Input(self.prefix+'update_datatable_trigger', 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_datatable())
           
         
-        self.app.callback([Output(prefix+'delete_confirm_dialog', 'displayed'),
+        self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+                            Output(prefix+'confirm_modal_title', 'children'),
+                            Output(prefix+'confirm_modal_message', 'children'),
                            Output(prefix+'row_edit_store', 'data'),
                            Output(prefix+'row_delete_store', 'data'),
                             Output(prefix+'datatable', 'selected_rows', allow_duplicate=True),
                            ],
-                        [Input(prefix+'table_edit_button', 'n_clicks'),
-                        Input(prefix+'table_delete_button', 'n_clicks'),
-                        State(prefix+'datatable', 'data'),
-                        State(prefix+'datatable', 'selected_rows')], prevent_initial_call=True)(self._table_button_pressed())   
+                        [State(prefix+'datatable', 'data'),
+                        State(prefix+'datatable', 'selected_rows'),
+                        Input({'type': prefix+'table', 'index': ALL}, 'n_clicks'),], prevent_initial_call=True)(self._table_button_pressed())   
 
         self.app.callback([Output(prefix+'datatable', 'style_data_conditional'),
                           Output(prefix+'datatable', 'selected_rows', allow_duplicate=True)],
@@ -189,18 +196,21 @@ class YoloModelTable():
         return trigger_update_datatable
             
     def _table_button_pressed(self): 
-        def table_button_pressed(table_edit_button, table_delete_button, model, selected_rows:list):
+        def table_button_pressed(model, selected_rows:list, *args):
             if selected_rows is None or len(selected_rows) == 0:
                 raise PreventUpdate
             row_index = selected_rows[0]
             name = model[row_index]['Model Name']
             data = DETECT_DAO.get_yolo_model(name)
-            button_id = ctx.triggered_id if not None else 'No clicks yet'
-            if button_id.endswith('table_edit_button'):
-                return (False, data, None, [])  
-            elif button_id.endswith('table_delete_button'):   
-                return (True, None, row_index, [])        
-            return (False, None, None, [])
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
+            button_index = button_id.get('index', None)
+            if button_index.endswith('update'):
+                return (False, None, None, data, None, [])  
+            elif button_index.endswith('delete'):   
+                title = 'Delete the YOLO model'
+                message = 'The selected YOLO model will be deleted. Are you sure?'
+                return (True, title, message, None, row_index, [])        
+            return (False, None, None, None, None, [])
         return table_button_pressed 
     
     def _edit_row_received(self): 
@@ -214,9 +224,10 @@ class YoloModelTable():
         return edit_row_received     
 
     def _edit_row_confirmed(self): 
-        def edit_row_confirmed(confirm_button, cancel_button, species, range, row):
-            button_id = ctx.triggered_id if not None else 'No clicks yet'
-            if button_id.endswith('confirm_button'):
+        def edit_row_confirmed(species, range, row, *args):
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
+            button_index = button_id.get('index', None)
+            if button_index.endswith('confirm'):
                 start_day, end_day = range
                 end_day = -1 if end_day >= self.default_max_end_day else end_day
                 result = DETECT_DAO.update_yolo_model(row['name'], species, start_day, end_day)
@@ -226,18 +237,20 @@ class YoloModelTable():
                 else:
                     message = 'Update yolo model failed'
                     return (True, message, False, True, False) 
-            elif button_id.endswith('cancel_button'):
+            else:
                 return (False, ' ', False, True, False) 
         return edit_row_confirmed  
 
     def _delete_row_confirmed(self): 
-        def delete_row_confirmed(submit_n_clicks, cancel_n_clicks, rows_previous, model_dict, row_index):
-            if submit_n_clicks:
+        def delete_row_confirmed(rows_previous, model_dict, row_index, *args):
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
+            button_index = button_id.get('index', None)
+            if button_index == 'confirm':
                 DETECT_DAO.delete_yolo_model(model_dict[row_index]['Model Name'])
                 del model_dict[row_index]
-                return (model_dict, 0, 0, True)
-            elif cancel_n_clicks:
-                return (model_dict, 0, 0, False)
+                return (False, True, 'The YOLO model has been deleted', model_dict, True)
+            else:
+                return (False, False, '', model_dict, False)
         return delete_row_confirmed 
 
     def _style_selected_rows(self):

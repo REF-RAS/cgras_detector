@@ -13,33 +13,36 @@ import os
 import pandas as pd
 # dash modules
 import dash
-from dash import html, dcc, Input, Output, State, dash_table, ctx
+from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, CONFIG, SystemConfigNames
-from detector.dao_detect import StatusNames
+from detector.dao_detect import SampleStatusNames
 from detector.task_detection import DetectionTaskModel
 from tools.logging_tools import logger
 
 class TileSampleTable():
-    def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_reload=False, allow_view=False):
+    def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_delete=False, allow_view=False):
         self.app = app 
         self.prefix = prefix = prefix + 'tst_'
         self.allow_priority = allow_priority
         self.allow_reprocess = allow_reprocess
         self.update_table_store_id = prefix + 'update_table_store'
-        # define widgets 
-        self._invalidate_confirm_dialog = dcc.ConfirmDialog(id=prefix+'invalidate_confirm_dialog',
-            message='The selected tile sample(s) will be invalidated and their findings cleared! Are you sure?',)  
-        
-        self._delete_confirm_dialog = dcc.ConfirmDialog(id=prefix+'delete_confirm_dialog',
-            message='The selected tile sample(s) and their findings will be deleted! The tile samples may be imported again. Are you sure?',)          
-        
-        self._redo_confirm_dialog = dcc.ConfirmDialog(id=prefix+'reprocess_confirm_dialog',
-            message='The findings of the selected tile sample(s) will be cleared and the sample placed in the pending queue for analysis again. Are you sure?',)          
-        
-        self._message_alert = dbc.Alert('', id=prefix+'message_alert', dismissable=True, duration=10000,
-                                 is_open=False, className='mx-auto mt-4 col-8', color='secondary')
+        self.user_action_store_id = prefix + 'user_action_store'
+      
+        # define a toast for feedback  
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
+                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+
+        # define the modal for confirmation of user actions
+        self._user_confirm_modal = dbc.Modal([
+                    dbc.ModalHeader(dbc.ModalTitle(id=prefix+'confirm_modal_title')),
+                    html.Div([html.P(id=prefix+'confirm_modal_message'),
+                                dbc.Button('Confirm', id={'type': prefix+'action', 'index': 'confirm'},), 
+                                dbc.Button('Cancel', id={'type': prefix+'action', 'index': 'cancel'}, color='secondary')
+                            ]
+                        , className='d-grid gap-2 col-8 mx-auto', style={'padding': '6px'})
+                        ], id=prefix+'confirm_modal', is_open=False)
 
         self._columns = [{'name': 'Tile Sample ID', 'id': 'id', 'type': 'text', 'editable': False},
                          {'name': 'Capture Time', 'id': 'batch_time', 'type': 'datetime', 'editable': False},
@@ -57,17 +60,18 @@ class TileSampleTable():
                 
         self._datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, fill_width=True, row_selectable='multi',
                                                style_cell_conditional=self._style_cell_conditional, 
-                                               cell_selectable=False, row_deletable=False)
+                                               cell_selectable=allow_view, row_deletable=False)
 
         self._viewdata_modal = dbc.Modal([
                     dbc.ModalHeader(dbc.ModalTitle('View analysis results of the tile sample')),
                     html.Div([
                         html.B('', id=prefix+'view_modal_message'),
                         html.P(''),
-                        dbc.Button('Reconstructed Image', target='view_image', external_link=False, id=prefix+'view_reconstruct_link', color='primary'),
-                        dbc.Button('Feature Matching Images', target='view_image', external_link=False, id=prefix+'view_feature_match_link', color='primary'),                        
+                        dbc.Button('Reconstructed Image', target='view_image', external_link=True, id=prefix+'view_reconstruct_link', color='primary'),
+                        dbc.Button('Feature Matching Images', target='view_image', external_link=True, id=prefix+'view_feature_match_link', color='primary'),  
+                        dbc.Button('Annotated Blobs', target='view_image', external_link=True, id=prefix+'view_annotated_blobs_link', color='primary'),                       
                         ]
-                        , className='d-grid gap-2 col-8 mx-auto', style={'padding': '6px'})
+                        , className='d-grid gap-2 col-8 mx-auto p-2 pb-3')
                         ], id=prefix+'view_modal', is_open=False)
         
         # define confirm panel in a modal
@@ -82,7 +86,7 @@ class TileSampleTable():
                                         self._reprocess_mode_radio ,
                                             html.Div(id=prefix+'confirm_modal_button_panel', children=[
                                             dbc.Button('Confirm Re-Process', id=prefix+'confirm_redo_button', n_clicks=0, className='me-3'), 
-                                            dbc.Button('Cancel', id=prefix+'cancel_reprocess_button', n_clicks=0, color='secondary'),], 
+                                            dbc.Button('Cancel', id=prefix+'cancel_redo_button', n_clicks=0, color='secondary'),], 
                                         className='text-center, mt-3', style={'display': 'block'}, ),
                                         ]),
             ], size='xl', is_open=False,)  
@@ -100,39 +104,34 @@ class TileSampleTable():
         ]
         if allow_reprocess:
             self._div_panel_children.append(
-                dbc.Button('Redo', id=prefix+'table_reprocess_button', color='primary',className='ms-2', size='sm', style={'width': '80px'}))
+                dbc.Button('Redo',  id={'type': prefix+'table', 'index': 'redo'}, color='primary',className='ms-2', size='sm', style={'width': '80px'}))
         if allow_priority:
             self._div_panel_children.append(
-                dbc.Button('Prioritize', id=prefix+'table_priority_button', color='primary', className='ms-2', size='sm', style={'width': '80px'}))
-        if allow_view:
-            self._div_panel_children.append(
-                dbc.Button('Examine', id=prefix+'table_view_button', color='secondary', className='ms-2', size='sm', style={'width': '80px'}))  
+                dbc.Button('Prioritize',  id={'type': prefix+'table', 'index': 'priority'}, color='primary', className='ms-2', size='sm', style={'width': '80px'}))
 
         self._div_panel_children.extend([         
-            dbc.Button('Invalidate', id=prefix+'table_invalid_button', color='danger', className='ms-2', size='sm', style={'width': '80px'}),
+            dbc.Button('Reject',  id={'type': prefix+'table', 'index': 'reject'}, color='danger', className='ms-2', size='sm', style={'width': '80px'}),
         ])
         
-        if allow_reload:
+        if allow_delete:
             self._div_panel_children.append(
-                dbc.Button('Delete', id=prefix+'table_reload_button', color='danger', className='ms-2', size='sm', style={'width': '80px'}))
+                dbc.Button('Delete',  id={'type': prefix+'table', 'index': 'delete'}, color='danger', className='ms-2', size='sm', style={'width': '80px'}))
             
         self._datatable_panel_children = [html.Div(self._div_panel_children, style={'display':'flex'}), 
                                           self._datatable]
 
         self.the_panel = html.Div([
                 dbc.Row(html.Div(self._datatable_panel_children, className='p-2', style={'background-color': 'rgb(225, 225, 225)'})),
-                self._message_alert,
                 dcc.Store(id=self.update_table_store_id),
-                dcc.Store(id=prefix+'row_invalid_store'),
-                dcc.Store(id=prefix+'row_reload_store'),
+                dcc.Store(id=self.user_action_store_id),
                 dcc.Store(id=prefix+'row_priority_store'),
-                dcc.Store(id=prefix+'row_reprocess_store'),
+                dcc.Store(id=prefix+'row_redo_store'),
                 dcc.Store(id=prefix+'row_view_store'),
                 self._confirm_reprocess_modal,
                 self._deletedata_modal,    
                 self._viewdata_modal,
-                self._invalidate_confirm_dialog,
-                self._delete_confirm_dialog,       
+                self._toast,
+                self._user_confirm_modal,     
                 ], id=prefix+'main_panel', style={'margin-top':'24px'})
         
         # define callback for selecting a scan and open the modal window
@@ -141,63 +140,63 @@ class TileSampleTable():
                             Output(prefix+'view_reconstruct_link', 'href'),
                             Output(prefix+'view_reconstruct_link', 'disabled'),
                             Output(prefix+'view_feature_match_link', 'href'),
-                            Output(prefix+'view_feature_match_link', 'disabled'),],
+                            Output(prefix+'view_feature_match_link', 'disabled'),
+                            Output(prefix+'view_annotated_blobs_link', 'href'),
+                            Output(prefix+'view_annotated_blobs_link', 'disabled'),],
                         [Input(prefix+'row_view_store', 'data')], prevent_initial_call=True)(self._view_row_confirmed())
         
-        self.app.callback([Output(prefix+'invalidate_confirm_dialog', 'displayed')],
-            [Input(prefix+'row_invalid_store', 'data')], prevent_initial_call=True)(self._invalidate_row_requested())  
+        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+        #                     Output(prefix+'confirm_modal_title', 'children', allow_duplicate=True),
+        #                     Output(prefix+'confirm_modal_message', 'children', allow_duplicate=True),],
+        #     [Input(self.user_action_store_id, 'data')], prevent_initial_call=True)(self._reject_row_requested())  
         
-        self.app.callback([Output(prefix+'delete_confirm_dialog', 'displayed')],
-            [Input(prefix+'row_reload_store', 'data')], prevent_initial_call=True)(self._delete_row_requested())           
+        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+        #                     Output(prefix+'confirm_modal_title', 'children', allow_duplicate=True),
+        #                     Output(prefix+'confirm_modal_message', 'children', allow_duplicate=True),],
+        #     [Input(prefix+'row_delete_store', 'data')], prevent_initial_call=True)(self._delete_row_requested())           
 
         self.app.callback([Output(prefix+'confirm_reprocess_modal', 'is_open', allow_duplicate=True)],
-            [Input(prefix+'row_reprocess_store', 'data')], prevent_initial_call=True)(self._redo_row_requested())     
+            [Input(prefix+'row_redo_store', 'data')], prevent_initial_call=True)(self._redo_row_requested())     
 
-        self.app.callback([Output(prefix+'message_alert', 'is_open'),
-                           Output(prefix+'message_alert', 'children'),
+        self.app.callback([Output(prefix+'toast', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'children', allow_duplicate=True),
                            Output(prefix+'confirm_reprocess_modal', 'is_open'),
                            Output(self.update_table_store_id, 'data', allow_duplicate=True)],
                         [Input(prefix+'confirm_redo_button', 'n_clicks'),
-                        Input(prefix+'cancel_reprocess_button', 'n_clicks'),
+                        Input(prefix+'cancel_redo_button', 'n_clicks'),
                         State(prefix+'reprocess_mode', 'value'),
-                        State(prefix+'row_reprocess_store', 'data'),
+                        State(prefix+'row_redo_store', 'data'),
                         State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._redo_row_confirmed())           
-        
-        self.app.callback([Output(prefix+'message_alert', 'is_open', allow_duplicate=True),
-                           Output(prefix+'message_alert', 'children', allow_duplicate=True),
-                           Output(self.update_table_store_id, 'data', allow_duplicate=True)],
-                            [Input(prefix+'invalidate_confirm_dialog', 'submit_n_clicks'),
-                            State(prefix+'row_invalid_store', 'data'),
-                            State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._invalidate_row_confirmed())    
-
-        self.app.callback([Output(prefix+'message_alert', 'is_open', allow_duplicate=True),
-                           Output(prefix+'message_alert', 'children', allow_duplicate=True),
-                           Output(self.update_table_store_id, 'data', allow_duplicate=True)],
-                            [Input(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
-                            State(prefix+'row_reload_store', 'data'),
-                            State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._delete_row_confirmed()) 
-        
-        self.app.callback([Output(prefix+'message_alert', 'is_open', allow_duplicate=True),
-                           Output(prefix+'message_alert', 'children', allow_duplicate=True)],
+        self.app.callback([Output(prefix+'toast', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'children', allow_duplicate=True)],
                             [Input(prefix+'row_priority_store', 'data'),], prevent_initial_call=True)(self._priority_row_confirmed())  
         
-        input_list = [State(prefix+'datatable', 'selected_rows'), 
-                      Input(prefix+'table_invalid_button', 'n_clicks'),]
-        
-        if allow_reload:
-            input_list.append(Input(prefix+'table_reload_button', 'n_clicks'))            
-        if allow_reprocess:
-            input_list.append(Input(prefix+'table_reprocess_button', 'n_clicks'))
-        if allow_priority:
-            input_list.append(Input(prefix+'table_priority_button', 'n_clicks'))
-        if allow_view:
-            input_list.append(Input(prefix+'table_view_button', 'n_clicks'))
+        self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'is_open', allow_duplicate=True),
+                           Output(prefix+'toast', 'children', allow_duplicate=True),
+                           Output(self.update_table_store_id, 'data', allow_duplicate=True)],
+                            [State(self.user_action_store_id, 'data'),
+                            State(self.update_table_store_id, 'data'),
+                            Input({'type': prefix+'action', 'index': ALL}, 'n_clicks'),], prevent_initial_call=True)(self._cb_confirm_modal_pressed())    
 
-        self.app.callback([Output(prefix+'row_reprocess_store', 'data'),
-                           Output(prefix+'row_priority_store', 'data'),
-                            Output(prefix+'row_invalid_store', 'data'),
-                            Output(prefix+'row_reload_store', 'data'),
-                            Output(prefix+'row_view_store', 'data'),
+        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+        #                    Output(prefix+'toast', 'is_open', allow_duplicate=True),
+        #                    Output(prefix+'toast', 'children', allow_duplicate=True),
+        #                    Output(self.update_table_store_id, 'data', allow_duplicate=True)],
+        #                     [Input(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
+        #                     State(prefix+'row_delete_store', 'data'),
+        #                     State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._delete_row_confirmed()) 
+        
+
+        input_list = [State(prefix+'datatable', 'selected_rows'), 
+                      Input({'type': prefix+'table', 'index': ALL}, 'n_clicks'),]
+        
+        self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+                            Output(prefix+'confirm_modal_title', 'children', allow_duplicate=True),
+                            Output(prefix+'confirm_modal_message', 'children', allow_duplicate=True),
+                            Output(prefix+'row_redo_store', 'data'),
+                            Output(prefix+'row_priority_store', 'data'),
+                            Output(self.user_action_store_id, 'data'),
                             Output(prefix+'datatable', 'selected_rows', allow_duplicate=True),
                            ], input_list, prevent_initial_call=True)(self._table_button_pressed())     
 
@@ -213,6 +212,12 @@ class TileSampleTable():
              State(self.prefix+'datatable', 'data'),
              State(self.prefix+'datatable', 'selected_rows')], prevent_initial_call=True, allow_duplicate=True)(self._selectall_button_pressed())  
                              
+        self.app.callback([Output(prefix+'row_view_store', 'data'),                 
+                            Output(prefix+'datatable', 'active_cell', allow_duplicate=True),
+                            Output(prefix+'datatable', 'selected_cells', allow_duplicate=True),],
+                            [Input(prefix+'datatable', 'active_cell'),
+                             State(prefix+'datatable', 'data')], prevent_initial_call=True, allow_duplicate=True)(self._cb_cell_selected())     
+    
     
     def register_trigger(self, trigger_id:str):
         # define callbacks for the datatable data
@@ -224,11 +229,11 @@ class TileSampleTable():
         return self.the_panel
     
     def get_default_datatable_model(self):
-        model = DETECT_DAO.list_tile_samples(season_title=None, status=StatusNames.PENDING.value)
+        model = DETECT_DAO.list_tile_samples(season_title=None, status=SampleStatusNames.QUEUED.value)
         return model
     
     def refine_datatable_model(self, model, show_column_top=True, show_column_refresh=False):
-        model['status'] = model['status'].apply(lambda x: StatusNames(x).name) 
+        model['status'] = model['status'].apply(lambda x: SampleStatusNames(x).name) 
         model = model[['id', 'batch_time', 'season', 'importer_id', 'operator', 'create_time', 'status', 'remarks']]
         return model
     
@@ -244,77 +249,103 @@ class TileSampleTable():
             return (self._model.to_dict('records'),)
         return update_datatable
     
-    def _update_season_dropdown(self):
-        def update_season_dropdown(tile_id):
-            # get options for the dropdown
-            options = DETECT_DAO.list_seasons_in_tile_sample()
-            logger.warning(f'update season: {options}')
-            value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
-            value = options[0] if value is None and options is not None and len(options) > 0 else None
-            return (options, value,)
-        return update_season_dropdown
+    # def _update_season_dropdown(self):
+    #     def update_season_dropdown(tile_id):
+    #         # get options for the dropdown
+    #         options = DETECT_DAO.list_seasons_in_tile_sample()
+    #         logger.warning(f'update season: {options}')
+    #         value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
+    #         value = options[0] if value is None and options is not None and len(options) > 0 else None
+    #         return (options, value,)
+    #     return update_season_dropdown
     
     def _table_button_pressed(self): 
         def table_button_pressed(selected_rows:list, *args):
             if selected_rows is None or len(selected_rows) == 0:
                 raise PreventUpdate
             row_index_list = list(selected_rows)
-            button_id = ctx.triggered_id if not None else 'No clicks yet'
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
+            button_index = button_id.get('index', None)
 
-            if button_id.endswith('table_reprocess_button'):
-                return (row_index_list, None, None, None, None, [])
-            elif button_id.endswith('table_priority_button'):
-                return (None, row_index_list, None, None, None, [])
-            elif button_id.endswith('table_invalid_button'):
-                return (None, None, row_index_list, None, None, []) 
-            elif button_id.endswith('table_reload_button'):
-                return (None, None, None, row_index_list, None, [])                 
-            elif button_id.endswith('table_view_button'):
-                return (None, None, None, None, row_index_list, [])        
-            return (None, None, None, None, [])
+            if button_index.endswith('redo'):
+                return (False, None, None, row_index_list, None, None, [])
+            elif button_index.endswith('priority'):
+                return (False, None, None, None, row_index_list, None, [])
+            elif button_index.endswith('reject'):
+                title = 'Reject the Selected Samples'
+                message = 'The selected tile sample(s) will be rejected and their findings cleared! Are you sure?'
+                action_data = {'selected_list': row_index_list, 'action': 'reject'}
+                return (True, title, message, None, None, action_data, []) 
+            elif button_index.endswith('delete'):
+                title = 'Delete the Selected Samples'
+                message = 'The selected tile sample(s) and their findings will be permanantly deleted! The tile samples may be imported again. Are you sure?'
+                action_data = {'selected_list': row_index_list, 'action': 'delete'}
+                return (True, title, message, None, None, action_data, [])                      
+            return (False, None, None, None, None, None, [])
         return table_button_pressed 
 
-    def _invalidate_row_requested(self): 
-        def invalidate_row_requested(row_index_list):
-            if row_index_list is None:
-                raise PreventUpdate        
-            return (True,)  
-        return invalidate_row_requested 
+    # callback when a cell is clicked, which should trigger the 
+    def _cb_cell_selected(self):
+        def cb_cell_selected(active_cell, model):
+            if not active_cell:
+                raise PreventUpdate
+            row, column = active_cell['row'], active_cell['column']
+            return ([row], None, [],)
+        return cb_cell_selected
 
-    def _invalidate_row_confirmed(self): 
-        def invalidate_row_confirmed(submit_n_clicks, row_index_list, store):
-            if submit_n_clicks:
+    # def _reject_row_requested(self): 
+    #     def reject_row_requested(row_index_list):
+    #         if row_index_list is None:
+    #             raise PreventUpdate        
+    #         return (True, 'Reject Tile Sample', 'The selected tile sample(s) will be rejected and their findings cleared! Are you sure?')  
+    #     return reject_row_requested 
+
+    def _cb_confirm_modal_pressed(self): 
+        def cb_confirm_modal_pressed(action_data, store, *args):
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
+            button_index = button_id.get('index', None)
+            if action_data is None or 'action' not in action_data:
+                raise PreventUpdate
+            # if the confirm buttons is pressed
+            if button_index == 'confirm':
+                row_index_list = action_data['selected_list']
+                message_info = []
                 for row_index in row_index_list:
                     tile_sample_id = self._model.iloc[row_index]['id']
-                    DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.INVALID.value)
-                    DETECT_DAO.clear_tile_sample_data(tile_sample_id)
-                    DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
+                    if action_data['action'] == 'reject':
+                        DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.REJECTED.value)
+                        DETECT_DAO.clear_tile_sample_data(tile_sample_id)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
+                    elif action_data['action'] == 'delete':
+                        DETECT_DAO.clear_tile_sample_data(tile_sample_id)
+                        DetectionTaskModel.delete_cache_folder(tile_sample_id)
+                        DETECT_DAO.delete_tile_sample(tile_sample_id)
                     # DETECT_DAO.delete_tile_sample(id)
-                message = f'The tile sample(s) {row_index_list} invalidated'
-                return (True, message, store)
-            return (False, '', store)
-        return invalidate_row_confirmed 
+                    message_info.append(tile_sample_id)
+                message = f'{action_data["action"].upper()} of the tile sample(s) {message_info} is successful'
+                return (False, True, message, store)
+            return (False, False, '', store)
+        return cb_confirm_modal_pressed 
 
-    def _delete_row_requested(self): 
-        def delete_row_requested(row_index_list):
-            if row_index_list is None:
-                raise PreventUpdate        
-            return (True,)  
-        return delete_row_requested 
+    # def _delete_row_requested(self): 
+    #     def delete_row_requested(row_index_list):
+    #         if row_index_list is None:
+    #             raise PreventUpdate        
+    #         return (True, 'Delete Tile Sample', 'The selected tile sample(s) and their findings will be permanantly deleted! The tile samples may be imported again. Are you sure?')  
+    #     return delete_row_requested 
 
-    def _delete_row_confirmed(self): 
-        def delete_row_confirmed(submit_n_clicks, row_index_list, store):
-            if submit_n_clicks:
-                for row_index in row_index_list:
-                    tile_sample_id = self._model.iloc[row_index]['id']
-                    DETECT_DAO.clear_tile_sample_data(tile_sample_id)
-                    DetectionTaskModel.delete_cache_folder(tile_sample_id)
-                    DETECT_DAO.delete_tile_sample(tile_sample_id)
-                message = f'The tile sample(s) {row_index_list} deleted'
-                return (True, message, store)
-            return (False, '', store)
-        return delete_row_confirmed 
-        
+    # def _delete_row_confirmed(self): 
+    #     def delete_row_confirmed(submit_n_clicks, row_index_list, store):
+    #         if submit_n_clicks:
+    #             for row_index in row_index_list:
+    #                 tile_sample_id = self._model.iloc[row_index]['id']
+    #                 DETECT_DAO.clear_tile_sample_data(tile_sample_id)
+    #                 DetectionTaskModel.delete_cache_folder(tile_sample_id)
+    #                 DETECT_DAO.delete_tile_sample(tile_sample_id)
+    #             message = f'The tile sample(s) {row_index_list} deleted'
+    #             return (False, True, message, store)
+    #         return (False, False, '', store)
+    #     return delete_row_confirmed 
 
     def _redo_row_requested(self): 
         def redo_row_requested(row_index_list):
@@ -325,12 +356,14 @@ class TileSampleTable():
 
     def _redo_row_confirmed(self): 
         def redo_row_confirmed(confirm_button, cancel_button, mode, row_index_list, store):
-            button_id = ctx.triggered_id if not None else 'No clicks yet'
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
             if button_id.endswith('confirm_redo_button'):
+                message_info = []
                 for row_index in row_index_list:
                     tile_sample_id = self._model.iloc[row_index]['id']
-                    DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.PENDING.value, '')
+                    DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.QUEUED.value, '')
                     DETECT_DAO.clear_tile_sample_data(tile_sample_id)
+                    message_info.append(tile_sample_id)
                     # remove the cache files
                     if mode == '_whole':
                         DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
@@ -339,7 +372,7 @@ class TileSampleTable():
                     elif mode == '_redo_analysis':
                         ...
                         
-                message = f'The tile sample(s) {row_index_list} moved to the pending queue'
+                message = f'The tile sample(s) {message_info} have been moved to the queue pending analysis'
                 return (True, message, False, store)
             return (False, ' ', False, store) 
         return redo_row_confirmed 
@@ -348,10 +381,12 @@ class TileSampleTable():
         def priority_row_confirmed(row_index_list):
             if row_index_list is None:
                 raise PreventUpdate
+            message_info = []
             for row_index in row_index_list:
                 id = self._model.iloc[row_index]['id']
                 DETECT_DAO.set_top_priority(id)
-            message = f'The tile sample(s) {row_index_list} moved to the top priority'
+                message_info.append(id)
+            message = f'The tile sample(s) {message_info} have been moved to the top priority'
             return (True, message) 
         return priority_row_confirmed 
     
@@ -368,20 +403,27 @@ class TileSampleTable():
             href = f'http://{CONFIG.get(SystemConfigNames.AUX_WEB_HOST, "localhost")}:{CONFIG.get(SystemConfigNames.AUX_WEB_PORT, "8024")}'
             # generate the title
             modal_title = f'Tile Sample ID: {tile_sample_id}'
-            # evalate if the file exists
-            view_reconstruct_path = os.path.join(logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
-            if os.path.isfile(view_reconstruct_path):
-                view_reconstruct_href = f'{href}/{DetectionTaskModel.get_partial_cache_folder(tile_sample_id)}/{DetectionTaskModel.WHOLE_RECO_HTML_FILENAME}' 
-            else:
-                view_reconstruct_href = None
+            # obtain the partial path to the cache folder
+            partial_cache_folder = DetectionTaskModel.get_partial_cache_folder(tile_sample_id)
+            view_reconstruct_href = view_feature_match_href = view_annotated_blobs_href = None
+            if partial_cache_folder is not None:
+                # evalate if the file exists
+                view_reconstruct_path = os.path.join(logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
+                if os.path.isfile(view_reconstruct_path):
+                    view_reconstruct_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.WHOLE_RECO_HTML_FILENAME}' 
 
-            # evaluate if the file exists
-            view_feature_match_path = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
-            if os.path.isfile(view_feature_match_path):
-                view_feature_match_href = f'{href}/{DetectionTaskModel.get_partial_cache_folder(tile_sample_id)}/{DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME}' 
-            else:           
-                view_feature_match_href = None
-            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_feature_match_href, view_feature_match_href==None,)
+                # evaluate if the file exists
+                view_feature_match_path = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
+                if os.path.isfile(view_feature_match_path):
+                    view_feature_match_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME}' 
+                    
+                # evaluate if the file exists
+                view_annotated_blobs_path = os.path.join(logdata_folder, DetectionTaskModel.ANNOTATED_BLOBS_INDEX_HTML_FILENAME)
+                if os.path.isfile(view_annotated_blobs_path):
+                    view_annotated_blobs_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.ANNOTATED_BLOBS_INDEX_HTML_FILENAME}' 
+                                
+            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_feature_match_href, view_feature_match_href==None, 
+                    view_annotated_blobs_href, view_annotated_blobs_href==None)
         return view_row_confirmed
     
     def _style_selected_rows(self):

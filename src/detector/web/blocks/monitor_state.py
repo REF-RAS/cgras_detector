@@ -17,7 +17,7 @@ import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 # project modules
-from detector.model import STATE, CAPTURER_STATE, SystemStates
+from detector.model import STATE, COORDINATOR_STATE, SystemStates
 
 class MonitorStateBlock():
     def __init__(self, app, prefix):
@@ -82,7 +82,7 @@ class MonitorStateBlock():
             # obtain the states of the two platforms
             state:SystemStates = STATE.get()
             previous_state:SystemStates = STATE.get_previous_state()
-            capturer_state = CAPTURER_STATE.get()
+            capturer_state = COORDINATOR_STATE.get()
             # query cpu percent and memory percent
             cpu_percent = psutil.cpu_percent()
             mem_percent = psutil.virtual_memory().percent        
@@ -93,8 +93,8 @@ class MonitorStateBlock():
                         'I am wasting my talent here. Got nothing to do. I should be nursing coral babies. ',
                         'I turn into a couch potato. Is it my destiny?'
                     ][random.randrange(0, 3)]
-            elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE, SystemStates.POLL_UPDATE_HEALTH_INDEX]:
-                if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE, SystemStates.POLL_UPDATE_HEALTH_INDEX] or random.random() < 0.2:
+            elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE]:
+                if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE] or random.random() < 0.2:
                     self.message = [
                         'I just asked my supervisor for more coral larvae but got nothing. I am feeling insecure.',
                         'No new coral again! Should I look elsewhere for coral babies?',

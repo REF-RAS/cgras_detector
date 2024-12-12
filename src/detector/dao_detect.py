@@ -43,6 +43,7 @@ DETECT_DDL = {
         importer_id text,
         operator text,
         create_time text,
+        modify_time text,
         status integer DEFAULT -1,
         priority text,
         remarks text DEFAULT '',
@@ -187,13 +188,20 @@ class ObjectClassCategories(Enum):
     DEAD_CORAL = 2
 
 # the constants defined for storing status in different tables
-class StatusNames(Enum):
+class TaskStatusNames(Enum):
     UNKNOWN = -1
     PENDING = 0
     SUCCESS = 1
     FAILED = 2
     ABORTED = 3
-    INVALID = 4  # Delete a tile sample puts it into INVALID
+    REJECTED = 4
+    
+class SampleStatusNames(Enum):
+    UNKNOWN = -1
+    QUEUED = 0
+    DONE = 1
+    ABORTED = 2  # ABORTED may be due to interrupted by user or by a recoverable error (not from the data itself) such as no suitable YOLO model
+    REJECTED = 4  # REJECTED may be due to rejected by user or rejected by the system if a non-recoverable error is found in the input data
 
 class CoralObject():
     """ CoralObject models an object in the tile images detected by an object detection model. It comprises locational information including the index in the image grid, the index of the blob in each image,
@@ -290,9 +298,9 @@ class DetectorDAO():
     # add a record to the tile_sample table, with species normalized to lower case
     @synchronized
     def add_tile_sample(self, tile_id:str, batch_id:str, batch_time:str, age:int, species:str, season:str, tab_ncols:int, tab_nrows:int, settle_time:str, spawn_time:str='', importer_id:str='', operator:str='', 
-                        status:int=StatusNames.PENDING.value):
-        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status, create_time, priority) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now"), DATETIME("now"))'
+                        status:int=SampleStatusNames.QUEUED.value):
+        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now"), DATETIME("now"), DATETIME("now"))'
         tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
         return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status))
     
@@ -306,8 +314,8 @@ class DetectorDAO():
     
     # return the number of records of tile sample given a particular status
     @synchronized
-    def count_tile_samples(self, status:int=StatusNames.PENDING.value) -> int:
-        if isinstance(status, StatusNames):
+    def count_tile_samples(self, status:int=SampleStatusNames.QUEUED.value) -> int:
+        if isinstance(status, SampleStatusNames):
             status = status.value
         sql = 'SELECT COUNT(*) FROM tile_sample WHERE status = ?'
         result = db_tools.query_for_object(self.db_file, sql, (status,))
@@ -378,7 +386,7 @@ class DetectorDAO():
 
     # return a dataframe of records given the season title, the status, and maximum records to return
     @synchronized
-    def list_tile_samples(self, season_title:str=None, status:int=StatusNames.PENDING.value, limit=None) -> pd.DataFrame:
+    def list_tile_samples(self, season_title:str=None, status:int=SampleStatusNames.QUEUED.value, limit=None, order_by_recent=False) -> pd.DataFrame:
         if status is not None:
             sql = 'SELECT * FROM tile_sample WHERE status = ?'
             param_list = [status] 
@@ -392,10 +400,14 @@ class DetectorDAO():
             else:
                 sql += ' WHERE season = ?'
             param_list.append(season_title)
-        if limit is None or not isinstance(limit, numbers.Number):
-            sql += ' ORDER BY priority ASC'
+        if order_by_recent:
+            sql += ' ORDER BY modify_time DESC'
         else:
-            sql = ' ORDER BY priority ASC LIMIT ?'
+            sql += ' ORDER BY priority ASC'
+        if limit is None or not isinstance(limit, numbers.Number):
+            ...
+        else:
+            sql += ' LIMIT ?'
             param_list.append(limit)
         return db_tools.query(self.db_file, sql, tuple(param_list)) 
         
@@ -403,7 +415,7 @@ class DetectorDAO():
     @synchronized
     def query_next_pending_tile_sample(self) -> dict:
         sql = 'SELECT * FROM tile_sample WHERE status = ? ORDER BY priority ASC LIMIT 1'
-        return db_tools.query_for_dict(self.db_file, sql, (StatusNames.PENDING.value,))                        
+        return db_tools.query_for_dict(self.db_file, sql, (SampleStatusNames.QUEUED.value,))                        
     
     # delete all records int he tile_sample table
     @synchronized
@@ -422,9 +434,9 @@ class DetectorDAO():
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
             if remarks is None:
-                c.execute('UPDATE tile_sample SET status = ? WHERE id = ?', (status, tile_sample_id,))
+                c.execute('UPDATE tile_sample SET status = ?, modify_time = DATETIME("now") WHERE id = ?', (status, tile_sample_id,))
             else:
-                c.execute('UPDATE tile_sample SET status = ?, remarks = ? WHERE id = ?', (status, remarks, tile_sample_id,))
+                c.execute('UPDATE tile_sample SET status = ?, remarks = ?, modify_time = DATETIME("now") WHERE id = ?', (status, remarks, tile_sample_id,))
             return True  
         
     @synchronized
@@ -445,8 +457,8 @@ class DetectorDAO():
     # update the priority field of a tile_sample record given its id
     @synchronized
     def set_top_priority(self, tile_sample_id:str):
-        sql = 'UPDATE tile_sample SET priority = (SELECT DATETIME(MIN(priority), "-1 minute") FROM tile_sample WHERE status = ?) WHERE id = ?'
-        status = StatusNames.PENDING
+        sql = 'UPDATE tile_sample SET priority = (SELECT DATETIME(MIN(priority), "-5 minute") FROM tile_sample WHERE status = ?) WHERE id = ?'
+        status = SampleStatusNames.QUEUED
         return db_tools.update(self.db_file, sql, (status.value, tile_sample_id,))   
     
     # return the records from a query based on search keys including season, status, tile_Id, batch_id, and the period
@@ -465,8 +477,8 @@ class DetectorDAO():
                 param_list.append(status)
         else:
             sql = 'SELECT * FROM tile_sample WHERE status NOT IN (?, ?)'
-            param_list.append(StatusNames.PENDING.value)
-            param_list.append(StatusNames.INVALID.value)
+            param_list.append(SampleStatusNames.QUEUED.value)
+            param_list.append(SampleStatusNames.REJECTED.value)
         if season_title:
             sql += ' AND season = ?'
             param_list.append(season_title)            
@@ -631,7 +643,7 @@ class DetectorDAO():
         total = 0
         for index, count_dict in enumerate(count_list):
             total += count_dict['count']
-            model.loc[index + current_index] = [f'# {StatusNames(count_dict["status"]).name} Status', count_dict['count']]
+            model.loc[index + current_index] = [f'# {SampleStatusNames(count_dict["status"]).name} Status', count_dict['count']]
         model.loc[1] = ['Total Samples', total]
         return model
     
@@ -647,9 +659,9 @@ class DetectorDAO():
     @synchronized
     def add_yolo_model(self, name:str, model_file_path:str, species:str, start_day:int, end_day:int, input_image_width:int, input_image_height:int, 
                        coral_classes:list, dead_coral_classes:list, remarks:str) -> int:
-        coral_classes = [] if coral_classes is None else coral_classes
+        coral_classes = [] if coral_classes is None or type(coral_classes) not in (list, tuple) else coral_classes
         coral_classes = yaml.dump(coral_classes, Dumper=yaml.Dumper)
-        dead_coral_classes = [] if dead_coral_classes is None else dead_coral_classes
+        dead_coral_classes = [] if dead_coral_classes is None or type(dead_coral_classes) not in (list, tuple) else dead_coral_classes
         dead_coral_classes = yaml.dump(dead_coral_classes, Dumper=yaml.Dumper)        
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
@@ -1048,7 +1060,7 @@ class DetectorDAO():
             row_index += 1
         # mean duration of DETECT_CORAL task
         sql = 'SELECT AVG(used_time) as mean_duration FROM task_record WHERE task_type = ? AND status = ?'
-        mean_duration = db_tools.query_for_object(self.db_file, sql, (TaskTypes.DETECT_CORALS.value, StatusNames.SUCCESS.value))
+        mean_duration = db_tools.query_for_object(self.db_file, sql, (TaskTypes.DETECT_CORALS.value, TaskStatusNames.SUCCESS.value))
         if mean_duration is not None:
             model.loc[row_index] = ['DETECT_CORALS Mean Time', f'{mean_duration:.1f} s']
             row_index += 1

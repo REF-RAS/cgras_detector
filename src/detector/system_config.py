@@ -29,6 +29,11 @@ class SystemConfigNames(Enum):
     AUX_WEB_HOST = 'aux_web_host'
     AUX_WEB_PORT = 'aux_web_port'
     AUX_WEB_DIRECTORY = 'aux_web_directory'
+    # automation mode (whether the task execution is automated)
+    TASK_AUTOMATION_MODE = 'task_automation' 
+    # default ros topics
+    ROS_COORDINATOR_STATE_TOPIC = 'ros_coordinator_state_topic' 
+    ROS_DETECTOR_STATE_TOPIC = 'ros_detector_state_topic' 
     # timer for refresh the system and GUI
     SYSTEM_TIMER = 'system_timer'
     DASHBOARD_TIMER = 'dashboard_timer'

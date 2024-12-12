@@ -20,7 +20,7 @@ from detector.models.reconstruct import ImageReconstructModel, ImageReconstructM
 from detector.models.reconstruct_tools import test_get_cgras_sample_images_as_list 
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.models.yolo_detector import YoloObjectDetector, YoloResult, ObjectType
-from detector.models import logger, ModelsConfigNames
+from detector.models import logger, ModelsConfigNames, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 from detector.model import CoralObject, ObjectClassCategories
 
 class CoralObjectDetectModel():
@@ -46,7 +46,13 @@ class CoralObjectDetectModel():
         self.progress_cb = progress_cb
         self.num_images = len(images_2d_list) * len(images_2d_list[0])
         self.count_images_completed = 0
-        # keep some input parameters
+        # keep input parameters
+        self.images_2d_list = images_2d_list
+        self.reco_model = reco_model
+        self.yolo_model = yolo_model
+        self.locate_tile_model = locate_tile_model
+        self.params = kwargs
+        # extract useful information
         self.tile_size = locate_tile_model.get_tile_size() if locate_tile_model is not None else None
         if self.tile_size is None:  # if the tile size is not known from LocateTileModel 
             whole_reco_image_size = reco_model.get_whole_reco_image_size()
@@ -70,17 +76,21 @@ class CoralObjectDetectModel():
         self.cod_model = None
         # model parameters: abort
         self.to_abort = False
+        
+    def build(self):
         # step 1: iterate through each image in the 2d list of images
-        for row_index, row_1d_image_list in enumerate(images_2d_list):
+        for row_index, row_1d_image_list in enumerate(self.images_2d_list):
             for col_index, image in enumerate(row_1d_image_list):                
                 # if the attribute progress_cb is set, call the progress_cb to record the progress
                 if hasattr(self, 'progress_cb') and self.progress_cb is not None:
                     self.progress_cb((self.count_images_completed, self.num_images))
-                time.sleep(0.1)    # sleep for a short while to release resources
+                time.sleep(0.1)    # sleep for a short while to release cpu
                 if self.to_abort:  # stop processing if abort signal is recieved
-                    return
+                    raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
                 # compute the coral object detect model (long process)
-                self.cod_model = CoralObjectDetectImageModel(image, col_index, row_index, reco_model, yolo_model, locate_tile_model, **kwargs)
+                self.cod_model = CoralObjectDetectImageModel(image, col_index, row_index, self.reco_model, self.yolo_model, self.locate_tile_model, **self.params)
+                self.cod_model.build()
+                
                 index = (col_index, row_index)
                 # extract the list of detected objects from the cod_model
                 self.object_list_of_images[index] = self.cod_model.get_object_list(include_invalidated=False)
@@ -98,6 +108,11 @@ class CoralObjectDetectModel():
         # step 3: extract the objects from individual lists of images into a single list
         self.object_list = self._merge_object_lists(include_invalidated=True)
         # step 4: save the object list and metadata to the cache file
+        # step 5: clear data if not needed for model inference
+        self.images_2d_list = None
+        self.reco_model = None
+        self.yolo_model = None
+        self.locate_tile_model = None     
 
     def _merge_object_lists(self, include_invalidated=False) -> list:
         """ internal function to return as a single list all the coral objects detected in the 2d grid of images, the duplicated objects due to overlapping regions between neighbouring images are flagged invalidated.
@@ -315,6 +330,13 @@ class CoralObjectDetectImageModel():
         """
         # model variable for abort
         self.to_abort = False
+        # input parameters
+        self.image = image
+        self.image_col_index, self.image_row_index = image_col_index, image_row_index
+        self.reco_model = reco_model
+        self.yolo_model = yolo_model
+        self.locate_tile_model = locate_tile_model
+        self.params = kwargs
         # other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
@@ -337,20 +359,23 @@ class CoralObjectDetectImageModel():
         self.resolved_object_list = None                  # final object list after duplicate removal
         self.annotated_blob_filename_dict_list = []       # list of annotated blob filenames
         self.annotated_image_filename_dict = None              # the filename for the annotated image 
+        
+    def build(self):
         # attempt to load from cache if the flag is true
         if self.use_cached_object_detection and self.logdata_folder is not None:
-            cached_file = os.path.join(self.logdata_folder, f'object_list_{image_col_index}_{image_row_index}.yaml')
+            cached_file = os.path.join(self.logdata_folder, f'object_list_{self.image_col_index}_{self.image_row_index}.yaml')
             self._load_raw_object_list_of_blobs(cached_file)
         # step 1: load the image if not already loaded
-        if type(image) == str:
+        if type(self.image) == str:
             try:
-                image = cv2.imread(image)
+                self.image = cv2.imread(self.image)
             except (Warning, Exception):
-                raise IOError(f'Unable to read image file {image}')
-        if type(image) is not np.ndarray:
+                # raise OSError(f'Unable to read image file {self.image}')
+                raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID,f'Unable to read image file {self.image}')
+        if type(self.image) is not np.ndarray:
             raise TypeError(f'Parameter image is neither an image file nor a numpy image') 
         # step 2: traverse through the image coordinates to build a list of logical image blobs 
-        image_size = image.shape[:2][::-1]
+        image_size = self.image.shape[:2][::-1]
         step_x, step_y = self.blob_size[0] - self.blob_overlap_pix, self.blob_size[1] - self.blob_overlap_pix
         self.image_blob_grid_size = math.ceil(image_size[0] / step_x), math.ceil(image_size[1] / step_y)
         self.blobs_count = 0
@@ -359,43 +384,51 @@ class CoralObjectDetectImageModel():
         for start_x in range(0, image_size[0], step_x):
             for start_y in range(0, image_size[1], step_y):
                 if self.to_abort:
-                    return
+                    raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received the abort command from the system')
                 # compute the blob index, the top left and the bottom right corner of an image blob
                 blob_col_index, blob_row_index = start_x // step_x, start_y // step_y 
                 corner = (start_x, start_y,)
                 end_x, end_y = start_x + self.blob_size[0], start_y + self.blob_size[1]
                 end_x, end_y = min(end_x, image_size[0]), min(end_y, image_size[1]) 
                 # extract the image blob from the numpy image
-                image_blob = image[start_y:end_y, start_x:end_x].copy()
+                image_blob = self.image[start_y:end_y, start_x:end_x].copy()
                 image_blob_size = image_blob.shape[:2][::-1]
                 # compute the cache index
-                cache_index = (image_col_index, image_row_index, blob_col_index, blob_row_index,)
+                cache_index = (self.image_col_index, self.image_row_index, blob_col_index, blob_row_index,)
+                # generate the raw object list or refer to the cache if loaded successfully earlier
+                object_list = [] 
                 if cache_index not in self.raw_object_list_of_blobs:
-                    self.to_update_cache = True
-                    # if the object list of the cache index does not exist (not using the cache file), invoke the yolo object detector and extract objects as a list
-                    # detect objects in the image_blob using the yolo_model
-                    logger.info(f'OBJECT DETECTION in image ({image_col_index, image_row_index}) blob ({blob_col_index, blob_row_index}): {start_x, start_y} {end_x, end_y} {image_blob_size}') 
-                    yolo_result:YoloResult = yolo_model.detect(image_blob)
-                    if self.object_class_names is None:
-                        self.object_class_names = yolo_result.get_class_names()
-                    # extract the processing speed information and update the metadata about processing this blob
-                    speed_as_dict = yolo_result.get_processes_speed_as_dict() 
-                    blob_metdata = {
-                        'cod_blob_size': image_blob_size,
-                        'cod_blob_bbox': [start_x, start_y, end_x, end_y] 
-                    }
-                    blob_metdata.update(speed_as_dict)
-                    self.metadata_of_blobs[cache_index] = blob_metdata   # the data structure is for logdata
-                    # extract the detected objects from the output of the yolo model of this blob
-                    object_list = self._extract_objects_from_result(yolo_result, image_col_index, image_row_index, corner, blob_col_index, blob_row_index, reco_model, locate_tile_model)  
-                    self.raw_object_list_of_blobs[cache_index] = object_list
+                    try:
+                        self.to_update_cache = True
+                        # if the object list of the cache index does not exist (not using the cache file), invoke the yolo object detector and extract objects as a list
+                        # detect objects in the image_blob using the yolo_model
+                        logger.info(f'OBJECT DETECTION in image ({self.image_col_index, self.image_row_index}) blob ({blob_col_index, blob_row_index}): {start_x, start_y} {end_x, end_y} {image_blob_size}') 
+                        yolo_result:YoloResult = self.yolo_model.detect(image_blob)
+                        if self.object_class_names is None:
+                            self.object_class_names = yolo_result.get_class_names()
+                        # extract the processing speed information and update the metadata about processing this blob
+                        speed_as_dict = yolo_result.get_processes_speed_as_dict() 
+                        blob_metdata = {
+                            'cod_blob_size': image_blob_size,
+                            'cod_blob_bbox': [start_x, start_y, end_x, end_y] 
+                        }
+                        blob_metdata.update(speed_as_dict)
+                        self.metadata_of_blobs[cache_index] = blob_metdata   # the data structure is for logdata
+                        # extract the detected objects from the output of the yolo model of this blob
+                        object_list = self._extract_objects_from_result(yolo_result, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, self.reco_model, self.locate_tile_model)  
+                        self.raw_object_list_of_blobs[cache_index] = object_list
+                    except Exception as e:
+                        raise DetectorAbortError(DetectorErrorCodes.YOLO_MODEL_ERROR, 'Error happened when the YoloModel is applied on an image blob', e=e)
+                    
                     # if the self.debug_blob_images is True, then generate the annotated image for this image blob and save to the logdata folder
                     if self.debug_blob_images and self.logdata_folder is not None:
                         annotated_image = yolo_result.draw_detection(image_blob, True)  # making a copy before annotation so that the original image is intact
-                        image_file_name = f'annotated_blob_{image_col_index}_{image_row_index}_{blob_col_index}_{blob_row_index}.jpg'
-                        image_dict = {'title': f'Annotated blob at image ({image_col_index} {image_row_index}) blob ({blob_col_index} {blob_row_index})', 'src': image_file_name}
+                        image_file_name = f'annotated_blob_{self.image_col_index}_{self.image_row_index}_{blob_col_index}_{blob_row_index}.jpg'
+                        image_dict = {'title': f'Annotated blob at image ({self.image_col_index} {self.image_row_index}) blob ({blob_col_index} {blob_row_index})', 'src': image_file_name}
                         self.annotated_blob_filename_dict_list.append(image_dict)
-                        cv2.imwrite(os.path.join(self.logdata_folder, image_file_name), annotated_image)
+                        target_image_file = os.path.join(self.logdata_folder, image_file_name)
+                        if not cv2.imwrite(target_image_file, annotated_image):
+                            raise OSError(f'Failed to save annotated image to {target_image_file}')
                 else:
                     # if the object_list for the cache_index exists, just get it from the data structure
                     object_list = self.raw_object_list_of_blobs[cache_index]
@@ -404,15 +437,13 @@ class CoralObjectDetectImageModel():
                     logger.info(coral_object)
                 self.blobs_count += 1
  
-
-        
         # step 3: iterate through each pair of neighbour blobs
-        logger.info(f'DUPLICATE REMOVAL between image blobs in the image ({image_col_index, image_row_index})') 
-        self._invalidate_duplicate_objects(self.raw_object_list_of_blobs, image_col_index, image_row_index, self.image_blob_grid_size, self.duplicate_max_displacement)
+        logger.info(f'DUPLICATE REMOVAL between image blobs in the image ({self.image_col_index, self.image_row_index})') 
+        self._invalidate_duplicate_objects(self.raw_object_list_of_blobs, self.image_col_index, self.image_row_index, self.image_blob_grid_size, self.duplicate_max_displacement)
     
         # save the raw_object_list_of_blobs to cache file
         if self.to_update_cache or (not self.use_cached_object_detection and self.logdata_folder is not None):
-            cache_data_file = os.path.join(self.logdata_folder, f'object_list_{image_col_index}_{image_row_index}.yaml')        # save the object list and metadata to the cache file
+            cache_data_file = os.path.join(self.logdata_folder, f'object_list_{self.image_col_index}_{self.image_row_index}.yaml')        # save the object list and metadata to the cache file
             logger.info(f'{type(self).__name__}: Save object list and metadata for {self.blobs_count} image blobs to {cache_data_file}')
             self._save_raw_object_list_of_blobs(cache_data_file)    
     
@@ -422,12 +453,20 @@ class CoralObjectDetectImageModel():
         # step 5: generate and save the image annotated with the resolved list of objects if the self.debug_blob_images is True
         if self.debug_blob_images and self.logdata_folder is not None:
             # generate the annotated image for the whole image and save to the logdata folder
-            annotated_image = CoralObjectListHelper.annotate_image_with_objects(self.resolved_object_list, image, print_name=True, include_invalidated=False)
+            annotated_image = CoralObjectListHelper.annotate_image_with_objects(self.resolved_object_list, self.image, print_name=True, include_invalidated=False)
             annotated_image = CoralObjectListHelper.annotate_image_with_blob_bbox(self.metadata_of_blobs, annotated_image)
-            image_file_name = f'annotated_image_{image_col_index}_{image_row_index}.jpg'
-            image_dict = {'title': f'Annotated image ({image_col_index} {image_row_index})', 'src': image_file_name}
+            image_file_name = f'annotated_image_{self.image_col_index}_{self.image_row_index}.jpg'
+            image_dict = {'title': f'Annotated image ({self.image_col_index} {self.image_row_index})', 'src': image_file_name}
             self.annotated_image_filename_dict = image_dict
-            cv2.imwrite(os.path.join(self.logdata_folder, image_file_name), annotated_image)            
+            target_image_file = os.path.join(self.logdata_folder, image_file_name)
+            if not cv2.imwrite(target_image_file, annotated_image):
+                raise OSError(f'Failed to save annotated image to {target_image_file}')
+            
+        # step 6: clear data if not needed for model inference
+        self.image = None
+        self.reco_model = None
+        self.yolo_model = None
+        self.locate_tile_model = None                  
     
     def _merge_into_image_object_list(self) -> list:
         """ internal function to merge the object lists from the blobs into the overall list
@@ -495,9 +534,13 @@ class CoralObjectDetectImageModel():
             'image_blob_grid_size': self.image_blob_grid_size,
             'blobs_count': self.blobs_count,
         }
-        with open(cache_file, 'w') as outfile:
-            yaml.dump(data, outfile, Dumper=yaml.Dumper)
-    
+        try:
+            with open(cache_file, 'w') as outfile:
+                yaml.dump(data, outfile, Dumper=yaml.Dumper)
+        except (Warning, Exception) as e:
+            logger.warning(f'{type(self).__name__}: Failed to write raw_object_list_of_blobs to {cache_file}')
+            raise
+                
     def _load_raw_object_list_of_blobs(self, cache_file:str):
         """ Load from a yaml file the data associated with the detected coral objects and restore them to the data structures of this object
 

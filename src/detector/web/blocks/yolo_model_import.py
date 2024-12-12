@@ -24,8 +24,9 @@ class YoloModelFileImportBlock():
         prefix = prefix + 'ymfi_'
         self.default_max_end_day = default_max_end_day
         self.import_success_trigger_id = prefix + 'import_success'
-        # --- define widgets
-        message_alert = dbc.Alert('Nothing is happening', id=prefix+'message_alert', dismissable=True, duration=5000, is_open=False, className='col-12')
+        # define widgets
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
+                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define tile sample spec import panel
         self.file_upload_area = dcc.Upload(id=prefix+'file_import_area', children=html.Div([
             'Drag and Drop or ', html.A('Select a Yolo model file specification yaml file')]), style={
@@ -52,14 +53,14 @@ class YoloModelFileImportBlock():
                 html.H4(dbc.Badge('IMPORT YOLO MODEL FILE SPEC', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.P('Select the yaml file that specifies a yolo model for coral detection.', style={'display': 'inline-block'}),
                 self.file_upload_area,
-                message_alert,
+                self._toast,
                 self.confirm_modal,
             ], className='text-center')   
                  
         # --- setup callbacks
         # callback setup for the tile sample import area and confirm dialog
-        self.app.callback([Output(prefix+'message_alert', 'is_open'),
-                           Output(prefix+'message_alert', 'children'),
+        self.app.callback([Output(prefix+'toast', 'is_open'),
+                           Output(prefix+'toast', 'children'),
                            Output(prefix+'import_success', 'data'),
                            Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),],
                         [Input(prefix+'confirm_button', 'n_clicks'),
@@ -91,7 +92,7 @@ class YoloModelFileImportBlock():
     # define callback functions
     def _file_import_confirmed(self): 
         def file_import_confirmed(confirm_button, cancel_button, yaml_data):
-            button_id = ctx.triggered_id if not None else 'No clicks yet'
+            button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
             if button_id.endswith('confirm_button'):
                 default_start_day = 0
                 result = DETECT_DAO.import_yolo_model_yaml(yaml_data, default_start_day, self.default_max_end_day)

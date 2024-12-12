@@ -17,23 +17,47 @@ from datetime import datetime
 from tools.logging_tools import logger
 
 class DetectorErrorCodes(Enum):
-    IMAGE_FILE_NOT_FOUND = 1
-    FILE_NOT_IMAGE = 2
-    IMAGE_FILES_NOT_SAME_SIZE = 3
-
+    UNDEFINED = 0
+    INPUT_DATA_INVALID = 1
+    RECO_MATCH_FAILED = 2
+    RECO_FAILED = 3
+    LOC_FAILED = 4
+    LOC_FRAME_MISSING = 5 
+    YOLO_MODEL_UNDEFINED = 6
+    YOLO_MODEL_ERROR = 7
+    YOLO_MODEL_FILE_ERROR = 8
+    ABORTED_BY_SYSTEM = 11
+    FILE_IO_ERROR = 21
+    DB_ERROR = 22
 
 class DetectorError(Exception):
-    def __init__(self, id:int, remarks:str, e=None):            
+    def __init__(self, code:DetectorErrorCodes, remarks:str=None, e=None, source=None):            
         # Call the base class constructor with the parameters it needs
         super().__init__(remarks)
-        if isinstance(id, Enum):
-            id = id.value
+        if isinstance(code, DetectorErrorCodes):
+            self.code = code
+        else:
+            logger.warning(f'DetectorError: Parameter code is not one of DetectorErrorCodes')
+            self.code = DetectorErrorCodes.UNDEFINED
+        self.source = source
         self.remarks = remarks
-        self.id = id
         self.e = e
     
-    def get_id(self):
-        return self.id
+    def get_code(self) -> DetectorErrorCodes:
+        return self.code
+    
+    def get_source(self):
+        return self.source
     
     def get_remarks(self):
         return self.remarks
+
+class DetectorRejectError(DetectorError):
+    def __init__(self, code:DetectorErrorCodes, remarks:str=None, e=None, source=None):            
+        # Call the base class constructor with the parameters it needs
+        super().__init__(code, remarks, e, source)
+
+class DetectorAbortError(DetectorError):
+    def __init__(self, code:DetectorErrorCodes, remarks:str=None, e=None, source=None):            
+        # Call the base class constructor with the parameters it needs
+        super().__init__(code, remarks, e, source) 

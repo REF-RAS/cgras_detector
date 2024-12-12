@@ -48,7 +48,7 @@ class FocusEvalTools():
          :return: The pair of variance (score) and bbox in (x1, y1, x2, y2) format
         :rtype: tuple
         """
-        sample_image, bbox = FocusEvalTools.sample_image_box(image, sample_size=sample_size, sample_point=sample_point)
+        sample_image, bbox = CropTools.sample_image_box(image, sample_size=sample_size, sample_point=sample_point)
         if len(sample_image.shape) == 3 and sample_image.shape[2] == 3:
             sample_image = cv2.cvtColor(sample_image, cv2.COLOR_BGR2GRAY)
         variance = cv2.Laplacian(sample_image, cv2.CV_64F).var()
@@ -92,7 +92,7 @@ class FocusEvalTools():
                 bbox_list.append(None)
                 continue
             if len(sample) == 2:
-                sample = (sample[0], sample[1], 0.1, 0.1)  # default 0.1
+                sample = (sample[0], sample[1], 0.1, 0.1)  # default 0.1 or 10%
             elif len(sample) == 3:
                 sample = (sample[0], sample[1], sample[2], sample[2])
             variance, bbox = FocusEvalTools.evaluate_focus_region(image, out_image, sample_size=sample[2:4], sample_point=sample[:2])

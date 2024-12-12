@@ -9,6 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
+from typing import Tuple
 import os, math, yaml, numbers, glob
 import numpy as np
 
@@ -105,7 +106,7 @@ class CoralObjectMapModel():
         self.tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
         self.map_size_default = (self.tile_sample_dict['tab_ncols'], self.tile_sample_dict['tab_nrows'],) 
         # first check if a cache file exists: compute the location of the cache file
-        self.cache_file, _ = CoralObjectMapModelHelper.form_cache_file_path(tile_sample_id, self.map_size_default)      
+        # self.cache_file, _ = CoralObjectMapModelHelper.form_cache_file_path(tile_sample_id, self.map_size_default)      
         # first check if a cache file exists: attempt to load the cache file
         # try:
         #     logger.info(f'{type(self).__name__}: Attempting to load cached ObjectCountMap from ({self.cache_file})')
@@ -115,7 +116,7 @@ class CoralObjectMapModel():
         # NOTE: Not using the cache file 
         self.count_map_cache = {}
             
-    def compute_object_count_map(self, class_filter:str=None) -> np.ndarray:
+    def compute_object_count_map(self, class_filter:str=None) -> Tuple[np.ndarray, np.ndarray]:
         """ return the object count map of a class detected objects on a tile_sample 
 
         :param tile_sample_id: The tile sample id
@@ -129,13 +130,15 @@ class CoralObjectMapModel():
         if class_filter not in self.count_map_cache:
             # load the detected object list from db and convert them into a list of CoralObject
             coral_object_list = self._load_coral_object_list(self.tile_sample_id, class_filter)
-            count_map = HeatmapHelper.compute_object_count_map(coral_object_list, self.map_size_default, None)
+            count_map, count_label_map = HeatmapHelper.compute_object_count_map(coral_object_list, self.map_size_default, None)
             self.count_map_cache[class_filter] = count_map
+            # NOTE: not applicable as cache file of count map is not used
             # save the generated map indexed by the class_filter to the yaml file for this tile_sample_id
-            CoralObjectMapModelHelper.to_yaml_file(self.count_map_cache, self.cache_file)
-        else:
-            count_map = self.count_map_cache[class_filter]
-        return count_map
+            # CoralObjectMapModelHelper.to_yaml_file(self.count_map_cache, self.cache_file)
+        else:  # NOTE: not applicable as cache file of count map is not used
+            # count_map = self.count_map_cache[class_filter]
+            ...
+        return count_map, count_label_map
     
     def get_tile_sample_info(self) -> dict:
         """ return the information of the tile sample associated with this object
@@ -163,8 +166,8 @@ class CoralObjectMapModel():
 # stored in teh database
 def test_generate_heatmap(tile_sample_id:str):
     vt_model = CoralObjectMapModel(tile_sample_id)
-    count_map = vt_model.compute_object_count_map()
-    HeatmapHelper.generate_plotly_heatmap(count_map, f'tile_sample_id: {tile_sample_id}', (1500, 500), output_file='heatmap_test_sample.jpg')
+    count_map, count_label_map = vt_model.compute_object_count_map()
+    HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, f'tile_sample_id: {tile_sample_id}', (1500, 500), output_file='heatmap_test_sample.jpg')
 
 if __name__ == '__main__':
     tile_sample_id = '2024-Nov-P00001-CG1-202411151200'  # tile_sample_id and the associated source images are assumed in the database

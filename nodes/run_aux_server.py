@@ -17,8 +17,8 @@ import socketserver
 
 import rospy
 
-from coordinator.model import CONFIG, SystemConfigNames
-from coordinator.run import ApplicationCoordinator
+from detector.model import CONFIG, SystemConfigNames
+from detector.run import ApplicationCoordinator
 
 from tools.logging_tools import logger
 
@@ -36,7 +36,7 @@ def cb_stop_server(*args, **kwargs):
 # The main program for running the detector as a web server and a daemon
 if __name__ == '__main__':
     SERVER = CONFIG.get(SystemConfigNames.AUX_WEB_HOST, '0.0.0.0')
-    PORT = CONFIG.get(SystemConfigNames.AUX_WEB_PORT, 8051)
+    PORT = CONFIG.get(SystemConfigNames.AUX_WEB_PORT, 8024)
     DIRECTORY = CONFIG.get(SystemConfigNames.AUX_WEB_DIRECTORY, '/home/qcr/cgras/images')
 
     # create the stop signal handler
@@ -52,6 +52,6 @@ if __name__ == '__main__':
             
     # Handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer((SERVER, PORT), Handler) as httpd:
-        logger.info(f'CGRAS ImageWebServer: running at {SERVER}:{PORT}')
-        logger.info(f'CGRAS ImageWebServer: serving images at {DIRECTORY}')
+        logger.info(f'CGRAS Detector ImageWebServer: running at {SERVER}:{PORT}')
+        logger.info(f'CGRAS Detector ImageWebServer: serving images at {DIRECTORY}')
         httpd.serve_forever()

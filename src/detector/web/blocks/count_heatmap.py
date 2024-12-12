@@ -95,8 +95,8 @@ class CountHeatmapBlock():
 
     def _generate_heatmap(self, tile_sample_id, filter_class, title:str=None):
         vt_model = CoralObjectMapModel(tile_sample_id)
-        count_map = vt_model.compute_object_count_map(filter_class)
-        fig = HeatmapHelper.generate_plotly_heatmap(count_map, title)
+        count_map, count_label_map = vt_model.compute_object_count_map(filter_class)
+        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title)
         return fig, count_map
     
     def _generate_figures_list(self, coral_trend_model, filter_class, compare_to_index:str=None):

@@ -21,6 +21,102 @@ from tools.lock_tools import synchronized
 from tools.logging_tools import logger
 
  
+# This class is used by the database DBFile class to manage the backup of the database file
+# It makes daily backup file, and remove those older than a prescribed days, but keep some of those permanently following a cycle of days
+class BackupFileManager():
+    DATE_FORMAT = '%Y%b%d'
+    RECORD_FILENAME = '.permanent_backup.csv'
+    def __init__(self, the_folder:str, the_file:str, **kwargs):
+        self.the_folder = the_folder
+        self.the_file = the_file
+        # check validity of input parameters
+        assert self.the_folder is not None and os.path.isdir(self.the_folder), 'Parameter (the_folder) is None or the folder does not exist'
+        # assert self.the_file is not None and os.path.isfile(os.path.join(self.the_folder, self.the_file)), 'Parameter (the_file_list) is None or the file does not exist'
+        # extract other input parameters
+        self.daily_backup_keep_days = kwargs.get('daily_backup_keep_days', 7)   # days
+        self.permanant_backup_cycle_days = kwargs.get('permanant_backup_cycle_days', 30)   # days
+        # load the hidden record file
+        self.permanent_backup_list = []
+        self.permanent_backup_latest_dt = None
+        try:
+            with open(os.path.join(the_folder, self.RECORD_FILENAME)) as infile:
+                for line in infile:
+                    dt = datetime.datetime.strptime(line, self.DATE_FORMAT).date()
+                    self.permanent_backup_list.append(dt)
+                    if self.permanent_backup_latest_dt is None or dt > self.permanent_backup_latest_dt:
+                        self.permanent_backup_latest_dt = dt
+        except:
+            ...
+        
+        # make the daily backup
+        self._make_daily_backup(self.the_folder, self.the_file)
+        # remove the old backup files except those considered 
+        self._remove_daily_backup_except_permanent(self.the_folder, self.the_file)
+        # save the latest list of permanant backup to the file
+        try:
+            with open(os.path.join(the_folder, self.RECORD_FILENAME), 'w') as outfile:
+                for line in self.permanent_backup_list:
+                    outfile.write(f'{line}\n')
+        except:
+            ...
+
+    def _generate_backup_filename(self, the_file:str, date_str:str=None) -> str:
+        if date_str is None:
+            today_dt = datetime.date.today()
+            date_str = today_dt.strftime(self.DATE_FORMAT)
+        return f'{date_str}_{the_file}'
+
+    # make a backup to the file indexed by today's date    
+    def _make_daily_backup(self, the_folder, the_file, use_move=False):
+        daily_backup_filename = self._generate_backup_filename(the_file)
+        daily_backup_path = os.path.join(the_folder, daily_backup_filename)
+        if os.path.isfile(daily_backup_path):
+            return
+        the_file_path = os.path.join(the_folder, the_file)
+        if not os.path.isfile(the_file_path):
+            return
+        if use_move:
+            shutil.move(the_file_path, daily_backup_path)        
+        else:
+            shutil.copyfile(the_file_path, daily_backup_path)
+
+    # remove daily backup files older than daily_backup_keep_days 
+    def _remove_daily_backup_except_permanent(self, the_folder, the_file):
+        today_dt = datetime.date.today()
+        # backup files to be deleted: all files older than daily_backup_keep_days AND not a permanant backup (older than 30 days)
+        # the permanently kept backup: iterate all files in the folder 
+        backup_files = [f for f in os.listdir(the_folder) if os.path.isfile(os.path.join(the_folder, f)) and f.endswith(the_file)]
+        backup_files_to_remove = []
+        backup_file_to_remove_latest = backup_file_to_remove_latest_dt = None
+        # iterate through the backup files of the_file and sort the older than daily_backup_keep_days to a list and record the latest one
+        for f in backup_files:
+            parts = f.split('_')
+            if len(parts) < 2:  # if the filename is not of the correct format, ignore
+                continue
+            # evaluate the date of the backup file and determine if it is older than daily_backup_keep_days 
+            try: 
+                f_dt = datetime.datetime.strptime(parts[0], self.DATE_FORMAT).date()
+                f_days_old = (today_dt - f_dt).days
+                if f_days_old > self.daily_backup_keep_days:
+                    if f not in self.permanent_backup_list:         # ignore the file if it is a permanant backup file    
+                        backup_files_to_remove.append(f)
+                        if backup_file_to_remove_latest is None or f_dt > backup_file_to_remove_latest_dt:
+                            backup_file_to_remove_latest = f
+                            backup_file_to_remove_latest_dt = f_dt
+            except:
+                continue
+        # check if the latest one should be considered as a permanant backup
+        if backup_file_to_remove_latest is not None and (self.permanent_backup_latest_dt is None or (backup_file_to_remove_latest_dt - self.permanent_backup_latest_dt).days > self.permanant_backup_cycle_days):
+            backup_files_to_remove.remove(backup_file_to_remove_latest)
+            self.permanent_backup_list.append(backup_file_to_remove_latest)
+            self.permanent_backup_latest_dt = backup_file_to_remove_latest_dt
+        # remove the filtered backup files
+        for f in backup_files_to_remove:
+            try:
+                os.remove(os.path.join(the_folder, f))
+            except:
+                logger.warning(f'BackupFileManager unable to remove old backup file: {f}')
+
 # This class models the management and backup of db files and the folder that contains the files
 class DBFile():
     def __init__(self, database_folder:str, db_filename:str, ddl_commands:dict):
@@ -32,7 +128,7 @@ class DBFile():
         # input parameters: convert ddl commands in a list to a single dict
         if isinstance(ddl_commands, list):
             self.ddl_commands = dict()
-            for ddl_dict in self.ddl_commands:
+            for ddl_dict in ddl_commands:
                 if not isinstance(ddl_dict, dict):
                     raise AssertionError(f'Parameter (ddl_commands) is a list but one of the list item is not a dict')
                 self.ddl_commands.update(ddl_dict)
@@ -49,13 +145,11 @@ class DBFile():
             # - test if the db_file exists, if not, create one
             if not os.path.isfile(self.db_file):
                 self.create_tables()
-            else:
-                # - making a backup of the database file if it has not been made this day
-                # self._make_daily_backup()
-                ...
         except Exception as e:
             raise AssertionError(f'DBFile: system database setup error: {e}')
-    
+        # handle backup of database files
+        self.backup_manager = BackupFileManager(self.db_parent_folder, db_filename)
+
     # ------- manage the sqlite3 database files    
     def _make_daily_backup(self):
         today = datetime.date.today()
@@ -124,12 +218,12 @@ class DBFile():
         error_list = []
         os.makedirs(file_tools.get_parent(self.db_file), exist_ok=True)
         if table_list is None:
-            table_list = self.ddb_commands.keys()
+            table_list = self.ddl_commands.keys()
         elif type(table_list) == str:
             table_list = [table_list]
             
         for table_name in table_list:
-            create_sql = self.ddb_commands.get(table_name, None)
+            create_sql = self.ddl_commands.get(table_name, None)
             if create_sql is None:
                 logger.warning(f'{__file__} (create_tables): No DDL SQL script has been specified for the given table name {table_name}')
                 continue

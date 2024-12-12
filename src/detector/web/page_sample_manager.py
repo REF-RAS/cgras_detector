@@ -29,7 +29,7 @@ class SampleManagerPage():
         self.pending_sample_table = TileSampleTable(app, prefix, allow_priority=True, allow_reprocess=False)
         self.tile_sample_retrieve_panel = EnableTileSamplesImportBlock(app, prefix)
         self.tile_sample_search_panel = TileSampleSearchBlock(app, prefix)
-        self.processed_sample_table = TileSampleTable(app, prefix + 'btm_', allow_priority=False, allow_reprocess=True, allow_reload=True, allow_view=True)
+        self.processed_sample_table = TileSampleTable(app, prefix + 'btm_', allow_priority=False, allow_reprocess=True, allow_delete=True, allow_view=True)
 
         self._define_page()
     
@@ -53,9 +53,9 @@ class SampleManagerPage():
             dbc.Row(html.H4( children = 'Queued Samples (Pending Analysis)', className='text-center mt-5 mb-3')),
             dbc.Row([dbc.Col(self.pending_sample_table.get_panel(), className='col-12 border'), 
                      ], className='mx-auto'),
-            dbc.Row(html.H4(children = 'Processed Samples', className='text-center mt-5 mb-3')),
+            dbc.Row(html.H4(children = 'Processed Samples', className='text-center mt-5 mb-3')), 
             dbc.Row([dbc.Col(self.tile_sample_search_panel.get_panel(), className='col-12 border'), 
-                     ], className='mx-auto', style={'white-space': 'nowrap', 'overflow': 'hidden'}),        
+                     ], className='mx-auto', style={'zIndex': 100}),               
             dbc.Row([dbc.Col(self.processed_sample_table.get_panel(), className='col-12 border'), 
                      ], className='mx-auto mp-6', style={'padding-bottom': '80px'}),                   
         ], className='mx-auto col-10')

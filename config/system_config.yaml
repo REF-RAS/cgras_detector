@@ -9,6 +9,11 @@ cgras_detector:
   aux_web_host: 0.0.0.0
   aux_web_port: 8024
   aux_web_directory: /home/qcr/cgras_data/detector/data
+  # automation mode (whether the task execution is automated)
+  task_automation: False  
+  # default ros topics
+  ros_coordinator_state_topic: '/cgras/coordinator/state' 
+  ros_detector_state_topic: '/cgras/detector/state' 
   # timers for driving the system and refresh the GUI
   system_timer: 1  # seconds
   dashboard_timer: 1  # seconds
@@ -27,7 +32,9 @@ cgras_detector:
   reco_debug_images_at_original_scale: False
   reco_debug_feature_matching_images: True
   reco_feature_detector: brisk               # sift, orb, brisk, akaze
-  reco_matching_confidence_threshold: 0.4
+  reco_feature_matching_confidence_threshold: 1.0
+  reco_image_matching_min_confidence: 1.0
+  reco_image2d_matching_min_confidence: 1.0
   cod_model_filename: coral_object_detect_model.yaml 
   cod_debug_blob_images: True
   cod_blob_overlap_pix: 128

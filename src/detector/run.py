@@ -21,11 +21,11 @@ from std_msgs.msg import String, Header, Bool, Int8, Float32
 from tools.logging_tools import logger
 import tools.hash_tools as hash_tools
 from detector.web.dashapp_main import DashApplicationMain
-from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, PERSISTENT_STORE_DAO, SystemConfigNames, StatusNames, TaskTypes, CALLBACK_MANAGER, CallbackTypes
-from detector.model import CAPTURER_STATE, CapturerStates
+from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, AUTOMATED_TASK_EXECUTION, SystemConfigNames, TaskStatusNames, TaskTypes, SampleStatusNames, CALLBACK_MANAGER, CallbackTypes
+from detector.model import COORDINATOR_STATE, CoordinatorStates
 from detector.task_detection import DetectionTaskModel
 from detector.task_health import HealthEvaluateTaskModel
-from detector.models.detector_error import DetectorError, DetectorErrorCodes
+from detector.models.detector_error import DetectorError, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 
 # project modules: frame locator
 # from detector.tile_reconstruct.model import CapturedImage, TileReconstructInfo
@@ -42,12 +42,14 @@ class ApplicationCoordinator(object):
         rospy.on_shutdown(self.cb_shutdown)
         # model variables
         self.counter = 0
+        # operation mode
+        AUTOMATED_TASK_EXECUTION.set_value(bool(CONFIG.get(SystemConfigNames.TASK_AUTOMATION_MODE, False)))
+
         # ros topic names
-        self.state_pub_name = '/cgras/detector/state'
-        
-        self.ias_state_sub_name = '/cgras/capturer/state'   
+        self.state_pub_name = CONFIG.get(SystemConfigNames.ROS_DETECTOR_STATE_TOPIC, '/cgras/detector/state')
+        self.coordinator_state_sub_name = CONFIG.get(SystemConfigNames.ROS_COORDINATOR_STATE_TOPIC, '/cgras/coordinator/state')  
         # define the ros topic subscriptions and services
-        self.robot_state_sub = rospy.Subscriber(self.ias_state_sub_name, Int8, self.cb_capturer)
+        self.ias_state_sub = rospy.Subscriber(self.coordinator_state_sub_name, Int8, self.cb_coordinator)
         self.state_pub = rospy.Publisher(self.state_pub_name, Int8, queue_size=1, latch=True)
         # register the callbacks (using the dash callback instead of the ros callback due to threading issue during GUI update)
         CALLBACK_MANAGER.set_listener(CallbackTypes.TIMER, self._timer_callback)
@@ -77,31 +79,55 @@ class ApplicationCoordinator(object):
         self.work_to_stop = True
         time.sleep(2)
         sys.exit(0)
+        
+    def abort_current_task(self, sample_state=SampleStatusNames.ABORTED) -> bool:
+        the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
+        if the_detection_task:
+            logger.warning(f'The task to be aborted: {the_detection_task}')      
+            STATE.set_var('exception', DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received the abort command'))       
+            STATE.update_state(SystemStates.D_ABORTED, info=sample_state)
+            the_detection_task.abort_task()        
+            return True
+        else:
+            logger.warning(f'Abort Current Task Received: No current task')
+            return False
 
     def cb_shutdown(self):
         self.work_to_stop = True
         time.sleep(2)
         
-    def cb_capturer(self, msg:Int8):
-        CAPTURER_STATE.update(CapturerStates(msg.data))
-        
-    def pub_detector_state(self):
-        logger.info(f'pub {STATE.get_state()}')
-        self.state_pub.publish(Int8(STATE.get_state()))
+    def cb_coordinator(self, msg:Int8):
+        received_coordinator_state_value = msg.data
+        if received_coordinator_state_value < 0:
+            COORDINATOR_STATE.update(CoordinatorStates.ERROR)
+        elif received_coordinator_state_value > 20:
+            COORDINATOR_STATE.update(CoordinatorStates.UNSAFE)
+        else:
+            COORDINATOR_STATE.update(CoordinatorStates.SAFE)
+                
+        with self.state_lock:
+            if COORDINATOR_STATE.get_state() not in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
+                state = STATE.get_state()
+                if state in [SystemStates.DETECT]:
+                    the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
+                    if the_detection_task:
+                        the_detection_task.abort_task()
+                # switch the state to SUSPENDED to avoid task execution
+                STATE.update_state(SystemStates.SUSPENDED)
+                
+
+    def _pub_detector_state(self):
+        # logger.info(f'pub {STATE.get_state()}')
+        self.state_pub.publish(Int8(STATE.get_state().value))
 
     #  callback from the GUI console
     def _console_callback(self, event, *args):
-        with self.state_lock:
-            state = STATE.get()
-            if state in [SystemStates.D_INIT, SystemStates.D_RECO, SystemStates.D_LOCTILE, SystemStates.D_OBJECT, SystemStates.D_COLLECT_STAT]:
-                if event == CallbackTypes.PROCESS_TILE_TO_ABORT:
-                    the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
-                    logger.warning(f'ABORT CALLBACK: {the_detection_task}')
-                    if the_detection_task:
-                        STATE.update_state(SystemStates.D_ABORTED)
-                        the_detection_task.abort_task()
-                return
-                        
+        # no mutex lock is needed here
+        state = STATE.get()
+        if state in [SystemStates.DETECT]:
+            if event == CallbackTypes.PROCESS_TILE_TO_ABORT:
+                logger.warning(f'_console_callback: received ABORT callback')
+                self.abort_current_task(sample_state=SampleStatusNames.ABORTED)
 
     def _timer_callback(self, event, *args):
         with self.state_lock:
@@ -120,40 +146,40 @@ class ApplicationCoordinator(object):
                     STATE.update_state(SystemStates.POLL_DETECT)
    
     def _task_execute_mode_changed_callback(self, event, *args):
-        logger.warning(f'_task_execute_mode_changed_callback: {event}')
+        AUTOMATED_TASK_EXECUTION.set_value(bool(args[0]))
         with self.state_lock:
             state = STATE.get()
             # if STATE.time_lapsed_since_update() < 3.0:  # demo state change with an arbitrary 3 second period
             #     return
             # the state transition machine 
-            if state in [SystemStates.AUTO_START, SystemStates.CLICK_START]:
+            if state in [SystemStates.AUTO_START, SystemStates.POLL_DETECT, SystemStates.CLICK_START]:
                 STATE.update_state(SystemStates.READY)
             
                     
     def _work_thread_loop(self):
         while not self.work_to_stop:
-            self.pub_detector_state()
+            self._pub_detector_state()
             time.sleep(0.1)
             with self.state_lock:
                 try:
                     state = STATE.get()
                     # check lost connection to the capturer
-                    if CAPTURER_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CONNECTION_TIMEOUT, 60):
-                        CAPTURER_STATE.update(CapturerStates.UNKNOWN)
+                    if COORDINATOR_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CONNECTION_TIMEOUT, 60):
+                        COORDINATOR_STATE.update(CoordinatorStates.UNKNOWN)
                     
                     if state == SystemStates.READY:
                         STATE.del_var('tile_sample_id')
                         STATE.del_var('the_detection_task')
                         
-                        task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF)
-                        if task_execute_mode == PERSISTENT_STORE_DAO.AUTO_EXECUTE_ON:
+                        logger.info(f'Initial Task Automation Mode: {AUTOMATED_TASK_EXECUTION.value}')
+                        if AUTOMATED_TASK_EXECUTION.value:
                             STATE.update(SystemStates.AUTO_START)
                         else:
                             STATE.update(SystemStates.CLICK_START)
                     
                     elif state == SystemStates.AUTO_START:
                         time.sleep(1.0)
-                        if CAPTURER_STATE.get_state() in [CapturerStates.IDLE, CapturerStates.UNKNOWN]:
+                        if COORDINATOR_STATE.get_state() in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
                             STATE.update(SystemStates.POLL_DETECT)
                             
                     elif state == SystemStates.CLICK_START:
@@ -165,94 +191,67 @@ class ApplicationCoordinator(object):
                         # query for a tile sample pending processig 
                         # if the request is DETECT, query the next pending tile sample
                         self.next_tile_sample = DETECT_DAO.query_next_pending_tile_sample()
-                        # make sure the image acquisition system is idle or not alive
-                        if self.next_tile_sample is not None and \
-                                CAPTURER_STATE.get_state() in [CapturerStates.IDLE, CapturerStates.UNKNOWN]:
-                            try:
-                                STATE.set_var('tile_sample_id', self.next_tile_sample['id'])
-                                STATE.update_state(SystemStates.D_INIT)
-                            except Exception as e:
-                                logger.error(e)
-                                DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.FAILED.value)
-                                STATE.update_state(SystemStates.READY)
+                        if self.next_tile_sample is not None:
+                            STATE.set_var('tile_sample_id', self.next_tile_sample['id'])
+                            STATE.update_state(SystemStates.DETECT)
                         else:
                             STATE.update_state(SystemStates.READY)
 
-                    elif state == SystemStates.D_INIT:             
-                        time.sleep(1.0)
+                    elif state == SystemStates.DETECT:
+                        time.sleep(1.0)                    
                         try:
+                            # initialization
                             tile_sample_id = STATE.get_var('tile_sample_id')
                             the_detection_task = DetectionTaskModel(tile_sample_id)
-                            STATE.set_var('the_detection_task', the_detection_task)
-                            STATE.update_state(SystemStates.D_RECO)
-                        except DetectorError as e:
-                            STATE.set_var('exception', e)
-                            STATE.update_state(SystemStates.D_FAILED) 
-                      
-                    elif state == SystemStates.D_RECO:             
-                        time.sleep(1.0)
-                        try:
-                            the_detection_task = STATE.get_var('the_detection_task')
+                            STATE.set_var('the_detection_task', the_detection_task) 
+                            # reconstruction                           
+                            logger.warning(f'DETECT: execute_task_reco')
                             the_detection_task.execute_task_reco()
                             if STATE.is_state(SystemStates.D_ABORTED):
                                 continue
-                            STATE.update_state(SystemStates.D_LOCTILE)
-                        except DetectorError as e:
-                            STATE.set_var('exception', e)
-                            STATE.update_state(SystemStates.D_FAILED) 
-
-                    elif state == SystemStates.D_LOCTILE:             
-                        time.sleep(1.0)
-                        try:
-                            the_detection_task = STATE.get_var('the_detection_task')
+                            # locate tile frames
+                            logger.warning(f'DETECT: execute_task_loctile')
                             the_detection_task.execute_task_loctile()
                             if STATE.is_state(SystemStates.D_ABORTED):
                                 continue
-                            STATE.update_state(SystemStates.D_OBJECT)
-                        except DetectorError as e:
-                            STATE.set_var('exception', e)
-                            STATE.update_state(SystemStates.D_FAILED) 
-                            
-                    elif state == SystemStates.D_OBJECT:             
-                        time.sleep(1.0)
-                        try:
-                            the_detection_task = STATE.get_var('the_detection_task')
+                            # detect objects
+                            logger.warning(f'DETECT: execute_task_object_detection')
                             the_detection_task.execute_task_object_detection()
                             if STATE.is_state(SystemStates.D_ABORTED):
                                 continue
-                            STATE.update_state(SystemStates.D_COLLECT_STAT)
-                        except DetectorError as e:
-                            STATE.set_var('exception', e)
-                            STATE.update_state(SystemStates.D_FAILED) 
-
-                    elif state == SystemStates.D_COLLECT_STAT:             
-                        time.sleep(1.0)
-                        try:
-                            the_detection_task = STATE.get_var('the_detection_task')
+                            # collect and record statistics
                             the_detection_task.execute_task_record()
                             if STATE.is_state(SystemStates.D_ABORTED):
                                 continue
-                            STATE.update_state(SystemStates.D_UPDATE_HEALTH_INDEX)
-                        except DetectorError as e:
-                            STATE.set_var('exception', e)
-                            STATE.update_state(SystemStates.D_FAILED) 
-                                                                
-                    elif state == SystemStates.D_UPDATE_HEALTH_INDEX:             
-                        time.sleep(1.0)
-                        tile_sample_id = STATE.get_var('tile_sample_id')
-                        try:
-                            health_task_model = HealthEvaluateTaskModel()
-                            health_task_model.detect_stat_to_cache_tile_health(tile_id_list=[tile_sample_id])
-                            STATE.update_state(SystemStates.D_SUCCESS)  
-                        except Exception as e:
-                            STATE.update_state(SystemStates.D_FAILED) 
+                            # update health index (disabled)
+                            # health_task_model = HealthEvaluateTaskModel()
+                            # health_task_model.detect_stat_to_cache_tile_health(tile_id_list=[tile_sample_id])                            
+                            
+                            STATE.update_state(SystemStates.D_SUCCESS)
+                            
+                        except DetectorRejectError as e: 
+                            logger.warning(f'Detector FAILED (Reject): {e}')
+                            STATE.set_var('exception', e)  
+                            STATE.update_state(SystemStates.D_FAILED)
+
+                        except DetectorAbortError as e: 
+                            logger.warning(f'Detector ABORTED: {e}')
+                            STATE.set_var('exception', e) 
+                            STATE.update_state(SystemStates.D_ABORTED)  
+                            
+                        except OSError as e:
+                            logger.warning(f'OS Error: {e}')
+                            STATE.set_var('exception', e) 
+                            STATE.update_state(SystemStates.D_ABORTED)                                                               
                         
                     elif state == SystemStates.D_SUCCESS:
                         the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
                         if the_detection_task:
-                            DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.SUCCESS.value)
+                            DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.DONE.value)
                             DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, the_detection_task.get_tile_sample_id(), 
-                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.SUCCESS.value, None)
+                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), TaskStatusNames.SUCCESS.value, None)
+                        STATE.del_var('tile_sample_id')
+                        STATE.del_var('the_detection_task')
                         STATE.update_state(SystemStates.READY)   
 
                     elif state == SystemStates.D_FAILED:
@@ -260,23 +259,51 @@ class ApplicationCoordinator(object):
                         the_detection_task = STATE.get_var('the_detection_task')
                         exception:DetectorError = STATE.get_var('exception')
                         if the_detection_task and exception:
-                            previous_state = STATE.get_previous_state()
-                            DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.FAILED.value, exception.get_remarks())
+                            sub_progress_model = the_detection_task.get_progress()
+                            current_stage = sub_progress_model.get_current_stage()
+                            
+                            DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.REJECTED.value, exception.get_remarks())
                             DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, the_detection_task.get_tile_sample_id(), 
-                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.FAILED.value, f'Failed at {previous_state.name}')
-                            DETECT_DAO.set_error_flag(exception.get_id(), exception.get_remarks())
+                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), TaskStatusNames.FAILED.value, f'{DetectorErrorCodes(exception.get_code()).name}')
+                            error_remarks = f'{the_detection_task.get_tile_sample_id()} Failed at {current_stage} ({DetectorErrorCodes(exception.get_code()).name}): {exception.get_remarks()}'
+                            DETECT_DAO.set_error_flag(exception.get_code().value, error_remarks)
+                        STATE.del_var('tile_sample_id')
+                        STATE.del_var('the_detection_task')
+                        STATE.del_var('exception')
                         STATE.update_state(SystemStates.READY)    
                           
                     elif state == SystemStates.D_ABORTED:
-                        time.sleep(2.0)
                         the_detection_task = STATE.get_var('the_detection_task')
+                        exception:DetectorError = STATE.get_var('exception')
                         if the_detection_task:
-                            previous_state = STATE.get_previous_state()
-                            DETECT_DAO.update_tile_sample_status(tile_sample_id, StatusNames.ABORTED.value)
+                            sub_progress_model = the_detection_task.get_progress()
+                            current_stage = sub_progress_model.get_current_stage()
+                            if exception is None:
+                                error_remarks = f'{the_detection_task.get_tile_sample_id()} Aborted at {current_stage} ({DetectorErrorCodes(exception.get_code()).name}): Received the abort command'
+                                task_remarks = DetectorErrorCodes.ABORTED_BY_SYSTEM.name
+                            elif type(exception) == OSError:
+                                error_remarks = f'{the_detection_task.get_tile_sample_id()} Aborted at {current_stage} ({DetectorErrorCodes.FILE_IO_ERROR.name}): {exception}'
+                                task_remarks = DetectorErrorCodes.FILE_IO_ERROR.name
+                            else:
+                                error_remarks = f'{the_detection_task.get_tile_sample_id()} Aborted at {current_stage} ({DetectorErrorCodes(exception.get_code()).name}): {exception.get_remarks()}'
+                                task_remarks = DetectorErrorCodes.ABORTED_BY_SYSTEM.name
+                                DETECT_DAO.set_error_flag(exception.get_code().value, error_remarks) 
+                                
+                            DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.ABORTED.value)
                             DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, the_detection_task.get_tile_sample_id(), 
-                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), StatusNames.ABORTED.value, f'Aborted at {previous_state.name}')     
-                                                   
-                        STATE.update_state(SystemStates.READY)                                                           
+                                the_detection_task.get_start_time_iso8601(), int(the_detection_task.get_time_lapsed()), TaskStatusNames.ABORTED.value, task_remarks)   
+                            
+                                                         
+                        
+                        STATE.del_var('tile_sample_id')
+                        STATE.del_var('the_detection_task')
+                        STATE.del_var('exception')
+                        STATE.update_state(SystemStates.READY)    
+                    
+                    elif state == SystemStates.SUSPENDED:
+                        time.sleep(1.0)
+                        if COORDINATOR_STATE.get_state() in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
+                            STATE.update_state(SystemStates.READY)                                                     
                         
                 except Exception as e:
                     traceback.print_exc()

@@ -36,6 +36,10 @@ class CountScatterMapBlock():
         self.latest_graph = None
         self.class_options = None
         self.figures_list = []
+        # a fixed discrete color map
+        self.scatter_plot_discrete_colour_map = {} 
+        for i, cat in enumerate(ObjectClassCategories):
+            self.scatter_plot_discrete_colour_map[cat.name] = px.colors.qualitative.G10[i]
         # define widgets
         _sample_select_datatable = dash_table.DataTable(id=prefix+'sample_select_datatable', row_selectable=False, cell_selectable=True, style_cell={'fontSize': 14})
         self._panel = html.Div(id=prefix+'top_panel', children=[
@@ -87,7 +91,7 @@ class CountScatterMapBlock():
         detected_object_df = DETECT_DAO.query_detected_objects(tile_sample_id)
         detected_object_df['class_category'] = detected_object_df['class_category'].apply(lambda cell: ObjectClassCategories(cell).name)
         
-        fig = px.scatter(detected_object_df, x='centre_x', y='centre_y', color='class_category', width=480, height=520, title=title)
+        fig = px.scatter(detected_object_df, x='centre_x', y='centre_y', color='class_category', width=480, height=520, title=title, color_discrete_map=self.scatter_plot_discrete_colour_map)
         fig.update_layout(
                 margin=dict(l=5, r=5, t=60, b=5),
                 plot_bgcolor='rgba(64, 64, 64, 1)',

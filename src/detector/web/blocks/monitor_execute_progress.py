@@ -17,7 +17,7 @@ import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 # project modules
-from detector.model import STATE, CAPTURER_STATE, SystemStates, logger, CALLBACK_MANAGER, CallbackTypes
+from detector.model import STATE, COORDINATOR_STATE, SystemStates, logger, CALLBACK_MANAGER, CallbackTypes
 from detector.task_detection import DetectionTaskModel, ProgressStages
 
 class MonitorExecuteProgressBlock():
@@ -96,29 +96,33 @@ class MonitorExecuteProgressBlock():
                 progress_bar_style = {'visibility': 'visible'}
                 progress_label = f'Finding Corals on the Tile Sample of ID "{the_detection_task.get_tile_sample_id()}"'
                 progress_time = f'{int(the_detection_task.get_time_since_start())} sec'
+                
                 state:SystemStates = STATE.get()
-                if state == SystemStates.D_INIT:
-                    progress_message = 'Getting ready for the analysis of coral babies'
-                elif state == SystemStates.D_RECO:
-                    progress_message = 'Putting the photos of coral babies together into an album'
-                    progress = (2.5, 0, 0, 0)
-                elif state == SystemStates.D_LOCTILE:
-                    progress_message = 'Making sure the coral babies are within bounds'
-                    progress = (5, 0, 0, 0)
-                elif state == SystemStates.D_OBJECT:
+                if state == SystemStates.DETECT:
                     sub_progress_model = the_detection_task.get_progress()
-                    sub_progress = sub_progress_model.get_progress_at_stage(ProgressStages.OBJECT_DETECT)
-                    if sub_progress is not None and sub_progress[1] > 0:
-                        progress = (5, 5, int(sub_progress[0] / sub_progress[1] * 80), 0)
-                    else:
-                        progress = (5, 5, 0, 0)
-                    progress_message = f'Counting coral babies in a photo ({sub_progress[0]} of {sub_progress[1]})'
-                elif state == SystemStates.D_COLLECT_STAT:
-                    progress_message = f'Recording their data for reminisce when corals are grown up'
-                    progress = (5, 5, 80, 2)
-                elif state == SystemStates.D_UPDATE_HEALTH_INDEX:
-                    progress_message = f'Doing health checks on the coral babies'
-                    progress = (5, 5, 80, 5)
+                    current_stage = sub_progress_model.get_current_stage()
+                                     
+                    if current_stage == ProgressStages.INIT:
+                        progress_message = 'Getting ready for the analysis of coral babies'
+                    elif current_stage == ProgressStages.RECO:
+                        progress_message = 'Putting the photos of coral babies together into an album'
+                        progress = (2.5, 0, 0, 0)
+                    elif current_stage == ProgressStages.LOCTILE:
+                        progress_message = 'Making sure the coral babies are within bounds'
+                        progress = (5, 0, 0, 0)
+                    elif current_stage == ProgressStages.OBJECT_DETECT:
+                        sub_progress = sub_progress_model.get_progress_at_stage(ProgressStages.OBJECT_DETECT)   
+                        if sub_progress is not None and sub_progress[1] > 0:
+                            progress = (5, 5, int(sub_progress[0] / sub_progress[1] * 80), 0)
+                        else:
+                            progress = (5, 5, 0, 0)
+                        progress_message = f'Counting coral babies in a photo ({sub_progress[0]} of {sub_progress[1]})'
+                    elif current_stage == ProgressStages.COLLECT_STAT:
+                        progress_message = f'Recording data for reminisce after the corals are grown up'
+                        progress = (5, 5, 80, 2)
+                    # elif state == SystemStates.D_UPDATE_HEALTH_INDEX:
+                    #     progress_message = f'Doing health checks on the coral babies'
+                    #     progress = (5, 5, 80, 5)
                 elif state == SystemStates.D_ABORTED:
                     progress_bar_style = {'visibility': 'hidden'}
                     progress_message = f'The task has been aborted'

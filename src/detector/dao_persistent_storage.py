@@ -11,7 +11,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, datetime, time, shutil, numbers, yaml
+import os, datetime, time, shutil, numbers, yaml, json
 import pandas as pd
 from enum import Enum
 from datetime import datetime as dt
@@ -22,9 +22,9 @@ from tools.logging_tools import logger
 from detector.database_file import DBFile
 
 PERSISTENT_STORE_DDL = {
-    'persistent_store':
+    'general_config':
     """
-    CREATE TABLE IF NOT EXISTS persistent_store (
+    CREATE TABLE IF NOT EXISTS general_config (
         name text PRIMARY KEY,
         value text
     );
@@ -32,18 +32,20 @@ PERSISTENT_STORE_DDL = {
 }
 
 class PersistentStoreDAO:
-    CONFIG_TASK_EXECUTE_MODE = 'task_execute_mode'          # int type
-    CONFIG_TILES_IMPORT_ENABLED = 'tiles_import_enabled'    # bool type
     CONFIG_SELECTED_SEASON = 'selected_season'              # string type
     
-    AUTO_EXECUTE_OFF = 0
-    AUTO_EXECUTE_ON = 1
+    # AUTO_EXECUTE_OFF = 0
+    # AUTO_EXECUTE_ON = 1
     
     def __init__(self, db_file:str, **kwargs):
         self.db_file = db_file
 
     @synchronized
     def set_config_value(self, name:str, value):
+        try:
+            value = json.dumps(value)
+        except:
+            return None
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
             c.execute('REPLACE INTO general_config (name, value) VALUES (?, ?)', (name, value))
@@ -51,7 +53,7 @@ class PersistentStoreDAO:
         return name   
     
     @synchronized
-    def get_config_value(self, name:str, default=None, to_type=None):     
+    def get_config_value(self, name:str, default=None):     
         with db_tools.create_connection(self.db_file) as conn:       
             c = conn.cursor() 
             result = c.execute('SELECT value FROM general_config WHERE name = ?', (name,)).fetchone()
@@ -59,27 +61,21 @@ class PersistentStoreDAO:
                 return default
             value = result[0]
             try:
-                if to_type == int:
-                    return int(value)
-                elif to_type == float:
-                    return float(value)      
-                elif to_type == bool:
-                    return bool(value)               
+                value = json.loads(value)
             except Exception as ex:
                 return default
             return value
-        
-    def update_task_execute_mode(self, new_mode):
-        self.set_config_value(self.CONFIG_TASK_EXECUTE_MODE, new_mode)
     
-    def get_task_execute_mode(self, default=None) -> int:
-        return self.get_config_value(self.CONFIG_TASK_EXECUTE_MODE, default, to_type=int)
-    
-    def update_tiles_import_enabled(self, enabled:bool):
-        self.set_config_value(self.CONFIG_TILES_IMPORT_ENABLED, 'True' if enabled else '')
-    
-    def get_tiles_import_enabled(self, default=False) -> bool:
-        return self.get_config_value(self.CONFIG_TILES_IMPORT_ENABLED, default, to_type=bool)
+    @synchronized
+    def delele_config(self, name:str):
+        with db_tools.create_connection(self.db_file) as conn:
+            c = conn.cursor()
+            c.execute('DELETE FROM general_config WHERE NAME = ?', (name,))
+            conn.commit()        
+            
+    def list_config_all(self):
+        results = db_tools.query_for_list_of_dicts(self.db_file, 'SELECT * FROM general_config')        
+        return results
     
 # ------------------------------------------------
 def manage_tables():
@@ -92,7 +88,41 @@ def manage_tables():
     DETECT_DBFM.create_tables(['persistent_store'])
     DETECT_DBFM.dump_all_tables()       
 
+def test_persistent_store():
+    CGRAS_HOME = '/home/qcr/cgras_data'
+    DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
+    DETECT_DBFM = DBFile(DATABASE_FOLDER, 'detector.db', PERSISTENT_STORE_DDL)
+    PERSISTENT_STORE_DAO = PersistentStoreDAO(DETECT_DBFM.db_file)
+    PERSISTENT_STORE_DAO.set_config_value('test_a', True)
+    PERSISTENT_STORE_DAO.set_config_value('test_b', [True, False])
+    PERSISTENT_STORE_DAO.set_config_value('test_c', 1)
+    PERSISTENT_STORE_DAO.set_config_value('test_d', 'ABC')
+    PERSISTENT_STORE_DAO.set_config_value('test_e', 1.23)
+    PERSISTENT_STORE_DAO.set_config_value('test_f', {'ABC': 1.23})
+    results = PERSISTENT_STORE_DAO.list_config_all()
+    print(results)
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_a'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_b'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_c'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_d'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_e'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_f'), type(v))   
+    PERSISTENT_STORE_DAO.set_config_value('test_a', False)
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_a'), type(v))
+    PERSISTENT_STORE_DAO.delele_config('test_a')
+    PERSISTENT_STORE_DAO.delele_config('test_b')
+    PERSISTENT_STORE_DAO.delele_config('test_c')
+    results = PERSISTENT_STORE_DAO.list_config_all()
+    print(results)
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_a'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_b'), type(v))
+    print(v:=PERSISTENT_STORE_DAO.get_config_value('test_c'), type(v))   
+    PERSISTENT_STORE_DAO.delele_config('test_d')
+    PERSISTENT_STORE_DAO.delele_config('test_e')
+    PERSISTENT_STORE_DAO.delele_config('test_f')        
+
 # The main program for testing the clearing
 # of database tables and creating them
 if __name__ == '__main__':
-    manage_tables()
+    # manage_tables()
+    test_persistent_store()

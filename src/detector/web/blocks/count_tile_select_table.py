@@ -43,8 +43,8 @@ class CountTileSelectTable():
                          ]
         self._datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_header={}, fill_width=True, 
                                                 page_current=0, page_size=page_size, page_action='custom',
-                                                filter_action='custom', filter_query='', row_selectable='multi',
-                                                cell_selectable=False, row_deletable=False, style_cell={'fontSize': 14})
+                                                filter_action='custom', filter_query='', row_selectable=False,
+                                                cell_selectable=True, row_deletable=False, style_cell={'fontSize': 14}) 
 
         self.the_panel = html.Div([
                 html.H4([dbc.Badge('TILES IN THE SELECTED SEASON', color='white', text_color='secondary'), ]),
@@ -56,14 +56,23 @@ class CountTileSelectTable():
                 dcc.Store(id=self.row_selected_trigger_id),     
             ], id=prefix+'main_panel', style={'margin-top':'24px'})     
         
+        # self.app.callback([Output(self.row_selected_trigger_id, 'data'),
+        #                     Output(prefix+'datatable', 'style_data_conditional'),
+        #                     Output(prefix+'datatable', 'selected_rows', allow_duplicate=True)],
+        #     [Input(prefix+'datatable', 'selected_rows'),
+        #      State(self.prefix+'datatable', 'data'),
+        #      State(self.prefix+'datatable', 'page_current'),
+        #      State(self.prefix+'datatable', 'page_size'),
+        #      ], prevent_initial_call=True)(self._row_selected())
+        
         self.app.callback([Output(self.row_selected_trigger_id, 'data'),
-                            Output(prefix+'datatable', 'style_data_conditional'),
-                            Output(prefix+'datatable', 'selected_rows', allow_duplicate=True)],
-            [Input(prefix+'datatable', 'selected_rows'),
+                            Output(prefix+'datatable', 'selected_cells', allow_duplicate=True),
+                            Output(prefix+'datatable', 'active_cell', allow_duplicate=True),
+                            Output(prefix+'datatable', 'style_data_conditional', allow_duplicate=True),],
+            [Input(prefix+'datatable', 'active_cell'),
              State(self.prefix+'datatable', 'data'),
              State(self.prefix+'datatable', 'page_current'),
-             State(self.prefix+'datatable', 'page_size'),
-             ], prevent_initial_call=True)(self._row_selected())
+             State(self.prefix+'datatable', 'page_size'),], prevent_initial_call=True)(self._cb_cell_selected())        
     
         self.app.callback([Output(self.prefix+'datatable', 'data'),
                            Output(prefix+'datatable', 'selected_rows', allow_duplicate=True)],
@@ -167,20 +176,36 @@ class CountTileSelectTable():
             return (model.iloc[page_current * page_size:(page_current + 1) * page_size].to_dict('records'), [], )
         return update_datatable 
     
-    def _row_selected(self):
-        def row_selected(selected_rows, model, page_current, page_size):
-            if selected_rows is None:
-                return dash.no_update
-            if len(selected_rows) >= 2:
-                selected_rows.pop(0)   # assume that the new row is added to the end of the selected_row list
-            if len(selected_rows) == 1:
-                row = selected_rows[0]
-                tile_id = model[row]['tile_id']
-            else:
-                tile_id = None
+    # def _row_selected(self):
+    #     def row_selected(selected_rows, model, page_current, page_size):
+    #         if selected_rows is None:
+    #             return dash.no_update
+    #         if len(selected_rows) >= 2:
+    #             selected_rows.pop(0)   # assume that the new row is added to the end of the selected_row list
+    #         if len(selected_rows) == 1:
+    #             row = selected_rows[0]
+    #             tile_id = model[row]['tile_id']
+    #         else:
+    #             tile_id = None
+    #         style_data_conditional = [
+    #             {"if": {"filter_query": "{{tile_id}} = '{}'".format(model[i]['tile_id'])}, "backgroundColor": "yellow",}
+    #             for i in selected_rows
+    #         ]
+    #         return (tile_id, style_data_conditional, selected_rows,)
+    #     return row_selected
+
+    # callback when a cell in the table is clicked, which triggers a query after composing a query string and highlight the row
+    def _cb_cell_selected(self):
+        def cb_cell_selected(active_cell, model, page_current, page_size):
+            if active_cell is None:
+                raise PreventUpdate
+            row, tile_x = active_cell['row'], active_cell['column']
+            tile_id = model[row]['tile_id']
+            query_dict = {
+                'tile_id': tile_id,
+            }
             style_data_conditional = [
-                {"if": {"filter_query": "{{tile_id}} = '{}'".format(model[i]['tile_id'])}, "backgroundColor": "yellow",}
-                for i in selected_rows
+                {"if": {"filter_query": "{{tile_id}} = '{}'".format(tile_id)}, "backgroundColor": "yellow",}
             ]
-            return (tile_id, style_data_conditional, selected_rows,)
-        return row_selected
+            return (tile_id, [], None, style_data_conditional,)
+        return cb_cell_selected

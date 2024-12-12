@@ -8,7 +8,7 @@ batch_id: CG1-202410312300
 batch_time: 2024-10-31 23:00:00
 importer_id: YAML
 operator: luia2
-image_files_parent_folder: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_31-10-2024
+image_files_parent_folder: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031
 images:
   - x: 0
     y: 0

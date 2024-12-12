@@ -12,11 +12,14 @@ __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
 import os, sys
+from detector.database_file import DBFile
 from tools import db_tools
-from detector.model import APP_FILE_MANAGER
+from detector.model import APP_FILE_MANAGER, DETECT_DBFM
+import tools.db_tools
 
 COORDINATOR_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'coordinator.db')
-DETECT_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'detect.db')
+COORDINATOR_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'coordinator.db', {})
+DETECT_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'detector.db')
 
 
 # The function that supports interactive execution of sql statements 
@@ -26,6 +29,7 @@ def run_db():
         (E): Exit
         (1): COORDINATOR
         (2): DETECT
+        (3): Setup Database
         ''')
         command = input('Select DB: ')
         if command == 'E':
@@ -34,16 +38,25 @@ def run_db():
             db_file = COORDINATOR_DBFILE
         elif command == '2':
             db_file = DETECT_DBFILE
+        elif command == '3':
+            DETECT_DBFM.create_tables()
+            continue
 
         print(f'''
         (E): Exit
         (Q): Run Query
         (U): Run Update
         ''')
+
         command = input('Command: ')
         if command == 'E':
             sys.exit(0)
-        elif command == 'Q':
+        if db_file == DETECT_DBFILE:
+            table_names = DETECT_DBFM.list_tables_name()
+        else:
+            table_names = COORDINATOR_DBFM.list_tables_name()
+        print(f'Table names: {table_names}')
+        if command == 'Q':
             while True:
                 sql = input('Enter SQL: ')
                 if not sql: break

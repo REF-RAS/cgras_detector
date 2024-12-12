@@ -20,17 +20,19 @@ from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO
 
  
 class EnableTileSamplesImportBlock():
+    CONFIG_NAME = 'tiles_import_enabled'
     def __init__(self, app, prefix):
         self.app = app 
         self.prefix = prefix = prefix + 'etsi'
         # model variables
-        self.enable_import_new_samples_config = 'enable_import_new_samples'
-        self.enable_import_new_samples:bool = PERSISTENT_STORE_DAO.get_tiles_import_enabled(default=False)
+        
+        self.enable_import_new_samples:bool = PERSISTENT_STORE_DAO.get_config_value(EnableTileSamplesImportBlock.CONFIG_NAME, default=False)
         self.import_new_samples_options = [
                 {'label': 'Enabled', 'value': True},
                 {'label': 'Disabled', 'value': False},]
         # define widgets 
-        message_alert = dbc.Alert('', id=prefix+'message_alert', dismissable=True, is_open=False, className='col-12')
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
+                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
 
         import_new_samples_select = dcc.Dropdown(self.import_new_samples_options, value=self.enable_import_new_samples, id=prefix+'mode_dropdown', 
                                                 className='mx-auto col-8', searchable=False, clearable=False)
@@ -41,7 +43,7 @@ class EnableTileSamplesImportBlock():
                 html.P('Import Tile Samples from the Image Acquisition System', className='mx-auto col-8 fw-bold'),
                 html.Div([import_new_samples_select], className='mx-auto col-4'),
                 html.P('New tile sample', id=prefix+'new_tile_sample_status', className='mt-3'),               
-                message_alert,
+                self._toast,
             ], className='mx-auto text-center')
 
         self.app.callback([Output(prefix+'dummy', 'data')],
@@ -64,6 +66,6 @@ class EnableTileSamplesImportBlock():
     
     def _enable_import_tile_samples_toggle(self):
         def enable_import_tile_samples_toggle(enabled):
-            PERSISTENT_STORE_DAO.update_tiles_import_enabled(enabled)
+            PERSISTENT_STORE_DAO.set_config_value(EnableTileSamplesImportBlock.CONFIG_NAME, enabled)
             return (None,)
         return enable_import_tile_samples_toggle

@@ -15,7 +15,7 @@ import os, math, yaml, numbers, pickle
 from detector.models.reconstruct_tools import ImageMap, test_get_cgras_sample_images_as_list
 from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper, test_load_reco_model
 
-from detector.models import Constants, logger
+from detector.models import logger
 
 class LocateTileModel():
     """ LocateTileModel uses computer vision means to detect the 4 corners of tile frames so to enable transformation from reconstructed image space to the tile space
@@ -31,11 +31,16 @@ class LocateTileModel():
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
             return
+        self.images_2d_list = images_2d_list
+        self.params = kwargs
+        self.reco_model = reco_model
+    
+    def build(self):
         # model variables 
         self.tile_bbox = (0, 0, 21170, 8750)    # hardcode tile size frame bbox for testing  
         self.tile_bbox = (0, 0, 21740, 8764)    # hardcode tile size from the reconstructed image 
         # hard code
-        whole_reco_image_size = reco_model.get_whole_reco_image_size()
+        whole_reco_image_size = self.reco_model.get_whole_reco_image_size()
         self.tile_bbox = (0, 0, whole_reco_image_size[0], whole_reco_image_size[1])
      
     def map_bbox(self, bbox:tuple):

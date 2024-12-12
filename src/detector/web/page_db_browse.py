@@ -149,7 +149,7 @@ class DBTableBrowsePage():
             if not dbname:
                 raise PreventUpdate            
             try:
-                button_id = ctx.triggered_id if not None else 'No clicks yet'
+                button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
                 if button_id == 'db_query_button':
                     df = db_tools.query_paged(self.dao_map[dbname].db_file, sql, page_size, page_current * page_size)
                     if 'start_time' in df.columns:

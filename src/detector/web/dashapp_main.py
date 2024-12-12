@@ -86,7 +86,7 @@ class DashApplicationMain():
                         dbc.NavItem(dbc.NavLink('Monitor', href='/page_monitor')),
                         dbc.NavItem(dbc.NavLink('Sample', href='/page_sample_manager')), 
                         dbc.NavItem(dbc.NavLink('Count', href='/page_count_display')), 
-                        dbc.NavItem(dbc.NavLink('Health', href='/page_coral_health')), 
+                        # dbc.NavItem(dbc.NavLink('Health', href='/page_coral_health')), 
                         dbc.NavItem(dbc.NavLink('Model', href='/page_yolo_model')), 
                         dbc.NavItem(dbc.NavLink('System', href='/page_setup')),                                                 
                     ],
