@@ -10,7 +10,6 @@ __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
 import sys, random
-from tools import db_tools
 from detector.model import DETECT_DAO
 from detector.dao_detect import StatusNames, ObjectClassCategories
 

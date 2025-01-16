@@ -11,16 +11,15 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, datetime, time, shutil
+import os, datetime, time, shutil, contextlib
 from enum import Enum
 from datetime import datetime as dt
 # project modules
-import tools.db_tools as db_tools
-import tools.file_tools as file_tools
-from tools.lock_tools import synchronized
-from tools.logging_tools import logger
+import cgras_datatools.db_tools as db_tools
+import cgras_datatools.file_tools as file_tools
+from cgras_datatools.lock_tools import synchronized
+from cgras_datatools.logging_tools import logger
 
- 
 # This class is used by the database DBFile class to manage the backup of the database file
 # It makes daily backup file, and remove those older than a prescribed days, but keep some of those permanently following a cycle of days
 class BackupFileManager():
@@ -36,18 +35,25 @@ class BackupFileManager():
         self.daily_backup_keep_days = kwargs.get('daily_backup_keep_days', 7)   # days
         self.permanant_backup_cycle_days = kwargs.get('permanant_backup_cycle_days', 30)   # days
         # load the hidden record file
-        self.permanent_backup_list = []
-        self.permanent_backup_latest_dt = None
-        try:
+        self.permanant_backup_file_list = []
+        self.permanent_backup_dt_list = []
+        self.permanent_backup_dt_latest = None
+        with contextlib.suppress(Exception):
             with open(os.path.join(the_folder, self.RECORD_FILENAME)) as infile:
                 for line in infile:
-                    dt = datetime.datetime.strptime(line, self.DATE_FORMAT).date()
-                    self.permanent_backup_list.append(dt)
-                    if self.permanent_backup_latest_dt is None or dt > self.permanent_backup_latest_dt:
-                        self.permanent_backup_latest_dt = dt
-        except:
-            ...
-        
+                    line = line.strip()
+                    filename_parts = line.split('_')
+                    if len(filename_parts) < 2:
+                        continue
+                    if filename_parts[1] != the_file:
+                        self.permanant_backup_file_list.append(line)
+                        continue
+                    self.permanant_backup_file_list.append(line)
+                    dt = datetime.datetime.strptime(filename_parts[0], self.DATE_FORMAT).date()
+                    self.permanent_backup_dt_list.append(dt)
+                    if self.permanent_backup_dt_latest is None or dt > self.permanent_backup_dt_latest:
+                        self.permanent_backup_dt_latest = dt
+
         # make the daily backup
         self._make_daily_backup(self.the_folder, self.the_file)
         # remove the old backup files except those considered 
@@ -55,7 +61,7 @@ class BackupFileManager():
         # save the latest list of permanant backup to the file
         try:
             with open(os.path.join(the_folder, self.RECORD_FILENAME), 'w') as outfile:
-                for line in self.permanent_backup_list:
+                for line in self.permanant_backup_file_list:
                     outfile.write(f'{line}\n')
         except:
             ...
@@ -90,30 +96,34 @@ class BackupFileManager():
         backup_file_to_remove_latest = backup_file_to_remove_latest_dt = None
         # iterate through the backup files of the_file and sort the older than daily_backup_keep_days to a list and record the latest one
         for f in backup_files:
-            parts = f.split('_')
-            if len(parts) < 2:  # if the filename is not of the correct format, ignore
+            filename_parts = f.split('_')
+            if len(filename_parts) < 2:  # if the filename is not of the correct format, ignore
                 continue
+            if filename_parts[1] != the_file:
+                continue            
             # evaluate the date of the backup file and determine if it is older than daily_backup_keep_days 
-            try: 
-                f_dt = datetime.datetime.strptime(parts[0], self.DATE_FORMAT).date()
+            try:
+                f_dt = datetime.datetime.strptime(filename_parts[0], self.DATE_FORMAT).date()
                 f_days_old = (today_dt - f_dt).days
                 if f_days_old > self.daily_backup_keep_days:
-                    if f not in self.permanent_backup_list:         # ignore the file if it is a permanant backup file    
+                    if f not in self.permanant_backup_file_list:         # ignore the file if it is a permanant backup file    
                         backup_files_to_remove.append(f)
                         if backup_file_to_remove_latest is None or f_dt > backup_file_to_remove_latest_dt:
                             backup_file_to_remove_latest = f
                             backup_file_to_remove_latest_dt = f_dt
-            except:
+            except Exception as e:
                 continue
         # check if the latest one should be considered as a permanant backup
-        if backup_file_to_remove_latest is not None and (self.permanent_backup_latest_dt is None or (backup_file_to_remove_latest_dt - self.permanent_backup_latest_dt).days > self.permanant_backup_cycle_days):
+        if backup_file_to_remove_latest is not None and (self.permanent_backup_dt_latest is None or (backup_file_to_remove_latest_dt - self.permanent_backup_dt_latest).days > self.permanant_backup_cycle_days):
             backup_files_to_remove.remove(backup_file_to_remove_latest)
-            self.permanent_backup_list.append(backup_file_to_remove_latest)
-            self.permanent_backup_latest_dt = backup_file_to_remove_latest_dt
+            self.permanant_backup_file_list.append(backup_file_to_remove_latest)
+            self.permanent_backup_dt_list.append(backup_file_to_remove_latest_dt)
+            self.permanent_backup_dt_latest = backup_file_to_remove_latest_dt
         # remove the filtered backup files
         for f in backup_files_to_remove:
             try:
                 os.remove(os.path.join(the_folder, f))
+                logger.info(f'BackFileManager: removed backup file: {os.path.join(the_folder, f)}')
             except:
                 logger.warning(f'BackupFileManager unable to remove old backup file: {f}')
 

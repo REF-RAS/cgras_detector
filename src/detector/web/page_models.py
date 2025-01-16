@@ -15,7 +15,7 @@ from dash import html, dcc, callback, Input, Output, State, ctx, dash_table
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 from detector.web.blocks import YoloModelFileImportBlock, YoloModelTable, YoloModelRangeChartBlock, HealthModelFileImportBlock, HealthModelTable
 
 dash.register_page(__name__)

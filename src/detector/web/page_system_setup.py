@@ -15,7 +15,7 @@ from dash import html
 import dash_bootstrap_components as dbc
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 from detector.web.blocks import ResetDBBlock, DiskspaceBlock, FileSpaceSaver, ResetStatDBTableBlock
 
 dash.register_page(__name__)

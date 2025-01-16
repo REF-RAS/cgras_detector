@@ -18,13 +18,12 @@ from datetime import datetime
 import rospy, message_filters, actionlib, rospkg
 from std_msgs.msg import String, Header, Bool, Int8, Float32
 # project modules: web and generic
-from tools.logging_tools import logger
-import tools.hash_tools as hash_tools
+from cgras_datatools.logging_tools import logger
+import cgras_datatools.hash_tools as hash_tools
 from detector.web.dashapp_main import DashApplicationMain
 from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, AUTOMATED_TASK_EXECUTION, SystemConfigNames, TaskStatusNames, TaskTypes, SampleStatusNames, CALLBACK_MANAGER, CallbackTypes
 from detector.model import COORDINATOR_STATE, CoordinatorStates
 from detector.task_detection import DetectionTaskModel
-from detector.task_health import HealthEvaluateTaskModel
 from detector.models.detector_error import DetectorError, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 
 # project modules: frame locator
@@ -81,11 +80,10 @@ class ApplicationCoordinator(object):
         sys.exit(0)
         
     def abort_current_task(self, sample_state=SampleStatusNames.ABORTED) -> bool:
+        STATE.set_var('exception', DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received the abort command'))          
+        STATE.update_state(SystemStates.D_ABORTED, info=sample_state)
         the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
-        if the_detection_task:
-            logger.warning(f'The task to be aborted: {the_detection_task}')      
-            STATE.set_var('exception', DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received the abort command'))       
-            STATE.update_state(SystemStates.D_ABORTED, info=sample_state)
+        if the_detection_task:   
             the_detection_task.abort_task()        
             return True
         else:
@@ -132,6 +130,7 @@ class ApplicationCoordinator(object):
     def _timer_callback(self, event, *args):
         with self.state_lock:
             state = STATE.get()
+            logger.warning('timer callback')
             # if STATE.time_lapsed_since_update() < 3.0:  # demo state change with an arbitrary 3 second period
             #     return
             # the state transition machine 
@@ -204,6 +203,8 @@ class ApplicationCoordinator(object):
                             tile_sample_id = STATE.get_var('tile_sample_id')
                             the_detection_task = DetectionTaskModel(tile_sample_id)
                             STATE.set_var('the_detection_task', the_detection_task) 
+                            if STATE.is_state(SystemStates.D_ABORTED):
+                                continue
                             # reconstruction                           
                             logger.warning(f'DETECT: execute_task_reco')
                             the_detection_task.execute_task_reco()

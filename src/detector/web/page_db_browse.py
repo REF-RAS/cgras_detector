@@ -16,7 +16,7 @@ from dash import html, dcc, callback, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate 
 # project modules
-from tools import db_tools, type_tools
+from cgras_datatools import db_tools, type_tools
 from detector.model import DETECT_DAO
 
 dash.register_page(__name__)

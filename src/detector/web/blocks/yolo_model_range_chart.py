@@ -20,7 +20,7 @@ import plotly.graph_objects as go
 
 # project modules
 from dash.exceptions import PreventUpdate
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 from detector.model import DETECT_DAO, CONFIG, SystemConfigNames
 
 class YoloModelRangeChartBlock():

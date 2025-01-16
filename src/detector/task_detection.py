@@ -17,8 +17,8 @@ from time import strftime, localtime
 import numpy as np
 import pandas as pd
 
-from tools.lock_tools import synchronized
-from tools.file_tools import replace_suffix 
+from cgras_datatools.lock_tools import synchronized
+from cgras_datatools.file_tools import replace_suffix 
 from detector.models import logger, ModelsConfigNames, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
@@ -211,6 +211,9 @@ class DetectionTaskModel():
         
         if self.reco_model is None:
             self.reco_model = ImageReconstructModel(self.image_map_as_list, working_scale=0.1, **self.params) 
+            if self.to_abort:
+                self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
+                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
             self.reco_model.build()
             ImageReconstructModelHelper.to_yaml(self.reco_model, reco_model_file)
         self.progress_model.end_stage(ProgressStages.RECO)
@@ -227,6 +230,9 @@ class DetectionTaskModel():
             
         if self.loctile_model is None:
             self.loctile_model = LocateTileModel(self.image_map_as_list, reco_model=self.reco_model, **self.params)
+            if self.to_abort:
+                self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
+                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
             self.loctile_model.build()
             LocateTileModelHelper.to_yaml(self.loctile_model, loctile_model_file)
         self.progress_model.end_stage(ProgressStages.LOCTILE)
@@ -301,7 +307,11 @@ class DetectionTaskModel():
 
     def abort_task(self):
         self.to_abort = True
+        if self.reco_model is not None:
+            logger.warning(f'Task Detection: attempt to abort reco_model')
+            self.reco_model.abort()        
         if self.cod_model is not None:
+            logger.warning(f'Task Detection: attempt to abort cod_model')
             self.cod_model.abort()
     
     def generate_html_files(self):

@@ -33,8 +33,8 @@ cgras_detector:
   reco_debug_feature_matching_images: True
   reco_feature_detector: brisk               # sift, orb, brisk, akaze
   reco_feature_matching_confidence_threshold: 1.0
-  reco_image_matching_min_confidence: 1.0
-  reco_image2d_matching_min_confidence: 1.0
+  reco_image_matching_min_confidence: 0.6
+  reco_image2d_matching_min_confidence: 0.6
   cod_model_filename: coral_object_detect_model.yaml 
   cod_debug_blob_images: True
   cod_blob_overlap_pix: 128

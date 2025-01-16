@@ -16,9 +16,9 @@ import pandas as pd
 from enum import Enum
 from datetime import datetime as dt
 # project modules
-import tools.db_tools as db_tools
-from tools.lock_tools import synchronized
-from tools.logging_tools import logger
+import cgras_datatools.db_tools as db_tools
+from cgras_datatools.lock_tools import synchronized
+from cgras_datatools.logging_tools import logger
 from detector.database_file import DBFile
 
 PERSISTENT_STORE_DDL = {

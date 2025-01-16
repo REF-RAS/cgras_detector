@@ -18,7 +18,7 @@ from dash.dash_table.Format import Format, Group, Scheme
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 
 class HealthViewTable():
     def __init__(self, app, prefix, page_size=50):

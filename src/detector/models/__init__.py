@@ -12,7 +12,7 @@ __status__ = 'Development'
 import os, math, random, re
 from datetime import datetime
 from enum import Enum
-from tools.logging_tools import get_logger
+from cgras_datatools.logging_tools import get_logger
 from .models_config import ModelsConfigNames
 from .detector_error import DetectorError, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
 

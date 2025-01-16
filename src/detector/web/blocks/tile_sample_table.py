@@ -19,7 +19,7 @@ from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, CONFIG, SystemConfigNames
 from detector.dao_detect import SampleStatusNames
 from detector.task_detection import DetectionTaskModel
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 
 class TileSampleTable():
     def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_delete=False, allow_view=False):

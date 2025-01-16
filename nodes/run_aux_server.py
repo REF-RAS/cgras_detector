@@ -18,9 +18,8 @@ import socketserver
 import rospy
 
 from detector.model import CONFIG, SystemConfigNames
-from detector.run import ApplicationCoordinator
 
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 
 # callback function for shutdown
 def cb_shutdown():

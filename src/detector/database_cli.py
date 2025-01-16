@@ -13,9 +13,8 @@ __status__ = 'Development'
 
 import os, sys
 from detector.database_file import DBFile
-from tools import db_tools
+from cgras_datatools import db_tools
 from detector.model import APP_FILE_MANAGER, DETECT_DBFM
-import tools.db_tools
 
 COORDINATOR_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'coordinator.db')
 COORDINATOR_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'coordinator.db', {})

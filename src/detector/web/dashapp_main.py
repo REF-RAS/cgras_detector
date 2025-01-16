@@ -22,8 +22,8 @@ from flask import Flask
 # ros modules
 import rospy, message_filters
 # project modules
-from tools.logging_tools import logger
-import tools.hash_tools as hash_tools
+from cgras_datatools.logging_tools import logger
+import cgras_datatools.hash_tools as hash_tools
 import detector.model as model
 from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER
 from detector.web.dash import themes

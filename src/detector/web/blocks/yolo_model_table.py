@@ -18,7 +18,7 @@ import dash_bootstrap_components as dbc
 from dash.dash_table.Format import Format, Padding
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, CONFIG, SystemConfigNames
-from tools.logging_tools import logger
+from cgras_datatools.logging_tools import logger
 
 class YoloModelTable():
     def __init__(self, app, prefix):
