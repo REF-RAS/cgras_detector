@@ -60,6 +60,7 @@ class MonitorTaskControlBlock():
 
         self.app.callback([Output(prefix+'button_panel', 'style'),
                            Output(prefix+'button_panel_header', 'children'),
+                           Output(prefix+'button_panel_header', 'style'),
                            Output(prefix+'mode_message_1', 'children'),
                            Output({'type': prefix+'button', 'index': 'automate_switch'}, 'children'),
                            Output({'type': prefix+'button', 'index': 'automate_switch'}, 'disabled'),
@@ -121,6 +122,7 @@ class MonitorTaskControlBlock():
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: SUSPENDED',
+                    {'color', 'red'},
                     'System suspended due to the execution of an image acquisition program',
                     '',
                     True, True, True,
@@ -129,6 +131,7 @@ class MonitorTaskControlBlock():
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: MANUAL',
+                    {'color', 'dark blue'},
                     'Execute a task manually by clicking on a button below',
                     'Switch to Automated Execution',
                     False, False, False,
@@ -137,6 +140,7 @@ class MonitorTaskControlBlock():
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: MANUAL',
+                    {'color', 'dark blue'},
                     'The buttons are enabled after the current task is completed or aborted',
                     'Switch to Automated Execution',
                     False, True, True,
@@ -145,6 +149,7 @@ class MonitorTaskControlBlock():
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: AUTOMATED',
+                    {'color', 'dark green'},
                     'Automated execution of tile sample processing and new tile sample import',
                     'Switch to Manual Execution',
                     False, True, True,

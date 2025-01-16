@@ -98,17 +98,17 @@ class MonitorExecuteProgressBlock():
                 progress_time = f'{int(the_detection_task.get_time_since_start())} sec'
                 
                 state:SystemStates = STATE.get()
-                if state == SystemStates.DETECT:
+                if state in [SystemStates.DETECT, SystemStates.WAIT_DETECT]:
                     sub_progress_model = the_detection_task.get_progress()
                     current_stage = sub_progress_model.get_current_stage()
                                      
                     if current_stage == ProgressStages.INIT:
                         progress_message = 'Getting ready for the analysis of coral babies'
                     elif current_stage == ProgressStages.RECO:
-                        progress_message = 'Putting the photos of coral babies together into an album'
+                        progress_message = 'Putting together images of coral babies into an album'
                         progress = (2.5, 0, 0, 0)
                     elif current_stage == ProgressStages.LOCTILE:
-                        progress_message = 'Making sure the coral babies are within bounds'
+                        progress_message = 'Making sure the coral babies are staying within bounds'
                         progress = (5, 0, 0, 0)
                     elif current_stage == ProgressStages.OBJECT_DETECT:
                         sub_progress = sub_progress_model.get_progress_at_stage(ProgressStages.OBJECT_DETECT)   
@@ -116,9 +116,9 @@ class MonitorExecuteProgressBlock():
                             progress = (5, 5, int(sub_progress[0] / sub_progress[1] * 80), 0)
                         else:
                             progress = (5, 5, 0, 0)
-                        progress_message = f'Counting coral babies in a photo ({sub_progress[0]} of {sub_progress[1]})'
+                        progress_message = f'Counting coral babies in images ({sub_progress[0]} of {sub_progress[1]})'
                     elif current_stage == ProgressStages.COLLECT_STAT:
-                        progress_message = f'Recording data for reminisce after the corals are grown up'
+                        progress_message = f'Saving data for bittersweet reminiscence when the corals are populating the reef'
                         progress = (5, 5, 80, 2)
                     # elif state == SystemStates.D_UPDATE_HEALTH_INDEX:
                     #     progress_message = f'Doing health checks on the coral babies'

@@ -10,6 +10,7 @@ __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
 import os, sys, threading, math, time
+from cgras_datatools.logging_tools import logger
 
 # --------------------------------------------
 # The class models callbacks and manages

@@ -25,7 +25,7 @@ import rospy, message_filters
 from cgras_datatools.logging_tools import logger
 import cgras_datatools.hash_tools as hash_tools
 import detector.model as model
-from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER
+from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER, CALLBACK_MANAGER, CallbackTypes
 from detector.web.dash import themes
 # from dash_bootstrap_components import themes
 
@@ -168,7 +168,7 @@ class DashApplicationMain():
     # -- dash callback for system interval timer
     def _dash_system_timer(self):
         def dash_system_timer(n, pathname):
-            # model.CALLBACK_MANAGER.fire_event(model.CallbackTypes.TIMER)
+            model.CALLBACK_MANAGER.fire_event(model.CallbackTypes.TIMER)
             return (n,)
         return dash_system_timer 
     

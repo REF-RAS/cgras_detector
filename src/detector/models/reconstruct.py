@@ -45,6 +45,10 @@ class ImageReconstructModel():
         :param images_2d_list: A list of lists of images, each of which can be image paths (str typed) or image pixels (np.ndarray), arranged in a 2D grid
         :type images_2d_list: list
         """
+        # control parameter
+        self.to_abort = False
+        # model parameter
+        self.reco_2d_model = None
         # obtain the logger
         self.logger = kwargs.get('logger', get_logger())
         # ignore the constructor if the object is loaded from yaml file and simply return
@@ -58,11 +62,7 @@ class ImageReconstructModel():
             self.logger.error(f'System configuration parameter working scale is beyond valid range between 0.01 and 1.00: {self.working_scale}')
             raise AssertionError(f'System configuration parameter working scale is beyond valid range between 0.01 and 1.00: {self.working_scale}')
         self.scaling_factor = 1 / self.working_scale                                 # the scaling factor to restore locations at the original scale
-        # model parameter
-        self.reco_2d_model = None
-        # control parameter
-        self.to_abort = False
-        
+
     def build(self):
         # build the model
         self.logger.info(f'ImageReconstructModel working_scale: {self.working_scale}')
@@ -108,7 +108,7 @@ class ImageReconstructModel():
         """ abort the current reconstruction process """
         self.to_abort = True
         self.logger.warning(f'ImageReconstructModel: received ABORT signal')
-        if self.reco_2d_model is not None:
+        if hasattr(self, 'reco_2d_model') and self.reco_2d_model is not None:
             self.reco_2d_model.abort()
 
     def map_bbox(self, col_index:int, row_index:int, bbox, use_working_scale=False):

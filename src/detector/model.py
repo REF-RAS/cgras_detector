@@ -43,6 +43,7 @@ class SystemStates(Enum):
     CLICK_START = 2
     POLL_DETECT = 3
     DETECT = 10
+    WAIT_DETECT = 11
     D_SUCCESS = 17
     D_FAILED = 18
     D_ABORTED = 19

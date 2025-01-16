@@ -25,7 +25,8 @@ class MonitorStateBlock():
         self.prefix = prefix = prefix + 'msb'
         self.update_store_id = prefix + 'update_store'
         # model variables
-        self.message = ''
+        self.banner_message = ''
+        self.current_detect_message = None
         # define widgets 
         self._panel = dbc.Col([
                 html.H4(dbc.Badge('SYSTEM MONITOR', className='ms-2 mb-4', color='white', text_color='secondary')),
@@ -87,21 +88,31 @@ class MonitorStateBlock():
             cpu_percent = psutil.cpu_percent()
             mem_percent = psutil.virtual_memory().percent        
             if state in [SystemStates.READY, SystemStates.AUTO_START, SystemStates.CLICK_START]:
+                self.current_detect_message = None
                 if previous_state not in [SystemStates.READY, SystemStates.AUTO_START, SystemStates.CLICK_START] or random.random() < 0.2:
-                    self.message = [
+                    self.banner_message = [
                         'I am consuming electricity but there is no coral babies to look after. Can you feel my guilt?',
                         'I am wasting my talent here. Got nothing to do. I should be nursing coral babies. ',
                         'I turn into a couch potato. Is it my destiny?'
                     ][random.randrange(0, 3)]
             elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE]:
                 if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE] or random.random() < 0.2:
-                    self.message = [
+                    self.banner_message = [
                         'I just asked my supervisor for more coral larvae but got nothing. I am feeling insecure.',
                         'No new coral again! Should I look elsewhere for coral babies?',
                         'Can we make corals more productive? '
                     ][random.randrange(0, 3)]
+            elif state in [SystemStates.SUSPENDED]:
+                self.current_detect_message = None
+                self.banner_message = 'I am on leave now as the system is suspended. Ping me if you want but I am not reading messages.'
             else:
-                self.message = 'Leave me alone. I am keeping large and small corals happy.'
+                if self.current_detect_message is None:
+                    self.current_detect_message = [
+                        'Leave me alone. I am working hard to keep large and small corals happy in the playpen.',
+                        'The corals are too noisy. No more bandwidth to entertain you.',
+                        'Shhh! The corals are sleeping and I am counting their tentacles.'
+                    ][random.randrange(0, 3)]
+                self.banner_message = self.current_detect_message
             return (state.name, capturer_state.name, cpu_percent, f'{cpu_percent} %', mem_percent, f'{mem_percent} %', 
-                    self.message,)
+                    self.banner_message,)
         return update_content 

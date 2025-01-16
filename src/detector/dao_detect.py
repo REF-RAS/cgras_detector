@@ -491,7 +491,7 @@ class DetectorDAO():
         if the_period != 0:
             sql += ' AND create_time >= DATE("now", ?)'
             param_list.append(f'{the_period} days')
-        sql += ' ORDER BY priority DESC'
+        sql += ' ORDER BY modify_time DESC, priority DESC'
         if type(limit) == int:
             sql += ' LIMIT ?'
             param_list.append(limit)
