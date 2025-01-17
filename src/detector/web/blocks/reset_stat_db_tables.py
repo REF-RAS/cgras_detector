@@ -24,8 +24,8 @@ class ResetStatDBTableBlock():
         self.button_pressed_store_id = prefix+'button_id_store'
 
         # define a toast for feedback  
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define the modal for confirmation of user actions
         self._user_confirm_modal = dbc.Modal([
                     dbc.ModalHeader(dbc.ModalTitle('Clear Statistics', id=prefix+'confirm_modal_title')),
@@ -75,7 +75,7 @@ class ResetStatDBTableBlock():
             button_index = button_id.get('index', None)
             if button_index.endswith('confirm'):
                 # TODO: uncomment it later
-                # DETECT_DAO.clear_all_task_records() 
+                DETECT_DAO.clear_all_task_records() 
                 message = 'The task records statistics have been cleared'
                 return (False, True, message,)
             else:

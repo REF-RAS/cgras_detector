@@ -24,7 +24,7 @@ class HealthModelFileImportBlock():
         prefix = prefix + 'hmfi_'
         self.import_success_trigger_id = prefix + 'import_success'
         # --- define widgets
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
                                 style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define tile sample spec import panel
         self.file_upload_area = dcc.Upload(id=prefix+'file_import_area', children=html.Div([
@@ -111,12 +111,15 @@ class HealthModelFileImportBlock():
         def file_import_received(contents, filename, last_modified):       
             uploaded = {'contents': contents, 'filename': filename, 'last_modified': last_modified}
             content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
-            is_valid, model = DETECT_DAO.validate_health_model_file_import(yaml_data)
-            if not is_valid:
-                message = 'One or more problems have been found in the tile sample spec yaml file.'
-                return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
-            else:
-                return (True, 'Confirm to import this health index model specification', model.to_dict('records'), None, {'display': 'block'}, yaml_data, None, None,) 
+            try:
+                decoded = base64.b64decode(content_string)
+                yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
+                is_valid, model = DETECT_DAO.validate_health_model_file_import(yaml_data)
+                if not is_valid:
+                    message = 'One or more problems have been found in the tile sample spec yaml file.'
+                    return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
+                else:
+                    return (True, 'Confirm to import this health index model specification', model.to_dict('records'), None, {'display': 'block'}, yaml_data, None, None,) 
+            except:
+                return (True, 'Unrecognized import file format', None, None, {'display': 'none'}, None, None, None,) 
         return file_import_received 

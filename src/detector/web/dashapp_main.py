@@ -61,7 +61,7 @@ class DashApplicationMain():
         self.flask_server = self.app.server
         self.dash_thread = None
         # define the pages
-        self._dashboard_page = page_dashboard.DashboardPage(self.app, CONFIG.get(SystemConfigNames.DASHBOARD_TIMER, 1))
+        self._dashboard_page = page_dashboard.DashboardPage(self.app, CONFIG.get(SystemConfigNames.DASHBOARD_REFRESH_CYCLES, 1))
         self._setup_page = page_system_setup.AdminSetupPage(self.app)
         self._db_browse_page = page_db_browse.DBTableBrowsePage(self.app)   
         self._sample_manager_page = page_sample_manager.SampleManagerPage(self.app)     
@@ -168,7 +168,7 @@ class DashApplicationMain():
     # -- dash callback for system interval timer
     def _dash_system_timer(self):
         def dash_system_timer(n, pathname):
-            model.CALLBACK_MANAGER.fire_event(model.CallbackTypes.TIMER)
+            model.CALLBACK_MANAGER.fire_event(model.CallbackTypes.TIMER, n)
             return (n,)
         return dash_system_timer 
     

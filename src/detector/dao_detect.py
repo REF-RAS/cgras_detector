@@ -11,7 +11,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, datetime, time, shutil, numbers, yaml
+import os, datetime, time, shutil, numbers, yaml, traceback
 import pandas as pd
 from enum import Enum
 from datetime import datetime as dt
@@ -23,6 +23,7 @@ from cgras_datatools.logging_tools import logger
 from detector.database_file import DBFile
 
 # NOTE: The batch_time is an ISO 8601 date time string format '2025-05-29 14:16:00' and the batch_id is derived from the time and cgras_station_id or the importer_id
+# NOTE: The date/time is recorded in localtime instead of the usual GMT because the system is not an Internet application and the data is considered locally
 
 # the DDL for creating tables in the detect.db
 DETECT_DDL = {
@@ -59,7 +60,8 @@ DETECT_DDL = {
         tile_sample_id text, 
         capture_x integer,
         capture_y integer,
-        file_path text,       
+        file_path text,     
+        metadata text,  
         UNIQUE (capture_id),
         CONSTRAINT fk_tile_sample_id
             FOREIGN KEY (tile_sample_id) REFERENCES tile_sample (id) ON DELETE CASCADE
@@ -167,10 +169,12 @@ DETECT_DDL = {
     'error_flag':
     """
     CREATE TABLE IF NOT EXISTS error_flag (
-        id integer PRIMARY KEY,
+        id integer,
+        object text,
         level integer DEFAULT 0,
         update_time text,
-        remarks text
+        remarks text,
+        PRIMARY KEY (id, object)
     );
     """,    
 }
@@ -193,14 +197,14 @@ class TaskStatusNames(Enum):
     PENDING = 0
     SUCCESS = 1
     FAILED = 2
-    ABORTED = 3
+    SOFT_FAILED = 3
     REJECTED = 4
     
 class SampleStatusNames(Enum):
     UNKNOWN = -1
     QUEUED = 0
     DONE = 1
-    ABORTED = 2  # ABORTED may be due to interrupted by user or by a recoverable error (not from the data itself) such as no suitable YOLO model
+    FLAGGED = 2  # ABORTED may be due to interrupted by user or by a recoverable error (not from the data itself) such as no suitable YOLO model
     REJECTED = 4  # REJECTED may be due to rejected by user or rejected by the system if a non-recoverable error is found in the input data
 
 class CoralObject():
@@ -292,7 +296,7 @@ class DetectorDAO():
     # a function to compute the id of a tile_sample given its tile_id and the batch_id
     @staticmethod
     def compute_tile_sample_id(tile_id:str, batch_id:str) -> str:
-        tile_sample_id = f'{tile_id}-{batch_id}'
+        tile_sample_id = f'{tile_id}_{batch_id}'
         return tile_sample_id
     
     # add a record to the tile_sample table, with species normalized to lower case
@@ -300,7 +304,7 @@ class DetectorDAO():
     def add_tile_sample(self, tile_id:str, batch_id:str, batch_time:str, age:int, species:str, season:str, tab_ncols:int, tab_nrows:int, settle_time:str, spawn_time:str='', importer_id:str='', operator:str='', 
                         status:int=SampleStatusNames.QUEUED.value):
         sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now"), DATETIME("now"), DATETIME("now"))'
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
         tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
         return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status))
     
@@ -434,9 +438,9 @@ class DetectorDAO():
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
             if remarks is None:
-                c.execute('UPDATE tile_sample SET status = ?, modify_time = DATETIME("now") WHERE id = ?', (status, tile_sample_id,))
+                c.execute('UPDATE tile_sample SET status = ?, modify_time = DATETIME("now", "localtime") WHERE id = ?', (status, tile_sample_id,))
             else:
-                c.execute('UPDATE tile_sample SET status = ?, remarks = ?, modify_time = DATETIME("now") WHERE id = ?', (status, remarks, tile_sample_id,))
+                c.execute('UPDATE tile_sample SET status = ?, remarks = ?, modify_time = DATETIME("now", "localtime") WHERE id = ?', (status, remarks, tile_sample_id,))
             return True  
         
     @synchronized
@@ -499,12 +503,12 @@ class DetectorDAO():
     
     # - table: source_image
     @synchronized
-    def add_source_image(self, capture_id:str, tile_sample_id:str, capture_x:int, capture_y:int, file_path:str) -> int:
+    def add_source_image(self, capture_id:str, tile_sample_id:str, capture_x:int, capture_y:int, file_path:str, metadata=None) -> int:
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO source_image (capture_id, tile_sample_id, capture_x, capture_y, file_path) '
-                      'VALUES (?, ?, ?, ?, ?)', 
-                      (capture_id, tile_sample_id, capture_x, capture_y, file_path,))
+            c.execute('INSERT INTO source_image (capture_id, tile_sample_id, capture_x, capture_y, file_path, metadata) '
+                      'VALUES (?, ?, ?, ?, ?, ?)', 
+                      (capture_id, tile_sample_id, capture_x, capture_y, file_path, metadata,))
             conn.commit()
             id = c.lastrowid
         return id
@@ -521,24 +525,26 @@ class DetectorDAO():
     
     # composite operation: validate yaml file for a new tile sample
     @synchronized
-    def validate_tile_sample_import(self, yaml_data:dict):
+    def validate_tile_sample_import(self, tile_sample_data:dict):
         error_list = []
         # load and validate the data in the yaml config file which has been converted to a YamlConfig object
-        tile_id = yaml_data.get('tile_id', None)
-        batch_id = yaml_data.get('batch_id', None)
-        batch_time = yaml_data.get('batch_time', None)
-        species = yaml_data.get('species', None)
-        season = yaml_data.get('season', None)
-        settle_time = yaml_data.get('settle_time', None)
-        num_tabs = yaml_data.get('num_tabs', None)
-        importer_id = yaml_data.get('importer_id', 'Unknown')
-        operator = yaml_data.get('operator', 'Unknown') 
+        tile_id = tile_sample_data.get('tile_id', None)
+        batch_id = tile_sample_data.get('batch_id', None)
+        batch_time = tile_sample_data.get('batch_time', None)
+        species = tile_sample_data.get('species', None)
+        season = tile_sample_data.get('season', None)
+        settle_time = tile_sample_data.get('settle_time', None)
+        num_tabs = tile_sample_data.get('num_tabs', None)
+        importer_id = tile_sample_data.get('importer_id', 'Unknown')
+        operator = tile_sample_data.get('operator', 'Unknown') 
         images_dict = dict()
-        image_files_parent_folder = yaml_data.get('image_files_parent_folder', None)
-        yaml_images_list = yaml_data.get('images', None)
+        image_files_parent_folder = tile_sample_data.get('image_files_parent_folder', None)
+        yaml_images_list = tile_sample_data.get('images', None)
         # validate the first tier data
         if tile_id is None or batch_id is None or yaml_images_list is None:
             error_list.append(f'One of the mandatory fields (tile_id, batch_id, and images) is missing in the yaml file')
+        if batch_time is None:
+            error_list.append(f'One of the mandatory fields (batch_time) is missing in the yaml file')            
         if species is None or season is None or settle_time is None:
             error_list.append(f'One of the mandatory fields (species, season, settle_time) is missing in the yaml file')       
         if num_tabs is None or type(num_tabs) not in (list, tuple) or len(num_tabs) != 2 or not all(n > 0 and isinstance(n, numbers.Number) for n in num_tabs):
@@ -567,17 +573,23 @@ class DetectorDAO():
             error_list.append(f'Some image index (x, y) is missing: the indices are expected to span from (0, 0) to ({max_x, max_y})')
         # start adding image data to list of lists
         if self.exist_tile_sample(tile_id, batch_id):
-            error_list.append(f'The (tile_id={tile_id}, batch_id={batch_id}) pair already exists)')
+            error_list.append(f'The tile_sample (tile_id={tile_id}, batch_id={batch_id}) exists in the system (previously imported))')
         for index_y in range(max_y + 1):    
             for index_x in range(max_x + 1): 
                 if (index_x, index_y) not in images_dict:
                     error_list.append(f'The image index ({index_x, index_y}) is missing from the images list') 
+        # add age to the yaml import file
+        try:
+            tile_sample_data['age'] = (pd.to_datetime(tile_sample_data['batch_time']) - pd.to_datetime(tile_sample_data['settle_time'])).days
+        except:
+            error_list.append(f'One of the parameters (batch_time, settle_time) is an invalid datetime format ({tile_sample_data["batch_time"]}, {tile_sample_data["settle_time"]})')
         if error_list:
             model = pd.DataFrame(columns=('#', 'Errors'))
             for index, error in enumerate(error_list):
                 model.loc[index + 1] = [index, error]
             return False, model
         else:
+            # generate a model for display
             model = pd.DataFrame(columns=('Parameters', 'Values'))
             model.loc[1] = ['tile_id', tile_id]
             model.loc[2] = ['batch_id', batch_id]
@@ -590,36 +602,40 @@ class DetectorDAO():
                 
     # composite operation: import yaml file for a new tile sample
     @synchronized
-    def import_tile_sample_yaml(self, yaml_data:dict) -> bool:
+    def import_tile_sample_yaml(self, tile_sample_data:dict) -> bool:
         error_list = []
         # load and validate the data in the yaml config file which has been converted to a YamlConfig object
-        tile_id = yaml_data.get('tile_id', None)
-        batch_id = yaml_data.get('batch_id', None)
-        batch_time = yaml_data.get('batch_time', None)
-        age = yaml_data.get('age', -1)
-        species = yaml_data.get('species').lower()
+        tile_id = tile_sample_data.get('tile_id', None)
+        batch_id = tile_sample_data.get('batch_id', None)
+        batch_time = tile_sample_data.get('batch_time', None)
+        age = tile_sample_data.get('age', -1)
+        species = tile_sample_data.get('species').lower()
         
-        season = yaml_data.get('season', None)
-        settle_time = yaml_data.get('settle_time', None)
-        num_tabs = yaml_data.get('num_tabs', None)
-        spawn_time = yaml_data.get('spawn_time', None)
-        importer_id = yaml_data.get('importer_id', 'Unknown')
-        operator = yaml_data.get('operator', 'Unknown') 
-        image_files_parent_folder = yaml_data.get('image_files_parent_folder', None)
-        yaml_images_list = yaml_data.get('images', None)
+        season = tile_sample_data.get('season', None)
+        settle_time = tile_sample_data.get('settle_time', None)
+        num_tabs = tile_sample_data.get('num_tabs', None)
+        spawn_time = tile_sample_data.get('spawn_time', None)
+        importer_id = tile_sample_data.get('importer_id', 'Unknown')
+        operator = tile_sample_data.get('operator', 'Unknown') 
+        image_files_parent_folder = tile_sample_data.get('image_files_parent_folder', None)
+        tile_images_list = tile_sample_data.get('images', None)
         try:
             tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
             self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator)
             self.delete_source_images_of_tile_sample(tile_sample_id)
-            for index, yaml_images in enumerate(yaml_images_list):
-                x, y = yaml_images.get('x', None), yaml_images.get('y', None)
-                filepath = yaml_images.get('file', None)
+            for index, tile_image in enumerate(tile_images_list):
+                x, y = tile_image.get('x', None), tile_image.get('y', None)
+                filepath = tile_image.get('file', None)
+                # metadata in yaml string format
+                metadata = tile_image.get('metadata', {}) # dump an empty dictionary as default
+                metadata_yaml = yaml.dump(metadata, Dumper=yaml.Dumper)
                 if image_files_parent_folder is not None:
                     filepath = os.path.join(image_files_parent_folder, filepath)
-                capture_id = yaml_images.get('capture_id', f'{tile_sample_id}-{x}-{y}')
-                self.add_source_image(capture_id, tile_sample_id, x, y, filepath)
+                capture_id = tile_image.get('capture_id', f'{tile_sample_id}-{x}-{y}')
+                self.add_source_image(capture_id, tile_sample_id, x, y, filepath, metadata_yaml)
             return True
         except Exception as e:
+            traceback.print_exc()
             logger.warning(e)
             return False
         
@@ -718,24 +734,24 @@ class DetectorDAO():
 
     # composite operation: validate yaml file for a new yolo model
     @synchronized
-    def validate_yolo_model_file_import(self, yaml_data:dict) -> tuple:
+    def validate_yolo_model_file_import(self, yolo_spec_data:dict) -> tuple:
         error_list = []
         # load and validate the data in the yaml config file which has been converted to a YamlConfig object
-        name = yaml_data.get('name', None)
-        file = yaml_data.get('file', None)
-        species = yaml_data.get('species', None)
-        valid_start_day = yaml_data.get('valid_start_day', None)
-        valid_end_day = yaml_data.get('valid_end_day', None)
+        name = yolo_spec_data.get('name', None)
+        file = yolo_spec_data.get('file', None)
+        species = yolo_spec_data.get('species', None)
+        valid_start_day = yolo_spec_data.get('valid_start_day', None)
+        valid_end_day = yolo_spec_data.get('valid_end_day', None)
         if valid_start_day is None or not isinstance(valid_start_day, numbers.Number):
-            valid_start_day = yaml_data['valid_end_day'] = 0
+            valid_start_day = yolo_spec_data['valid_end_day'] = 0
         if valid_end_day is None or not isinstance(valid_end_day, numbers.Number):
-            valid_end_day = yaml_data['valid_end_day'] = -1        
+            valid_end_day = yolo_spec_data['valid_end_day'] = -1        
 
-        input_image_width = yaml_data.get('input_image_width', None)
-        input_image_height = yaml_data.get('input_image_height', None)
-        coral_classes = yaml_data.get('coral_classes', [])  
-        dead_coral_classes = yaml_data.get('dead_coral_classes', [])  
-        remarks = yaml_data.get('remarks', None)         
+        input_image_width = yolo_spec_data.get('input_image_width', None)
+        input_image_height = yolo_spec_data.get('input_image_height', None)
+        coral_classes = yolo_spec_data.get('coral_classes', [])  
+        dead_coral_classes = yolo_spec_data.get('dead_coral_classes', [])  
+        remarks = yolo_spec_data.get('remarks', None)         
         # validate data
         if name is None or file is None or species is None:
             error_list.append(f'One of the mandatory fields (name, file, species) is missing in the yaml file')
@@ -794,19 +810,19 @@ class DetectorDAO():
     
     # composite operation: import yaml file for a yolo model
     @synchronized
-    def import_yolo_model_yaml(self, yaml_data:dict, default_start_day:int, default_end_day:int) -> bool:
+    def import_yolo_model_yaml(self, yolo_spec_data:dict, default_start_day:int, default_end_day:int) -> bool:
         error_list = []
         # load and validate the data in the yaml config file which has been converted to a YamlConfig object
-        name = yaml_data.get('name', None)
-        model_file_path = yaml_data.get('file', None)
-        species = yaml_data.get('species', None)
-        valid_start_day = yaml_data.get('valid_start_day', default_start_day)
-        valid_end_day = yaml_data.get('valid_end_day', default_end_day)
-        input_image_width = yaml_data.get('input_image_width')
-        input_image_height = yaml_data.get('input_image_height')  
-        coral_classes = yaml_data.get('coral_classes', []) 
-        dead_coral_classes = yaml_data.get('dead_coral_classes', []) 
-        remarks = yaml_data.get('remarks', None)  
+        name = yolo_spec_data.get('name', None)
+        model_file_path = yolo_spec_data.get('file', None)
+        species = yolo_spec_data.get('species', None)
+        valid_start_day = yolo_spec_data.get('valid_start_day', default_start_day)
+        valid_end_day = yolo_spec_data.get('valid_end_day', default_end_day)
+        input_image_width = yolo_spec_data.get('input_image_width')
+        input_image_height = yolo_spec_data.get('input_image_height')  
+        coral_classes = yolo_spec_data.get('coral_classes', []) 
+        dead_coral_classes = yolo_spec_data.get('dead_coral_classes', []) 
+        remarks = yolo_spec_data.get('remarks', None)  
         try:
             with db_tools.create_connection(self.db_file) as conn: 
                 conn.isolation_level = None  # to turn off auto-commit (may be unnecessary, minor issue, to check)
@@ -1068,9 +1084,9 @@ class DetectorDAO():
     
     # - table: error flag
     @synchronized
-    def set_error_flag(self, id:int, remarks:str, level:int=0) -> int:
-        sql = 'REPLACE INTO error_flag(id, update_time, remarks, level) VALUES (?, DATETIME("now"), ?, ?)'
-        return db_tools.update(self.db_file, sql, (id, remarks, level,))    
+    def set_error_flag(self, id:int, obj:str, remarks:str, level:int=0) -> int:
+        sql = 'REPLACE INTO error_flag(id, object, update_time, remarks, level) VALUES (?, ?, DATETIME("now", "localtime"), ?, ?)'
+        return db_tools.update(self.db_file, sql, (id, obj, remarks, level,))    
 
     @synchronized
     def list_error_flags(self) -> int:
@@ -1078,9 +1094,9 @@ class DetectorDAO():
         return db_tools.query(self.db_file, sql)
     
     @synchronized
-    def unset_error_flag(self, id:int) -> int:
-        sql = 'DELETE FROM error_flag WHERE id = ?'
-        return db_tools.update(self.db_file, sql, (id,))       
+    def unset_error_flag(self, id:int, obj:str) -> int:
+        sql = 'DELETE FROM error_flag WHERE id = ? AND object = ?'
+        return db_tools.update(self.db_file, sql, (id, obj))       
 
     @synchronized
     def clear_error_flags(self) -> int:
@@ -1093,7 +1109,7 @@ def manage_tables():
     DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
     DETECT_DBFM = DBFile(DATABASE_FOLDER, 'detector.db', DETECT_DDL)
     DETECT_DAO = DetectorDAO(DETECT_DBFM.db_file)
-    # DETECT_DBFM.drop_tables([''])
+    DETECT_DBFM.drop_tables(['error_flag'])
     tables_name = DETECT_DBFM.list_tables_name()
     logger.info(f'tables: {tables_name}')
     DETECT_DBFM.create_tables(['error_flag'])

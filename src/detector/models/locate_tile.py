@@ -12,7 +12,7 @@ __status__ = 'Development'
 import os, math, yaml, numbers, pickle
 
 
-from detector.models.reconstruct_tools import ImageMap, test_get_cgras_sample_images_as_list
+from cgras_detector.src.detector.models.imaging_tools import ImageMap, test_get_cgras_sample_images_as_list
 from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper, test_load_reco_model
 
 from detector.models import logger

@@ -16,7 +16,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
 import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, AUTOMATED_TASK_EXECUTION, CALLBACK_MANAGER, CallbackTypes, STATE, SystemStates, logger, TaskStatusNames
+from detector.model import DETECT_DAO, AUTOMATED_TASK_EXECUTION, CALLBACK_MANAGER, CallbackTypes, STATE, SystemStates, logger, TaskStatusNames, PERSISTENT_STORE_DAO, PersistentStoreDAO
 
 class MonitorTaskControlBlock():
     def __init__(self, app, prefix):
@@ -24,8 +24,8 @@ class MonitorTaskControlBlock():
         self.prefix = prefix = prefix + 'ptc'
         self.update_store_id = prefix + 'update_store'
         # define widgets 
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='primary', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='primary', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         
         # mode dependent panels       
         self.button_panel = [
@@ -35,7 +35,7 @@ class MonitorTaskControlBlock():
                 dbc.Label('Execute the next tile sample in the queue', className='col-7'),
             ], className='mb-2'),
             dbc.Row([
-                dbc.Button('Import New Tile Samples', id={'type': prefix+'button', 'index': 'import_tile'}, color='primary', size='me', className='offset-1 col-4'),  
+                dbc.Button('Import New Tile Samples', id={'type': prefix+'button', 'index': 'import_sample'}, color='primary', size='me', className='offset-1 col-4'),  
                 dbc.Label('Query for newly acquired tile samples', className='col-7'),
             ], className='mb-2'),
             dbc.Row([
@@ -65,7 +65,7 @@ class MonitorTaskControlBlock():
                            Output({'type': prefix+'button', 'index': 'automate_switch'}, 'children'),
                            Output({'type': prefix+'button', 'index': 'automate_switch'}, 'disabled'),
                            Output({'type': prefix+'button', 'index': 'process_tile'}, 'disabled'),
-                           Output({'type': prefix+'button', 'index': 'import_tile'}, 'disabled'),],
+                           Output({'type': prefix+'button', 'index': 'import_sample'}, 'disabled'),],
             [Input(self.update_store_id, 'data')], prevent_initial_call=True)(self._update_content())
         
         self.app.callback([Output(prefix+'mode_message_2', 'children'),],
@@ -93,6 +93,9 @@ class MonitorTaskControlBlock():
             elif button_index.endswith('process_tile'):
                 CALLBACK_MANAGER.fire_event(CallbackTypes.PROCESS_TILE_CLICKED)
                 return (True, 'Attempt to process the next pending tile sample if it exists', 'Process Tile')
+            elif button_index.endswith('import_sample'):
+                CALLBACK_MANAGER.fire_event(CallbackTypes.IMPORT_SAMPLE_CLICKED)
+                return (True, 'Attempt to import new tile samples found in the image acquisition system', 'Import New Tile Samples')            
             elif button_index.endswith('automate_switch'):
                 new_mode = not AUTOMATED_TASK_EXECUTION.value
                 CALLBACK_MANAGER.fire_event(CallbackTypes.TASK_EXECUTE_MODE_CHANGED, new_mode)
@@ -108,21 +111,16 @@ class MonitorTaskControlBlock():
             return (timer, )
         return update_panel
     
-    # def _main_panel_loaded(self):
-    #     def main_panel_loaded(children):
-    #         task_execute_mode = PERSISTENT_STORE_DAO.get_task_execute_mode(default=PERSISTENT_STORE_DAO.AUTO_EXECUTE_OFF)
-    #         return (task_execute_mode, )
-    #     return main_panel_loaded
-    
     def _update_content(self):
         def update_content(timer):
             current_state = STATE.get_state()
             is_menu_appear = current_state in [SystemStates.CLICK_START]
+            enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
             if current_state in [SystemStates.SUSPENDED]:
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: SUSPENDED',
-                    {'color', 'red'},
+                    {'color': 'red'},
                     'System suspended due to the execution of an image acquisition program',
                     '',
                     True, True, True,
@@ -131,16 +129,16 @@ class MonitorTaskControlBlock():
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: MANUAL',
-                    {'color', 'dark blue'},
+                    {'color': 'blue'},
                     'Execute a task manually by clicking on a button below',
                     'Switch to Automated Execution',
-                    False, False, False,
+                    False, False, not enable_import_new_samples,
                 )
             elif not AUTOMATED_TASK_EXECUTION.value:
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: MANUAL',
-                    {'color', 'dark blue'},
+                    {'color': 'blue'},
                     'The buttons are enabled after the current task is completed or aborted',
                     'Switch to Automated Execution',
                     False, True, True,
@@ -149,7 +147,7 @@ class MonitorTaskControlBlock():
                 return (
                     {'visibility': 'visible'},
                     'Task Execution Mode: AUTOMATED',
-                    {'color', 'dark green'},
+                    {'color': 'purple'},
                     'Automated execution of tile sample processing and new tile sample import',
                     'Switch to Manual Execution',
                     False, True, True,

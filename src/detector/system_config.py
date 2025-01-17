@@ -21,6 +21,7 @@ class SystemConfigNames(Enum):
     """ Maps the config names as a sting to a constant
     """
     CGRAS_DATA_FOLDER = 'cgras_data_folder'
+    CGRAS_CAPTURED_IMAGES_FOLDER = 'cgras_captured_images_folder'
     WEB_HOST = 'web_host'
     WEB_PORT = 'web_port'
     WEB_DEBUG_MODE = 'web_debug_mode'
@@ -35,8 +36,8 @@ class SystemConfigNames(Enum):
     ROS_COORDINATOR_STATE_TOPIC = 'ros_coordinator_state_topic' 
     ROS_DETECTOR_STATE_TOPIC = 'ros_detector_state_topic' 
     # timer for refresh the system and GUI
-    SYSTEM_TIMER = 'system_timer'
-    DASHBOARD_TIMER = 'dashboard_timer'
+    SYSTEM_TIMER = 'system_timer'                                # the timer driving the state transition machine through the timer callback
+    DASHBOARD_REFRESH_CYCLES = 'dashboard_refresh_cycles'        # the refresh rate of 'auto-refresh pages' in the dashboard the number of cycles of system timer
     # yolo model range
     MAX_CORAL_AGE = 'max_coral_age'
     # connection timeout

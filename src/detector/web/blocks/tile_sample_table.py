@@ -31,8 +31,8 @@ class TileSampleTable():
         self.user_action_store_id = prefix + 'user_action_store'
       
         # define a toast for feedback  
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
 
         # define the modal for confirmation of user actions
         self._user_confirm_modal = dbc.Modal([
@@ -47,6 +47,8 @@ class TileSampleTable():
         self._columns = [{'name': 'Tile Sample ID', 'id': 'id', 'type': 'text', 'editable': False},
                          {'name': 'Capture Time', 'id': 'batch_time', 'type': 'datetime', 'editable': False},
                          {'name': 'Season', 'id': 'season', 'type': 'text', 'editable': False},
+                         {'name': 'Age', 'id': 'age', 'type': 'text', 'editable': False},
+                         {'name': 'Settled On', 'id': 'settle_time', 'type': 'text', 'editable': False},
                          {'name': 'Importer', 'id': 'importer_id', 'type': 'text', 'editable': False},
                          {'name': 'Import Time', 'id': 'create_time', 'type': 'text', 'editable': False},  
                          {'name': 'Status', 'id': 'status', 'type': 'text', 'editable': False},    
@@ -166,7 +168,8 @@ class TileSampleTable():
                         Input(prefix+'cancel_redo_button', 'n_clicks'),
                         State(prefix+'reprocess_mode', 'value'),
                         State(prefix+'row_redo_store', 'data'),
-                        State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._redo_row_confirmed())           
+                        State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._redo_row_confirmed())      
+             
         self.app.callback([Output(prefix+'toast', 'is_open', allow_duplicate=True),
                            Output(prefix+'toast', 'children', allow_duplicate=True)],
                             [Input(prefix+'row_priority_store', 'data'),], prevent_initial_call=True)(self._priority_row_confirmed())  
@@ -177,20 +180,10 @@ class TileSampleTable():
                            Output(self.update_table_store_id, 'data', allow_duplicate=True)],
                             [State(self.user_action_store_id, 'data'),
                             State(self.update_table_store_id, 'data'),
-                            Input({'type': prefix+'action', 'index': ALL}, 'n_clicks'),], prevent_initial_call=True)(self._cb_confirm_modal_pressed())    
-
-        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
-        #                    Output(prefix+'toast', 'is_open', allow_duplicate=True),
-        #                    Output(prefix+'toast', 'children', allow_duplicate=True),
-        #                    Output(self.update_table_store_id, 'data', allow_duplicate=True)],
-        #                     [Input(prefix+'delete_confirm_dialog', 'submit_n_clicks'),
-        #                     State(prefix+'row_delete_store', 'data'),
-        #                     State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._delete_row_confirmed()) 
-        
+                            Input({'type': prefix+'action', 'index': ALL}, 'n_clicks'),], prevent_initial_call=True)(self._cb_confirm_modal_pressed())            
 
         input_list = [State(prefix+'datatable', 'selected_rows'), 
                       Input({'type': prefix+'table', 'index': ALL}, 'n_clicks'),]
-        
         self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
                             Output(prefix+'confirm_modal_title', 'children', allow_duplicate=True),
                             Output(prefix+'confirm_modal_message', 'children', allow_duplicate=True),
@@ -218,13 +211,11 @@ class TileSampleTable():
                             [Input(prefix+'datatable', 'active_cell'),
                              State(prefix+'datatable', 'data')], prevent_initial_call=True, allow_duplicate=True)(self._cb_cell_selected())     
     
-    
     def register_trigger(self, trigger_id:str):
         # define callbacks for the datatable data
         self.app.callback([Output(self.update_table_store_id, 'data', allow_duplicate=True)],
             [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
 
-        
     def get_panel(self):
         return self.the_panel
     
@@ -234,7 +225,7 @@ class TileSampleTable():
     
     def refine_datatable_model(self, model, show_column_top=True, show_column_refresh=False):
         model['status'] = model['status'].apply(lambda x: SampleStatusNames(x).name) 
-        model = model[['id', 'batch_time', 'season', 'importer_id', 'operator', 'create_time', 'status', 'remarks']]
+        model = model[['id', 'batch_time', 'season', 'importer_id', 'operator', 'create_time', 'age', 'settle_time', 'status', 'remarks']]
         return model
     
     # the callback for updating the datatable

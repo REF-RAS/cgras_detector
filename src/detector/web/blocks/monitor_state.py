@@ -95,8 +95,8 @@ class MonitorStateBlock():
                         'I am wasting my talent here. Got nothing to do. I should be nursing coral babies. ',
                         'I turn into a couch potato. Is it my destiny?'
                     ][random.randrange(0, 3)]
-            elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE]:
-                if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_SAMPLE] or random.random() < 0.2:
+            elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_IMPORT_SAMPLE]:
+                if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_IMPORT_SAMPLE] or random.random() < 0.2:
                     self.banner_message = [
                         'I just asked my supervisor for more coral larvae but got nothing. I am feeling insecure.',
                         'No new coral again! Should I look elsewhere for coral babies?',

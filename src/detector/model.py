@@ -21,6 +21,7 @@ import catkin_pkg.package
 from detector.database_file import DBFile
 from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ObjectClassCategories, TaskStatusNames, TaskTypes, SampleStatusNames
 from detector.dao_persistent_storage import PERSISTENT_STORE_DDL, PersistentStoreDAO
+from detector.dao_tile_samples import TileSamplesDAO
 from detector.file_manager import ApplicationFileManager
 
 # --- System-wide definitions and variables 
@@ -30,8 +31,8 @@ class CallbackTypes(Enum):
     TASK_EXECUTE_MODE_CHANGED = 1
     PROCESS_TILE_CLICKED = 3
     UPDATE_HEALTH_CLICKED = 4
-    IMPORT_TILES_CLICKED = 5
-    PROCESS_TILE_TO_ABORT = 11
+    IMPORT_SAMPLE_CLICKED = 5
+    PROCESS_TILE_TO_CANCEL = 11
 
 # The states of the system for tracking the current task
 class SystemStates(Enum):
@@ -44,11 +45,12 @@ class SystemStates(Enum):
     POLL_DETECT = 3
     DETECT = 10
     WAIT_DETECT = 11
-    D_SUCCESS = 17
+    D_SUCCESS = 16
+    D_CANCELLED = 17
     D_FAILED = 18
-    D_ABORTED = 19
-    POLL_SAMPLE = 41
-    # SAMPLE_IMPORT = 42
+    D_FLAGGED = 19
+    POLL_IMPORT_SAMPLE = 41
+    IMPORT_SAMPLE = 42
     
 # The states of the Image Acquisition system 
 class CoordinatorStates(Enum):
@@ -81,6 +83,7 @@ AUTOMATED_TASK_EXECUTION = ValueHolder()
 DETECT_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'detector.db', [DETECT_DDL, PERSISTENT_STORE_DDL])
 DETECT_DAO:DetectorDAO = DetectorDAO(DETECT_DBFM.db_file)
 PERSISTENT_STORE_DAO:PersistentStoreDAO = PersistentStoreDAO(DETECT_DBFM.db_file)
-
+COORDINATOR_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'coordinator.db')
+IMPORT_SAMPLE_DAO:TileSamplesDAO = TileSamplesDAO(COORDINATOR_DBFILE)
 # the states of other components
 COORDINATOR_STATE = model_base.StateManager(CoordinatorStates.UNKNOWN)

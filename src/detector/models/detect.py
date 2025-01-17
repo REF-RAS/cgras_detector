@@ -17,10 +17,10 @@ import cv2
 import numpy as np
 
 from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper
-from detector.models.reconstruct_tools import test_get_cgras_sample_images_as_list 
+from cgras_detector.src.detector.models.imaging_tools import test_get_cgras_sample_images_as_list 
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.models.yolo_detector import YoloObjectDetector, YoloResult, ObjectType
-from detector.models import logger, ModelsConfigNames, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
+from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
 from detector.model import CoralObject, ObjectClassCategories
 
 class CoralObjectDetectModel():
@@ -75,7 +75,7 @@ class CoralObjectDetectModel():
         # init the current COD model
         self.cod_model = None
         # model parameters: abort
-        self.to_abort = False
+        self.to_cancel = False
         
     def build(self):
         # step 1: iterate through each image in the 2d list of images
@@ -85,8 +85,8 @@ class CoralObjectDetectModel():
                 if hasattr(self, 'progress_cb') and self.progress_cb is not None:
                     self.progress_cb((self.count_images_completed, self.num_images))
                 time.sleep(0.1)    # sleep for a short while to release cpu
-                if self.to_abort:  # stop processing if abort signal is recieved
-                    raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+                if self.to_cancel:  # stop processing if abort signal is recieved
+                    raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
                 # compute the coral object detect model (long process)
                 self.cod_model = CoralObjectDetectImageModel(image, col_index, row_index, self.reco_model, self.yolo_model, self.locate_tile_model, **self.params)
                 self.cod_model.build()
@@ -131,13 +131,13 @@ class CoralObjectDetectModel():
                         final_objects_list.append(coral_object)
         return final_objects_list
     
-    def abort(self):
+    def cancel_build(self):
         """ call to abort the computing of this CoralObjectDetectModel
         """
-        self.to_abort = True
+        self.to_cancel = True
         if hasattr(self, 'cod_model'):
             if self.cod_model:
-                self.cod_model.abort()
+                self.cod_model.cancel_build()
 
     def get_progress(self) -> tuple:
         """ returns the progress of computing this CoralObjectDetectModel
@@ -283,8 +283,8 @@ class CoralObjectDetectModel():
         for row_index in range(images_grid_size[1]):
             for col_index in range(images_grid_size[0] - 1):
                 # abort the process
-                if self.to_abort:
-                    return
+                if self.to_cancel:
+                    raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
                 # resolve diplicate between (col_index, row_index) and (col_index + 1, row_index)
                 object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index)
                 num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
@@ -329,7 +329,7 @@ class CoralObjectDetectImageModel():
         :type locate_tile_model: LocateTileModel, optional
         """
         # model variable for abort
-        self.to_abort = False
+        self.to_cancel = False
         # input parameters
         self.image = image
         self.image_col_index, self.image_row_index = image_col_index, image_row_index
@@ -369,9 +369,8 @@ class CoralObjectDetectImageModel():
         if type(self.image) == str:
             try:
                 self.image = cv2.imread(self.image)
-            except (Warning, Exception):
-                # raise OSError(f'Unable to read image file {self.image}')
-                raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID,f'Unable to read image file {self.image}')
+            except (Warning, Exception) as e:
+                raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID,f'Unable to read image file {self.image}', e=e)
         if type(self.image) is not np.ndarray:
             raise TypeError(f'Parameter image is neither an image file nor a numpy image') 
         # step 2: traverse through the image coordinates to build a list of logical image blobs 
@@ -383,8 +382,8 @@ class CoralObjectDetectImageModel():
         # start_x and start_y are the top left corner of an image blob
         for start_x in range(0, image_size[0], step_x):
             for start_y in range(0, image_size[1], step_y):
-                if self.to_abort:
-                    raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received the abort command from the system')
+                if self.to_cancel:
+                    raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received the abort command from the system')
                 # compute the blob index, the top left and the bottom right corner of an image blob
                 blob_col_index, blob_row_index = start_x // step_x, start_y // step_y 
                 corner = (start_x, start_y,)
@@ -418,7 +417,7 @@ class CoralObjectDetectImageModel():
                         object_list = self._extract_objects_from_result(yolo_result, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, self.reco_model, self.locate_tile_model)  
                         self.raw_object_list_of_blobs[cache_index] = object_list
                     except Exception as e:
-                        raise DetectorAbortError(DetectorErrorCodes.YOLO_MODEL_ERROR, 'Error happened when the YoloModel is applied on an image blob', e=e)
+                        raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_ERROR, 'Error happened when the YoloModel is applied on an image blob', e=e)
                     
                     # if the self.debug_blob_images is True, then generate the annotated image for this image blob and save to the logdata folder
                     if self.debug_blob_images and self.logdata_folder is not None:
@@ -428,7 +427,7 @@ class CoralObjectDetectImageModel():
                         self.annotated_blob_filename_dict_list.append(image_dict)
                         target_image_file = os.path.join(self.logdata_folder, image_file_name)
                         if not cv2.imwrite(target_image_file, annotated_image):
-                            raise OSError(f'Failed to save annotated image to {target_image_file}')
+                            raise DetectorExceptionCodes(DetectorExceptionCodes.OS_ERROR, f'Failed to save annotated image to {target_image_file}')
                 else:
                     # if the object_list for the cache_index exists, just get it from the data structure
                     object_list = self.raw_object_list_of_blobs[cache_index]
@@ -460,7 +459,7 @@ class CoralObjectDetectImageModel():
             self.annotated_image_filename_dict = image_dict
             target_image_file = os.path.join(self.logdata_folder, image_file_name)
             if not cv2.imwrite(target_image_file, annotated_image):
-                raise OSError(f'Failed to save annotated image to {target_image_file}')
+                raise DetectorExceptionCodes(DetectorExceptionCodes.OS_ERROR, f'Failed to save annotated image to {target_image_file}')
             
         # step 6: clear data if not needed for model inference
         self.image = None
@@ -479,10 +478,10 @@ class CoralObjectDetectImageModel():
             all_object_list.extend(self.raw_object_list_of_blobs[index])    
         return all_object_list    
     
-    def abort(self):
+    def cancel_build(self):
         """ call to abort the computing of this CoralObjectDetectImageModel
         """
-        self.to_abort = True
+        self.to_cancel = True
 
     def get_annotated_blob_filename_dict_list(self) -> list:
         """ Returns the list of file names of images showing annotation of blobs for debug purpose

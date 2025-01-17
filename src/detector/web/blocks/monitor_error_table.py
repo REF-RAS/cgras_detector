@@ -18,6 +18,7 @@ import dash_bootstrap_components as dbc
 from dash.dash_table.Format import Format, Padding
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, CONFIG, SystemConfigNames
+from detector.models import DetectorExceptionCodes
 from cgras_datatools.logging_tools import logger
 
 class MonitorErrorTableBlock():
@@ -28,7 +29,6 @@ class MonitorErrorTableBlock():
         
         # define widgets 
         self._columns = [
-                        # {'name': 'ID', 'id': 'id', 'type': 'numeric', 'editable': False},
                         {'name': 'Issues', 'id': 'remarks', 'type': 'text', 'editable': False},                                               
                     ]
               
@@ -71,9 +71,17 @@ class MonitorErrorTableBlock():
     def register_trigger(self, trigger_id:str):
         self.app.callback(Output(self.prefix+'datatable', 'data'),
             [Input(trigger_id, 'data')], prevent_initial_call=False)(self._update_table())  
-        
+               
     def _update_model(self):   
+        def update_remarks(row):
+            error_code = row['id']
+            error_str = DetectorExceptionCodes(error_code).name
+            error_obj = '' if row['object'] is None else row['object']
+            return f'{row["update_time"]} {error_str} ({error_obj}): {row["remarks"]}'
+        
         model = DETECT_DAO.list_error_flags()
+        if not model.empty:
+            model['remarks'] = model.apply(update_remarks, axis=1, result_type='reduce')
         return model
           
     # callback for the table
@@ -91,7 +99,8 @@ class MonitorErrorTableBlock():
                 return dash.no_update
             row_index = selected_rows[0]
             id = model[row_index]['id']
-            DETECT_DAO.unset_error_flag(id)
+            obj = model[row_index]['object']
+            DETECT_DAO.unset_error_flag(id, obj)
             model.pop(row_index)
             return (model, [],)
         return style_selected_rows

@@ -25,8 +25,8 @@ class ResetDBBlock():
         self.reset_success_trigger_id = prefix+'reset_success'
         self.counter_store_id = prefix+'counter_store'
         # define the toast for feedback 
-        self._toast = dbc.Toast('The database is reset and rebuilt', id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast('The database is reset and rebuilt', id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define the modal for confirmation of user actions
         self._user_confirm_modal = dbc.Modal([
                     dbc.ModalHeader(dbc.ModalTitle('Clear Database', id=prefix+'confirm_modal_title')),
@@ -54,17 +54,27 @@ class ResetDBBlock():
                            Output(self.counter_store_id, 'data', allow_duplicate=True)],
                             [Input(prefix+'reset_button', 'n_clicks')], prevent_initial_call=True)(self._cb_reset_button_pressed())
         
-        self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
-                           Output(prefix+'toast', 'is_open', allow_duplicate=True),
-                           Output(prefix+'toast', 'children', allow_duplicate=True),
+        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
+        #                    Output(prefix+'toast', 'is_open', allow_duplicate=True),
+        #                    Output(prefix+'toast', 'children', allow_duplicate=True),
+        #                    Output(self.counter_store_id, 'data', allow_duplicate=True),
+        #                    Output(self.reset_success_trigger_id, 'data',)],
+        #                    [State(self.counter_store_id, 'data'),
+        #                     Input({'type': prefix+'action', 'index': ALL}, 'n_clicks')], prevent_initial_call=True)(self._cb_confirm_modal_pressed())
+
+        self.app.callback([Output('page_content', 'children', allow_duplicate=True),
+                           Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
                            Output(self.counter_store_id, 'data', allow_duplicate=True),
                            Output(self.reset_success_trigger_id, 'data',)],
                            [State(self.counter_store_id, 'data'),
-                            Input({'type': prefix+'action', 'index': ALL}, 'n_clicks')], prevent_initial_call=True)(self._cb_confirm_modal_pressed())
-        
+                            State('page_content', 'children'),
+                            Input({'type': prefix+'action', 'index': ALL}, 'n_clicks')], prevent_initial_call=True)(self._cb_confirm_modal_pressed()) 
+
+    # return the panel to the state page           
     def get_panel(self):
         return self.reset_db_panel
     
+    # return the store id that is triggered when the reset successful   
     def get_success_trigger_id(self):
         return self.reset_success_trigger_id
         
@@ -75,28 +85,49 @@ class ResetDBBlock():
         return cb_reset_button_pressed
     
     # callback when the confirm button is pressed, which then clear the database of coordinator, and open the toast for feedback
+    # def _cb_confirm_modal_pressed(self):
+    #     def cb_confirm_modal_pressed(counter, *args):
+    #         button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
+    #         button_index = button_id.get('index', None)
+    #         # if the confirm buttons is pressed
+    #         if button_index == 'confirm':
+    #             # count thrice pressing the confirm button to really confirm the reset
+    #             if counter <= 1:
+    #                 return (True, False, None, counter + 1, False)
+    #             else:
+    #                 # drop all the tables first and create them again
+    #                 DETECT_DBFM.drop_tables()
+    #                 error_str = DETECT_DBFM.create_tables()   
+    #                 if error_str is None:
+    #                     return (False, True, f'Successfully reset the database tables to a blank state', 0, True)
+    #                 else:
+    #                     return (False, True, f'The database tables are deleted but then error occurred when creating tables: {error_str}', 0, False)                    
+    #         else:
+    #             return (False, False, None, 0, False)
+            
+    #     return cb_confirm_modal_pressed 
+    
+    # callback when the confirm button is pressed, which then clear the database of coordinator, and open the toast for feedback
+    # a new version that refresh the page after successful reset db
     def _cb_confirm_modal_pressed(self):
-        def cb_confirm_modal_pressed(counter, *args):
+        def cb_confirm_modal_pressed(counter, page_content, args):
             button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
             button_index = button_id.get('index', None)
             # if the confirm buttons is pressed
-            if button_index == 'confirm':
+            if button_index == 'confirm' and args[0] is not None:  # the second condition checks if it is a page loading event
                 # count thrice pressing the confirm button to really confirm the reset
+                if counter is None:
+                    counter = 0
                 if counter <= 1:
-                    return (True, False, None, counter + 1, False)
+                    return (page_content, True, counter + 1, False)
                 else:
                     # drop all the tables first and create them again
-                    # DETECT_DBFM.drop_tables()
-                    # error_str = DETECT_DBFM.create_tables()   
-                    error_str = '' 
+                    DETECT_DBFM.drop_tables()
+                    error_str = DETECT_DBFM.create_tables()  
                     if error_str is None:
-                        return (False, True, f'Successfully reset the database tables to a blank state', 0, True)
+                        return (page_content, False, 0, True)
                     else:
-                        return (False, True, f'The database tables are deleted but then error occurred when creating tables: {error_str}', 0, False)                    
+                        return (page_content, False, 0, False)                    
             else:
-                return (False, False, None, 0, False)
-            
-        return cb_confirm_modal_pressed 
-    
-
-      
+                return (page_content, False, 0, False)
+        return cb_confirm_modal_pressed       

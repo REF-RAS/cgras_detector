@@ -14,6 +14,6 @@ from datetime import datetime
 from enum import Enum
 from cgras_datatools.logging_tools import get_logger
 from .models_config import ModelsConfigNames
-from .detector_error import DetectorError, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
+from .detector_error import DetectorException, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
 
 logger = get_logger()

@@ -25,7 +25,8 @@ class TileSampleSearchBlock():
     def __init__(self, app, prefix):
         self.app = app 
         self.prefix = prefix = prefix + 'tss_'
-        self.search_trigger_id = prefix + 'search_query_store'
+        self.search_clicked_trigger_id = prefix + 'search_query_store'
+        self.external_trigger_id = prefix + 'external_trigger_store'
         # define widgets
         tile_id_textbox = dcc.Input(id=prefix+'tile_id_input', type='text', placeholder='Tile ID', className='', style={'width': '240px'})
         batch_id_textbox = dcc.Input(id=prefix+'batch_id_input', type='text', placeholder='Batch ID', className='ms-2', style={'width': '240px'})
@@ -40,9 +41,9 @@ class TileSampleSearchBlock():
                                        searchable=False, clearable=False, className='ms-2', style={'width': '240px', 'zIndex': 10})
         # the status filter
         self.status_options = [
-            {'label': 'Done or Aborted', 'value': SampleStatusNames.UNKNOWN.value},
+            {'label': 'Done or Flagged', 'value': SampleStatusNames.UNKNOWN.value},
             {'label': 'Done', 'value': SampleStatusNames.DONE.value},
-            {'label': 'Aborted', 'value': SampleStatusNames.ABORTED.value},
+            {'label': 'Flagged', 'value': SampleStatusNames.FLAGGED.value},
             {'label': 'Rejected', 'value': SampleStatusNames.REJECTED.value},
         ]
         status_dropdown = dcc.Dropdown(options=self.status_options, id=prefix+'status_dropdown', 
@@ -57,7 +58,7 @@ class TileSampleSearchBlock():
                                        searchable=False, clearable=False, className='ms-2', maxHeight=200, style={'width': '160px', 'zIndex': 10})
       
         self.tile_sample_search_panel = html.Div([
-                dcc.Store(id=self.search_trigger_id),
+                dcc.Store(id=self.search_clicked_trigger_id),
                 html.H4(dbc.Badge('SEARCH PROCESSED TILE SAMPLES', className='ms-1 me-2', color='white', text_color='secondary')),
                 dbc.Row(children=[
                     html.Span('Filters: ', className='col-2'),
@@ -67,12 +68,8 @@ class TileSampleSearchBlock():
                     status_dropdown,
                     pagesize_dropdown,
                     dbc.Button('Reset', id=prefix+'reset_filter_button', n_clicks=0, className='ms-4', color='secondary', size='sm', style={'width': '80px', 'marginLeft': '20px'}),
+                    dcc.Store(id=self.external_trigger_id),
                 ]),
-                # dbc.Row(children=[
-                #     html.Span(' ', className='col-2'),
-                #     dbc.Button('Refresh', id=prefix+'refresh_button', n_clicks=0, className='', color='primary', size='sm', style={'width': '160px'}),
-                #     dbc.Button('Reset', id=prefix+'reset_filter_button', n_clicks=0, className='ms-4', color='secondary', size='sm', style={'width': '160px'})
-                # ], className='mt-2 mb-5'),
                 
             ], id=prefix+'main_panel', className='mx-auto text-center', style={'zIndex': 10})
         
@@ -96,24 +93,34 @@ class TileSampleSearchBlock():
                             Input(prefix+'batch_id_input', 'value'),
                             Input(prefix+'period_dropdown', 'value'),
                             Input(prefix+'pagesize_dropdown', 'value'),
-                            Input(prefix+'status_dropdown', 'value'),                            
+                            Input(prefix+'status_dropdown', 'value'),  
+                            Input(self.external_trigger_id, 'data'),                           
                             ], prevent_initial_call=True)(self._refresh_table_clicked())  
 
-    def get_search_trigger_id(self):
-        return self.search_trigger_id
+     
+    def get_panel(self):
+        return self.tile_sample_search_panel
+
+    def register_trigger(self, trigger_id:str):
+        # define callbacks for the datatable data
+        self.app.callback([Output(self.external_trigger_id, 'data', allow_duplicate=True)],
+            [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._external_triggered())
+
+    def get_search_clicked_trigger_id(self):
+        return self.search_clicked_trigger_id
 
     def _reset_filter_button_clicked(self):
-        def clear_filter_button_clicked(n_clicks, _):
+        def reset_filter_button_clicked(n_clicks, _):
             period_options = self.period_options
             season_titles_list = DETECT_DAO.list_seasons_in_tile_sample()
             for season_title in season_titles_list:
                 period_options.append({'label': f'{season_title} Season', 'value': season_title})
             value = 0
             return ('', '', period_options, value, 10, SampleStatusNames.UNKNOWN.value,)
-        return clear_filter_button_clicked
+        return reset_filter_button_clicked
     
     def _refresh_table_clicked(self):
-        def refresh_table_clicked(tile_id, batch_id, the_period, the_pagesize, the_status):
+        def refresh_table_clicked(tile_id, batch_id, the_period, the_pagesize, the_status, store):
             button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
             # set default value at initialization
             the_status = None if the_status == SampleStatusNames.UNKNOWN.value or the_status is None else the_status
@@ -128,5 +135,10 @@ class TileSampleSearchBlock():
             return (query,)
         return refresh_table_clicked
     
-    def get_panel(self):
-        return self.tile_sample_search_panel
+    def _external_triggered(self):
+        def external_triggered(store):
+            return (store,)
+        return external_triggered
+
+    
+    

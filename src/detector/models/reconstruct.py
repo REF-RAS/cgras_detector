@@ -28,8 +28,8 @@ from stitching.warper import Warper
 from stitching.seam_finder import SeamFinder
 from stitching.blender import Blender
 
-from detector.models.reconstruct_tools import ImageMap, CameraTransformTools, test_get_cgras_sample_images_as_list
-from detector.models import ModelsConfigNames, get_logger, DetectorRejectError, DetectorErrorCodes, DetectorAbortError
+from detector.models.imaging_tools import ImageMap, CameraTransformTools, test_get_cgras_sample_images_as_list
+from detector.models import ModelsConfigNames, get_logger, DetectorFailed, DetectorExceptionCodes, DetectorAborted, DetectorCancelled
 
 class ImageReconstructModel():
     """ ImageReconstructModel is the wrapper class of the other image reconstruction classes in this module, that provides functions for mapping locations from the space of an individual input image to the 
@@ -46,7 +46,7 @@ class ImageReconstructModel():
         :type images_2d_list: list
         """
         # control parameter
-        self.to_abort = False
+        self.to_cancel = False
         # model parameter
         self.reco_2d_model = None
         # obtain the logger
@@ -67,8 +67,8 @@ class ImageReconstructModel():
         # build the model
         self.logger.info(f'ImageReconstructModel working_scale: {self.working_scale}')
         self.reco_2d_model = ImageReconstruct2DModel(self.images_2d_list, **self.params)  
-        if self.to_abort:  # stop processing if abort signal is recieved
-            raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')         
+        if self.to_cancel:  # stop processing if abort signal is recieved
+            raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')         
         self.reco_2d_model.build()  
         # retrieve major parameters from the model
         self.ncols, self.nrows = self.reco_2d_model.get_image_map_size()               # the number of rows and columns in the 2d grid of images
@@ -104,12 +104,12 @@ class ImageReconstructModel():
             self.warper.append(cv2.PyRotationWarper("spherical", self.get_row_median_focal(row_index)))
         self.warper_between_rows = cv2.PyRotationWarper("spherical", self.get_between_rows_median_focal())  
 
-    def abort(self):
+    def cancel_build(self):
         """ abort the current reconstruction process """
-        self.to_abort = True
+        self.to_cancel = True
         self.logger.warning(f'ImageReconstructModel: received ABORT signal')
         if hasattr(self, 'reco_2d_model') and self.reco_2d_model is not None:
-            self.reco_2d_model.abort()
+            self.reco_2d_model.cancel_build()
 
     def map_bbox(self, col_index:int, row_index:int, bbox, use_working_scale=False):
         """ returns the mapped coordinates in the reconstructed image of the coordinates of a bounding box of one of the original images 
@@ -324,7 +324,7 @@ class ImageReconstructModelHelper():
                     yamlstr = yaml.dump(object_dict, outfile, Dumper=yaml.Dumper)
             except Exception as e:
                 get_logger().warning(f'Failed to save ImageReconstructModel object to {outfile}')
-                raise OSError(f'Failed to write ImageReconstructModel to {object_file}: {e}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write ImageReconstructModel to {object_file}', e=e)
             return yamlstr
         
     @staticmethod
@@ -464,7 +464,7 @@ class ImageReconstruct2DModel():
         :type working_scale: float        
         """
         # control parameter
-        self.to_abort = False 
+        self.to_cancel = False 
         # input parameters
         self.params = kwargs
         self.images_2d_list = images_2d_list
@@ -496,8 +496,8 @@ class ImageReconstruct2DModel():
         self.logger.info(f'{type(self).__name__} Step 1: building 1d row reconstruction models for {self.ncols} x {self.nrows} images')
         # step 1: construct a 1d reconstruction model for each row of images
         for row_index in range(self.nrows):
-            if self.to_abort:  # stop processing if abort signal is recieved
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+            if self.to_cancel:  # stop processing if abort signal is recieved
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             images_in_row = self.image_map.get_row_images_at_working_scale(y = row_index)
             reco_row_model = ImageReconstruct1DModel(images_in_row, row_index=row_index, **self.params)
             # extract the relevant model parameters
@@ -514,15 +514,15 @@ class ImageReconstruct2DModel():
                     self.feature_match_image_dict_list.append(image_dict)
                     image_file = os.path.join(self.logdata_folder, image_file_name)
                     if not cv2.imwrite(image_file, image):
-                        raise OSError(f'Failed to write feature matching output to {image_file}')
+                        raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching output to {image_file}')
 
         # step 2: generate the reconstructed images row by row at the current scale
         self.logger.info(f'{type(self).__name__} Step 2: generating {self.nrows} reconstructed row images')
         row_recoimages_list = []
         output_file = None
         for row_index in range(self.nrows):
-            if self.to_abort:  # stop processing if abort signal is recieved
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+            if self.to_cancel:  # stop processing if abort signal is recieved
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             images_in_row = self.image_map.get_row_images_at_working_scale(y = row_index)
             output_file = os.path.join(self.logdata_folder, f'row_reco_image_{row_index}.jpg') if self.logdata_folder is not None else None
             row_recoimage, warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(images_in_row, self.camera_transforms_row_list[row_index], 
@@ -531,7 +531,7 @@ class ImageReconstruct2DModel():
             if output_file is not None:  # save the images only if output_folder is provided
                 self.logger.info(f'{type(self).__name__}: Writing 1d row reconstructed image (size: {row_recoimage.shape[:2][::-1]}) to file {output_file}')
                 if not cv2.imwrite(output_file, row_recoimage):
-                    raise OSError(f'Failed to write row reconstructed image to {output_file}')
+                    raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write row reconstructed image to {output_file}')
 
         # step 2A: if there is only one row, skip the rest
         if len(row_recoimages_list) == 1:
@@ -550,45 +550,45 @@ class ImageReconstruct2DModel():
             if self.debug_feature_matching_images:        
                 debug_images = reco_whole_model.get_debug_images_feature_matching()
                 for image_index_1, image_index_2, image in debug_images:
-                    if self.to_abort:  # stop processing if abort signal is recieved
-                        raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+                    if self.to_cancel:  # stop processing if abort signal is recieved
+                        raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
                     image_file_name = f'feature_match_between_rows_images_{image_index_1}_{image_index_2}.jpg'
                     image_dict = {'title': f'Feature matching between rows {image_index_1} and {image_index_2}', 'src': image_file_name}
                     self.feature_match_image_dict_list.append(image_dict)
                     image_file = os.path.join(self.logdata_folder, image_file_name)
                     if not cv2.imwrite(image_file, cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)):
-                        raise OSError(f'Failed to write feature matching results between row reconstructed images to {image_file}')
+                        raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching results between row reconstructed images to {image_file}')
             # using the computed transforms to generate the reconstructed image for the input 2d grid of images
             self.confidence_matrix_between_rows = reco_whole_model.get_confidence_matrix()
             self.camera_transforms_between_rows = reco_whole_model.get_camera_transforms_row()
             self.whole_reco_image_origin_offset = reco_whole_model.get_reco_image_origin_offset()
-            if self.to_abort:  # stop processing if abort signal is recieved
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+            if self.to_cancel:  # stop processing if abort signal is recieved
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             whole_reco_image, warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(row_recoimages_rotated_list, self.camera_transforms_between_rows, 
                                                                                                                 images_list_scaling_factor=1.0)
             # write the whole reconstructed image (at working scale) to the logdata folder
             whole_reco_image = cv2.rotate(whole_reco_image, cv2.ROTATE_90_CLOCKWISE)
-        if self.to_abort:  # stop processing if abort signal is recieved
-            raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+        if self.to_cancel:  # stop processing if abort signal is recieved
+            raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
         # save the whole reco images only if output_folder is provided
         if self.logdata_folder is not None:  
             output_file = os.path.join(self.logdata_folder, ImageReconstructModel.FILENAME_WHOLE_RECO_IMAGE)
             self.logger.info(f'{type(self).__name__}: Writing whole reconstructed image (size: {whole_reco_image.shape[:2][::-1]}) to file {output_file}')
             if not cv2.imwrite(output_file, whole_reco_image):
-                raise OSError(f'Failed to write whole reconstructed image to {output_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write whole reconstructed image to {output_file}')
         self.whole_reco_image_size = whole_reco_image.shape[:2][::-1]
-        if self.to_abort:  # stop processing if abort signal is recieved
-            raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+        if self.to_cancel:  # stop processing if abort signal is recieved
+            raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
         # step 5: generate the debug images in original scale
         if self.logdata_folder and self.debug_images_at_original_scale:
             images_list_scaling_factor = 1 / self.working_scale
             whole_reco_image_original_scale = self._generate_whole_recoimage_with_scaling(self.images_2d_list, self.camera_transforms_row_list, self.camera_transforms_between_rows,
                                                                                           images_list_scaling_factor, logdata_folder=self.logdata_folder)
             
-    def abort(self):
+    def cancel_build(self):
         """ abort the current reconstruction process """
         self.logger.warning(f'ImageReconstruct2DModel: received ABORT')
-        self.to_abort = True    
+        self.to_cancel = True    
             
     def get_image_map_size(self) -> tuple:
         """ 
@@ -716,7 +716,7 @@ class ImageReconstruct2DModel():
             if debug_folder:
                 output_file = os.path.join(debug_folder, f'row_reco_image_{row_index}_rotated.jpg')
                 if not cv2.imwrite(output_file, image_rotated):
-                    raise OSError(f'Failed to write rotated reconstructed image to {output_file}')
+                    raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write rotated reconstructed image to {output_file}')
         return images_rotated_list
 
     def _generate_whole_recoimage_with_scaling(self, images_2d_list:list, camera_transforms_row_list:list, camera_transforms_between_rows:list, images_list_scaling_factor:float=1.0, logdata_folder:str=None) -> np.ndarray:
@@ -748,7 +748,7 @@ class ImageReconstruct2DModel():
                 output_file = os.path.join(logdata_folder, f'row_reco_image_{row_index}_original_scale.jpg')
                 self.logger.info(f'{self.__name__}: Writing full-scale row reconstructed image to file {output_file}')
                 if not cv2.imwrite(output_file, row_reco_image_original_scale):
-                    raise OSError(f'Failed to write whole reconstructed image at original scale to {output_file}')
+                    raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write whole reconstructed image at original scale to {output_file}')
                 
             row_reco_image_original_scale = cv2.rotate(row_reco_image_original_scale, cv2.ROTATE_90_COUNTERCLOCKWISE)
             row_recoimages_list.append(row_reco_image_original_scale)
@@ -760,7 +760,7 @@ class ImageReconstruct2DModel():
             output_file = os.path.join(logdata_folder, ImageReconstructModel.FILENAME_WHOLE_RECO_FULL_SCALE_IMAGE)
             self.logger.info(f'{type(self).__name__}: Writing whole full-scale reconstructed image to file {output_file}')
             if not cv2.imwrite(output_file, whole_reco_image_original_scale):
-                raise OSError(f'Failed to write whole reconstructed image at original scale to {output_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write whole reconstructed image at original scale to {output_file}')
             
         return whole_reco_image_original_scale
         
@@ -782,7 +782,7 @@ class ImageReconstruct2DModel():
         if output_file is not None:  # save the images only if output_folder is provided
             self.logger.info(f'{type(self).__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
             if not cv2.imwrite(output_file, row_reco_image):
-                raise OSError(f'Failed to write  row reconstructed image at scale to {output_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write  row reconstructed image at scale to {output_file}')
         return row_reco_image, warped_roi_corners, warped_roi_sizes 
  
             
@@ -841,7 +841,7 @@ class ImageReconstruct1DModel():
         self.logger.info(f'The confidence matrix:\n{self.confidence_matrix}')
         for image_index in range(0, len(images_1d_list) - 1):
             if self.confidence_matrix[image_index, image_index + 1] < image_matching_min_confidence:
-                raise DetectorRejectError(DetectorErrorCodes.RECO_MATCH_FAILED, f'Cannot merge adjacent images: possibly error in image capturing')
+                raise DetectorFailed(DetectorExceptionCodes.RECO_MATCH_FAILED, f'Cannot merge adjacent images: possibly error in image capturing')
         # step 4: save the images annotated with matching results to a class variables 
         self.debug_images_feature_matching = None
         if debug_feature_matching_images:
@@ -879,7 +879,7 @@ class ImageReconstruct1DModel():
             self.estimated_reco_image_size = self._estimate_model_outer_roi_size(self.roi_corners, self.roi_sizes)
             self.logger.info(f'Estimated reconstructed image size: {self.estimated_reco_image_size} and\ncorners: {self.roi_corners}')
         except:
-            raise DetectorRejectError(DetectorErrorCodes.RECO_FAILED, f'Cannot combine image as a grid: possibly wayward homography matrices')
+            raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot combine image as a grid: possibly wayward homography matrices')
 
     @classmethod
     def _print_camera_transforms_row(cls, camera_transforms_row, logger):

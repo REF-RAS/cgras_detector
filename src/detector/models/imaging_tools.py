@@ -9,16 +9,16 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, random, re
+import os, yaml
 import numpy as np
 import cv2
 from collections import defaultdict
-from .detector_error import DetectorRejectError, DetectorErrorCodes
+from .detector_error import DetectorFailed, DetectorExceptionCodes
 
 class ImageMap():
     """ Model a 2D list of images as an ImageMap object that facilitates downscaling for reducing the processing time 
     """
-    def __init__(self, image_map, working_scale:float=0.1, **kwargs):
+    def __init__(self, images_2d_list:list, working_scale:float=0.1, **kwargs):
         """ the constructor
 
         :param image_map: a list of lists of numpy images representing a 2D grid of images
@@ -31,38 +31,38 @@ class ImageMap():
         self.image_size_full = None
         self.map_image_scaled = defaultdict(lambda: None)
         # validate the image_map parameter
-        if type(image_map) not in (list, tuple):
+        if type(images_2d_list) not in (list, tuple):
             raise AssertionError(f'Parameter image_map is not a list/tuple')
-        self.nrows, self.ncols = len(image_map), None
+        self.nrows, self.ncols = len(images_2d_list), None
         # iterate through the 2d list of lists image_map
-        for row_index, image_row in enumerate(image_map):
+        for row_index, image_row in enumerate(images_2d_list):
             if type(image_row) not in (list, tuple):
                 raise AssertionError(f'Parameter image_map is not a 2d list: A list element is not a list/tuple')  
             # set the number of columns
             if self.ncols is None:
                 self.ncols = len(image_row)
             elif self.ncols != len(image_row):
-                raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Row Length Mismatch: two rows in the image grid are of different lengths')
+                raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Row Length Mismatch: two rows in the image grid are of different lengths')
             for col_index, image_obj in enumerate(image_row):
                 # if image_obj is a file path, read in the image
                 if type(image_obj) == str:
                     if not os.path.isfile(image_obj):
-                        raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Image File Not Found: {image_obj}')
+                        raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Image File Not Found: {image_obj}')
                     try:
                         image_obj = cv2.imread(image_obj)
                     except Warning as e:
-                        raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}', e)
+                        raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}', e)
                     except Exception as e:
-                        raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}', e)
+                        raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}', e)
                 # test if image_obj is a numpy image
                 if type(image_obj) is not np.ndarray:
-                    raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}')
+                    raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}')
                 # test if the image size is consistent with the first image
                 if self.image_size_full is None:
                     self.image_size_full = image_obj.shape[:2][::-1]
                 else:
                     if self.image_size_full[0] != image_obj.shape[1] or self.image_size_full[1] != image_obj.shape[0]:
-                        raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Dimension of Images Different: Image at grid index (row {row_index} col {col_index}) has a different resolution ')
+                        raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Dimension of Images Different: Image at grid index (row {row_index} col {col_index}) has a different resolution ')
                 # resize the image to the work_scale
                 self.image_size_scale = (int(self.image_size_full[0] * self.working_scale), int(self.image_size_full[1] * self.working_scale))
                 image_scaled = cv2.resize(image_obj, self.image_size_scale)
@@ -209,6 +209,46 @@ class CameraTransformTools():
         camera_transform.ppy = camera_transform.ppy * scaling_factor
         return camera_transform    
 
+class ImageFileTools():
+    @staticmethod
+    def tile_sample_to_image_2d_list(tile_sample_data:dict) -> list:
+        image_files_parent_folder = tile_sample_data.get('image_files_parent_folder', None)
+        tile_images_list = tile_sample_data.get('images', None)
+        assert tile_images_list is not None, 'Input parameter does not contain a mandatory key (images)'
+        try:
+            # traverse the images branch of the tile sample specification
+            # index the image path with their x and y location 
+            image_grid = dict()
+            max_x, max_y = -1, -1
+            for index, tile_image in enumerate(tile_images_list):
+                x, y = tile_image.get('x', None), tile_image.get('y', None)
+                max_x, max_y = max(max_x, x), max(max_y, y)
+                filepath = tile_image.get('file', None)
+                if image_files_parent_folder is not None:
+                    filepath = os.path.join(image_files_parent_folder, filepath)
+                image_grid[x, y] = filepath 
+            # build the image_2d_list
+            image_2d_list = []
+            for y in range(max_y + 1):
+                row_list = []
+                for x in range(max_x + 1):
+                    filepath = image_grid.get((x, y,), None)
+                    if filepath is None:
+                        raise Exception(f'Missing index {(x, y)} in the images list')
+                    row_list.append(filepath)
+                image_2d_list.append(row_list)
+            return image_2d_list
+        except Exception as e:
+            raise
+        
+    @staticmethod
+    def tile_sample_file_to_image_2d_list(yaml_filepath:dict) -> list:
+        try:
+            with open(yaml_filepath, 'r') as infile:
+                tile_sample_data = yaml.load(infile, Loader=yaml.Loader)
+            return ImageFileTools.tile_sample_to_image_2d_list(tile_sample_data)
+        except:
+            raise
 
 # ----------------------------------------------------------------------------------
 # Test functions

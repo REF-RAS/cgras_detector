@@ -38,7 +38,7 @@ class HealthModelTable():
                         ], id=prefix+'confirm_modal', is_open=False)
         
         # define a toast for feedback  
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='primary', 
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='primary', header='Message',
                                 style={'position': 'fixed', 'top': '50%', 'left': '30%', 'width': 480, 'transform': 'translate(-50%, -50%)'})
         
         self._model, self._model_column = self.get_default_datatable_model()

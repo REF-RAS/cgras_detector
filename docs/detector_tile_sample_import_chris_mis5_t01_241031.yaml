@@ -13,6 +13,9 @@ images:
   - x: 0
     y: 0
     file: CGRAS_Amag_241031_T01_00.jpg
+    metadata:
+      - focus: 1
+        length: 2
   - x: 1
     y: 0
     file: CGRAS_Amag_241031_T01_01.jpg

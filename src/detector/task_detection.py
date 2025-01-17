@@ -19,7 +19,7 @@ import pandas as pd
 
 from cgras_datatools.lock_tools import synchronized
 from cgras_datatools.file_tools import replace_suffix 
-from detector.models import logger, ModelsConfigNames, DetectorRejectError, DetectorAbortError, DetectorErrorCodes
+from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
 from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.html.lightbox import LightboxHelper
@@ -86,7 +86,7 @@ class DetectionTaskModel():
     ANNOTATED_IMAGES_HTML_FILENAME = 'annotated_images.html'
     LANDING_HTML_FILENAME = 'index.html'
     
-    def __init__(self, tile_sample_id:str, params:dict=None, **kwargs):
+    def __init__(self, tile_sample_id:str, params:dict=None):
         # progress tracking
         self.progress_model = ProgressModel()
         self.progress_model.start_stage(ProgressStages.INIT)
@@ -97,7 +97,7 @@ class DetectionTaskModel():
         self.loctile_model:LocateTileModel = None
         self.cod_model:CoralObjectDetectModel = None
         self.detection_stat = {} 
-        self.to_abort = False
+        self.to_cancel = False
         self.start_time = time.time()
         # extract information about this tile sample
         self.tile_sample_id = tile_sample_id
@@ -113,13 +113,13 @@ class DetectionTaskModel():
             self.settle_date_dt, self.capture_date_dt = pd.to_datetime(self.settle_time, utc=True), pd.to_datetime(self.batch_time, utc=True)
             self.days_since_settle = (self.capture_date_dt - self.settle_date_dt).days
         except Exception as e:
-            raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Invalid date/time format in batch time or settle time', e = e)
+            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Invalid date/time format in batch time or settle time', e = e)
         
         # resolve the suitable yolo model for this tile
         self.yolo_model_list = DETECT_DAO.query_yolo_model(self.species, self.days_since_settle)
         if self.yolo_model_list is None or len(self.yolo_model_list) == 0:
             logger.warning(f'{type(self).__name__}: No suitable yolo model for species ({self.species}) and days_since_settlement ({self.days_since_settle}) is found')
-            raise DetectorAbortError(DetectorErrorCodes.YOLO_MODEL_UNDEFINED, f'No suitable yolo model: species ({self.species}) and days_since_settlement ({self.days_since_settle})') 
+            raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_UNDEFINED, f'No suitable yolo model: species ({self.species}) and days_since_settlement ({self.days_since_settle})') 
         # just pick the first one if more than one yolo model is suitable
         self.yolo_model_dict = self.yolo_model_list[0]
         # build parameters for the detection process
@@ -149,7 +149,7 @@ class DetectionTaskModel():
                 yaml.dump(self.params, outfile, Dumper=yaml.Dumper)
         except Exception as e:
             logger.warning(f'{type(self).__name__}: unable to save detect model parameter to the logdata folder {param_yaml_file}')
-            raise OSError(f'Failed to save detect model parameter to the logdata folder {param_yaml_file}')
+            raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to save detect model parameter to the logdata folder {param_yaml_file}', e=e)
         # copy the script files for the generated html files to the logdata folder of a tile sample
         scripts_folder = os.path.join(self.logdata_folder, 'scripts')
         APP_FILE_MANAGER.copy_scripts_folder(scripts_folder)
@@ -189,18 +189,18 @@ class DetectionTaskModel():
             for x in range(grid_size_x + 1):
                 if (x, y) not in capture_image_grid:
                     logger.warning(f'DetectionTaskModel._build_image_map_as_list: One or more images are missing in the 2d grid of images')
-                    raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid')
+                    raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid')
                 row_images.append(capture_image_grid[(x, y)])
             image_map_as_list.append(row_images)
         return image_map_as_list, (grid_size_x, grid_size_y,)
     
     def execute_task_reco(self):
-        self.progress_model.start_stage(ProgressStages.INIT)
+        self.progress_model.start_stage(ProgressStages.RECO)
         # build image_map_as_list from the captured images
         try:
             self.image_map_as_list, self.image_grid_dim = self._build_image_map_as_list(self.tile_sample_id)
         except Exception as e:
-            raise DetectorRejectError(DetectorErrorCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
+            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
         # load the cached ImageReconstructModel if exists, or build a new model from captured images
         reco_model_file = os.path.join(self.logdata_folder, self.params.get('reco_model_filename', 'reco_model.yaml'))
         try:
@@ -211,9 +211,9 @@ class DetectionTaskModel():
         
         if self.reco_model is None:
             self.reco_model = ImageReconstructModel(self.image_map_as_list, working_scale=0.1, **self.params) 
-            if self.to_abort:
+            if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             self.reco_model.build()
             ImageReconstructModelHelper.to_yaml(self.reco_model, reco_model_file)
         self.progress_model.end_stage(ProgressStages.RECO)
@@ -230,9 +230,9 @@ class DetectionTaskModel():
             
         if self.loctile_model is None:
             self.loctile_model = LocateTileModel(self.image_map_as_list, reco_model=self.reco_model, **self.params)
-            if self.to_abort:
+            if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             self.loctile_model.build()
             LocateTileModelHelper.to_yaml(self.loctile_model, loctile_model_file)
         self.progress_model.end_stage(ProgressStages.LOCTILE)
@@ -251,25 +251,25 @@ class DetectionTaskModel():
         if self.cod_model is None:
             # load the yolo_model first
             yolo_model_file=self.params.get(ModelsConfigNames.YOLO_MODEL_FILE.value)
-            if self.to_abort:
+            if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             try:
                 logger.info(f'{type(self).__name__}: Attempting to load the yolo_model_file at {yolo_model_file}')
                 yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file)
             except Exception as e:
                 logger.info(f'{type(self).__name__}: Failed to load the yolo model file: {e}')
-                raise DetectorAbortError(DetectorErrorCodes.YOLO_MODEL_FILE_ERROR, f'Failed to load the yolo model file ({yolo_model_file})', e = e)
+                raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_FILE_ERROR, f'Failed to load the yolo model file ({yolo_model_file})', e = e)
             # build the cod model
-            if self.to_abort:
+            if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
-                raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+                raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             self.cod_model = CoralObjectDetectModel(self.image_map_as_list, self.reco_model, yolo_model, self.loctile_model, self._execute_task_object_detection_cb, **self.params)
             self.cod_model.build()
             try:
                 CoralObjectDetectModelHelper.to_yaml_file(self.cod_model, cod_model_file)  
             except Exception as e:
-                raise OSError(f'Failed to write cod model to yaml file {cod_model_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write cod model to yaml file {cod_model_file}', e=e)
         self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)        
 
     def _execute_task_object_detection_cb(self, progress_tuple:tuple):
@@ -285,9 +285,9 @@ class DetectionTaskModel():
         
         DETECT_DAO.delete_detected_objects_of_tile_sample(self.tile_sample_id)  # DB operation
          
-        if self.to_abort:
+        if self.to_cancel:
             self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
-            raise DetectorAbortError(DetectorErrorCodes.ABORTED_BY_SYSTEM, 'Received an abort command from the system')
+            raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
         stat = self._process_detected_objects(self.cod_model)    # DB operation
         logger.info(f'{type(self).__name__}: Statistics {stat}')
         self.detection_stat.update(stat)
@@ -295,24 +295,24 @@ class DetectionTaskModel():
         try:
             self._update_detection_stat(self.detection_stat)     # DB opration
         except Exception:
-            raise DetectorAbortError(DetectorErrorCodes.DB_ERROR, 'Failed to write detection results to the database')
+            raise DetectorAborted(DetectorExceptionCodes.DB_ERROR, 'Failed to write detection results to the database')
         # generate html files
         try:
             self.generate_html_files()
         except Exception as e:
-            raise OSError(f'Unable to write html files: {e}')
+            raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Unable to write html files: {e}', e=e)
         # update the progress model
         self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
         self.progress_model.end_stage(ProgressStages.COMPLETED)
 
-    def abort_task(self):
-        self.to_abort = True
+    def cancel_task(self):
+        self.to_cancel = True
         if self.reco_model is not None:
-            logger.warning(f'Task Detection: attempt to abort reco_model')
-            self.reco_model.abort()        
+            logger.warning(f'Task Detection: attempt to cancel building of reco_model')
+            self.reco_model.cancel_build()        
         if self.cod_model is not None:
-            logger.warning(f'Task Detection: attempt to abort cod_model')
-            self.cod_model.abort()
+            logger.warning(f'Task Detection: attempt to cancel building of cod_model')
+            self.cod_model.cancel_build()
     
     def generate_html_files(self):
         link_dict_list = []

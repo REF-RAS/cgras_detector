@@ -30,8 +30,8 @@ class ModelsPage():
         self.yolo_model_table_panel = YoloModelTable(app, prefix)
         self.yolo_model_range_chart_panel = YoloModelRangeChartBlock(app, prefix)
         # the health model blocks
-        self.health_model_file_import_panel = HealthModelFileImportBlock(app, prefix)
-        self.health_model_table_panel = HealthModelTable(app, prefix)
+        # self.health_model_file_import_panel = HealthModelFileImportBlock(app, prefix)
+        # self.health_model_table_panel = HealthModelTable(app, prefix)
         self._define_page()
     
     def layout(self, validate=False):
@@ -42,7 +42,7 @@ class ModelsPage():
         self.yolo_model_table_panel.register_update_table_trigger(self.yolo_model_file_import_panel.get_import_success_trigger_id())
         self.yolo_model_range_chart_panel.register_update_chart_trigger(self.yolo_model_table_panel.get_updated_success_trigger_id())
         # connect the import health model and the table
-        self.health_model_table_panel.register_update_table_trigger(self.health_model_file_import_panel.get_import_success_trigger_id())
+        # self.health_model_table_panel.register_update_table_trigger(self.health_model_file_import_panel.get_import_success_trigger_id())
 
         # putting the components together 
         rows = html.Div(id='scan-body', children =[
@@ -56,12 +56,14 @@ class ModelsPage():
             dbc.Row(html.H4(children = 'Scopes of Yolo Models', className='text-center mt-5 mb-3')),
             dbc.Row([dbc.Col(self.yolo_model_range_chart_panel.get_panel(), className='col-12 border'), 
                      ], className='mx-auto'), 
-            dbc.Row(html.H4(children = 'Import Health Model', className='text-center mt-5 mb-3')),
-            dbc.Row([dbc.Col(self.health_model_file_import_panel.get_panel(), className='col-12 border'), 
-                     ], className='mx-auto'), 
-            dbc.Row(html.H4(children = 'Health Models', className='text-center mt-5 mb-3')),
-            dbc.Row([dbc.Col(self.health_model_table_panel.get_panel(), className='col-12 border'), 
-                     ], className='mx-auto'),                       
+            
+            # dbc.Row(html.H4(children = 'Import Health Model', className='text-center mt-5 mb-3')),
+            # dbc.Row([dbc.Col(self.health_model_file_import_panel.get_panel(), className='col-12 border'), 
+            #          ], className='mx-auto'), 
+            # dbc.Row(html.H4(children = 'Health Models', className='text-center mt-5 mb-3')),
+            # dbc.Row([dbc.Col(self.health_model_table_panel.get_panel(), className='col-12 border'), 
+            #          ], className='mx-auto'),  
+                                 
         ], className='mx-auto col-10 mb-5')
         self._layout = dbc.Container(rows, fluid=True)
 

@@ -1,0 +1,50 @@
+batch_id: CG1_241219102421
+batch_time: '2024-12-19 00:27:28'
+image_files_parent_folder: /home/qcr/cgras_data/images/2024Oct-MIS5T13_CG1_241219102421/Original
+images:
+- file: 2024Oct-MIS5T13_CG1_241219102421_0_0.jpg
+  x: 0
+  y: 0
+- file: 2024Oct-MIS5T13_CG1_241219102421_1_0.jpg
+  x: 1
+  y: 0
+- file: 2024Oct-MIS5T13_CG1_241219102421_2_0.jpg
+  x: 2
+  y: 0
+- file: 2024Oct-MIS5T13_CG1_241219102421_2_1.jpg
+  x: 2
+  y: 1
+- file: 2024Oct-MIS5T13_CG1_241219102421_1_1.jpg
+  x: 1
+  y: 1
+- file: 2024Oct-MIS5T13_CG1_241219102421_0_1.jpg
+  x: 0
+  y: 1
+- file: 2024Oct-MIS5T13_CG1_241219102421_0_2.jpg
+  x: 0
+  y: 2
+- file: 2024Oct-MIS5T13_CG1_241219102421_1_2.jpg
+  x: 1
+  y: 2
+- file: 2024Oct-MIS5T13_CG1_241219102421_2_2.jpg
+  x: 2
+  y: 2
+- file: 2024Oct-MIS5T13_CG1_241219102421_2_3.jpg
+  x: 2
+  y: 3
+- file: 2024Oct-MIS5T13_CG1_241219102421_1_3.jpg
+  x: 1
+  y: 3
+- file: 2024Oct-MIS5T13_CG1_241219102421_0_3.jpg
+  x: 0
+  y: 3
+importer: POLL_IMPORTER
+num_tabs:
+- 20
+- 20
+operator: Unknown
+season: 2024Oct
+settle_time: '2024-10-30'
+spawn_time: '2024-10-15 00:00:00'
+species: acropora palmata
+tile_id: 2024Oct-MIS5T13

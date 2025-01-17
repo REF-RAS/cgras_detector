@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import base64, io, yaml
+import base64, io, yaml, traceback
 import pandas as pd
 import dash
 from dash import html, dcc, callback, Input, Output, State, dash_table, ctx
@@ -25,8 +25,8 @@ class TileSampleImportFileBlock():
         self.app = app
         prefix = prefix + 'tsif_'
         # define widgets
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define tile sample spec import panel
         self.file_upload_area = dcc.Upload(id=prefix+'file_import_area', children=html.Div([
             'Drag and Drop or ', html.A('Select a tile sample yaml file')]), style={
@@ -44,6 +44,7 @@ class TileSampleImportFileBlock():
                                             dbc.Button('Cancel', id=prefix+'cancel_button', n_clicks=0, color='secondary'),], 
                                         className='text-center, mt-3', style={'display': 'block'}),
                                         ]),
+                html.P('Note: The tile sample import process will run in the background and will take some time to complete.', className='mt-3 text-danger'),
             ], size='xl', is_open=False,)  
         
         self._panel = dbc.Col([
@@ -85,11 +86,11 @@ class TileSampleImportFileBlock():
 
     # define callback functions
     def _file_import_confirmed(self): 
-        def file_import_confirmed(confirm_button, cancel_button, yaml_data):
+        def file_import_confirmed(confirm_button, cancel_button, tile_sample_data):
             button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
             if button_id.endswith('confirm_button'):
               
-                result = DETECT_DAO.import_tile_sample_yaml(yaml_data)
+                result = DETECT_DAO.import_tile_sample_yaml(tile_sample_data)
                 if result:
                     message = 'Import tile sample successful'
                 else:
@@ -105,15 +106,18 @@ class TileSampleImportFileBlock():
         def file_import_received(contents, filename, last_modified):       
             uploaded = {'contents': contents, 'filename': filename, 'last_modified': last_modified}
             content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
-            
-            # validate the input and obtain the model for the confirm dialog
-            is_valid, model = DETECT_DAO.validate_tile_sample_import(yaml_data)
-            if not is_valid:
-                message = 'One or more problems have been found in the tile sample spec yaml file.'
-                return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
-            else:
-                yaml_data['age'] = (yaml_data['batch_time'] - pd.to_datetime(yaml_data['settle_time'])).days
-                return (True, 'Confirm to import this tile sample', model.to_dict('records'), None, {'display': 'block'}, yaml_data, None, None,) 
+            try:
+                decoded = base64.b64decode(content_string)
+                tile_sample_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
+                
+                # validate the input and obtain the model for the confirm dialog
+                is_valid, model = DETECT_DAO.validate_tile_sample_import(tile_sample_data)
+                if not is_valid:
+                    message = 'One or more problems have been found in the tile sample spec yaml file.'
+                    return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, tile_sample_data, None, None,)  
+                else:
+                    return (True, 'Confirm to import this tile sample', model.to_dict('records'), None, {'display': 'block'}, tile_sample_data, None, None,) 
+            except Exception as e:
+                traceback.print_exc()
+                return (True, 'Unrecognized import file format', None, None, {'display': 'none'}, None, None, None,) 
         return file_import_received 

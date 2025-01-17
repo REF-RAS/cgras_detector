@@ -38,8 +38,8 @@ class YoloModelTable():
                         ], id=prefix+'confirm_modal', is_open=False)
         
         # define a toast for feedback  
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         
         self._model, self._model_column = self.get_default_datatable_model()
         self._datatable = dash_table.DataTable(data=self._model, columns=self._model_column,
@@ -168,8 +168,8 @@ class YoloModelTable():
     
     def get_default_datatable_model(self):
         model = DETECT_DAO.list_yolo_model()
-        model['Period'] = model.apply(lambda row: DETECT_DAO.get_period_str(row['start_day'], row['end_day']), axis=1)
-        model['Input Image Size'] = model.apply(lambda row: f'{row["input_image_width"]} x {row["input_image_height"]}', axis=1)
+        model['Period'] = model.apply(lambda row: DETECT_DAO.get_period_str(row['start_day'], row['end_day']), axis=1, result_type='reduce')
+        model['Input Image Size'] = model.apply(lambda row: f'{row["input_image_width"]} x {row["input_image_height"]}', axis=1, result_type='reduce')
         model = model[['id', 'name', 'species', 'Period', 'Input Image Size']]
         model.columns = ['ID', 'Model Name', 'Species', 'Period', 'Input Image Size']
         columns = []

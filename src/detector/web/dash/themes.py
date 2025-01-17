@@ -4,6 +4,7 @@
 
 # BOOTSTRAP = "../../scripts/bootstrap.min.css"
 BOOTSTRAP = ['assets/scripts/bootstrap.min.css',
+             'assets/scripts/table.css',
             ]
 
 BOOTSTRAP_JS = ['assets/scripts/bootstrap.min.js',

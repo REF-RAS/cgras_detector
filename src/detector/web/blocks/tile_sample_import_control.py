@@ -16,25 +16,24 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO
-
+from detector.model import DETECT_DAO, PERSISTENT_STORE_DAO, PersistentStoreDAO
+from cgras_datatools.logging_tools import logger
  
 class EnableTileSamplesImportBlock():
-    CONFIG_NAME = 'tiles_import_enabled'
+
     def __init__(self, app, prefix):
         self.app = app 
         self.prefix = prefix = prefix + 'etsi'
+        self.update_store_id = prefix + 'update_store'
         # model variables
-        
-        self.enable_import_new_samples:bool = PERSISTENT_STORE_DAO.get_config_value(EnableTileSamplesImportBlock.CONFIG_NAME, default=False)
         self.import_new_samples_options = [
                 {'label': 'Enabled', 'value': True},
                 {'label': 'Disabled', 'value': False},]
         # define widgets 
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
 
-        import_new_samples_select = dcc.Dropdown(self.import_new_samples_options, value=self.enable_import_new_samples, id=prefix+'mode_dropdown', 
+        import_new_samples_select = dcc.Dropdown(self.import_new_samples_options, value=None, id=prefix+'mode_dropdown', 
                                                 className='mx-auto col-8', searchable=False, clearable=False)
         # database reset panel
         self._panel = dbc.Col([
@@ -42,30 +41,42 @@ class EnableTileSamplesImportBlock():
                 html.P('', className='mt-3 text-danger'), 
                 html.P('Import Tile Samples from the Image Acquisition System', className='mx-auto col-8 fw-bold'),
                 html.Div([import_new_samples_select], className='mx-auto col-4'),
-                html.P('New tile sample', id=prefix+'new_tile_sample_status', className='mt-3'),               
+                # html.P('New tile sample', id=prefix+'new_tile_sample_status', className='mt-3'),               
                 self._toast,
-            ], className='mx-auto text-center')
+                dcc.Store(self.update_store_id),
+            ], id=prefix+'main_panel', className='mx-auto text-center')
 
-        self.app.callback([Output(prefix+'dummy', 'data')],
-                            [Input(prefix+'mode_dropdown', 'value')], 
-            prevent_initial_call=True)(self._enable_import_tile_samples_toggle())
+        self.app.callback([Output(self.update_store_id, 'data', allow_duplicate=True)],
+                            [Input(prefix+'mode_dropdown', 'value')], prevent_initial_call=True)(self._enable_import_tile_samples_toggle())
+        
+        self.app.callback([Output(self.prefix+'mode_dropdown', 'value')],
+            [Input(self.update_store_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_dropdown())
+
+        self.app.callback([Output(self.update_store_id, 'data', allow_duplicate=True)],
+            [Input(prefix+'main_panel', 'children')], prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
    
     def get_panel(self):
         return self._panel
     
     def register_trigger(self, trigger_id:str):
         # define callbacks for the datatable data
-        self.app.callback([Output(self.prefix+'new_tile_sample_status', 'children')],
-            [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_panel())
+        self.app.callback([Output(self.update_store_id, 'data', allow_duplicate=True)],
+            [Input(trigger_id, 'data')], prevent_initial_call=True, allow_duplicate=True)(self._update_dropdown())
+    
+    def _update_dropdown(self):
+        def update_dropdown(data):
+            enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
+            return (enable_import_new_samples,)
+        return update_dropdown
     
     def _update_panel(self):
-        def update_panel(data):
-            message = 'No new tile sample is found in the image acquisition system'
-            return (message,)
-        return update_panel
+        def update_panel(children):
+            message = ' '
+            return (True,)
+        return update_panel    
     
     def _enable_import_tile_samples_toggle(self):
         def enable_import_tile_samples_toggle(enabled):
-            PERSISTENT_STORE_DAO.set_config_value(EnableTileSamplesImportBlock.CONFIG_NAME, enabled)
-            return (None,)
+            PERSISTENT_STORE_DAO.set_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, enabled)
+            raise PreventUpdate
         return enable_import_tile_samples_toggle

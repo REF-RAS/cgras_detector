@@ -16,7 +16,7 @@ from datetime import datetime
 # project modules
 from cgras_datatools.logging_tools import logger
 
-class DetectorErrorCodes(Enum):
+class DetectorExceptionCodes(Enum):
     UNDEFINED = 0
     INPUT_DATA_INVALID = 1
     RECO_MATCH_FAILED = 2
@@ -26,24 +26,26 @@ class DetectorErrorCodes(Enum):
     YOLO_MODEL_UNDEFINED = 6
     YOLO_MODEL_ERROR = 7
     YOLO_MODEL_FILE_ERROR = 8
-    ABORTED_BY_SYSTEM = 11
+    CANCELLED_BY_SYSTEM = 11
     FILE_IO_ERROR = 21
     DB_ERROR = 22
+    OS_ERROR = 31
+    DISK_SPACE_ERROR = 32
 
-class DetectorError(Exception):
-    def __init__(self, code:DetectorErrorCodes, remarks:str=None, e=None, source=None):            
+class DetectorException(Exception):
+    def __init__(self, code:DetectorExceptionCodes, remarks:str=None, e=None, source=None):            
         # Call the base class constructor with the parameters it needs
         super().__init__(remarks)
-        if isinstance(code, DetectorErrorCodes):
+        if isinstance(code, DetectorExceptionCodes):
             self.code = code
         else:
             logger.warning(f'DetectorError: Parameter code is not one of DetectorErrorCodes')
-            self.code = DetectorErrorCodes.UNDEFINED
+            self.code = DetectorExceptionCodes.UNDEFINED
         self.source = source
         self.remarks = remarks
         self.e = e
     
-    def get_code(self) -> DetectorErrorCodes:
+    def get_code(self) -> DetectorExceptionCodes:
         return self.code
     
     def get_source(self):
@@ -52,12 +54,17 @@ class DetectorError(Exception):
     def get_remarks(self):
         return self.remarks
 
-class DetectorRejectError(DetectorError):
-    def __init__(self, code:DetectorErrorCodes, remarks:str=None, e=None, source=None):            
+class DetectorFailed(DetectorException):
+    def __init__(self, code:DetectorExceptionCodes, remarks:str=None, e=None, source=None):            
         # Call the base class constructor with the parameters it needs
         super().__init__(code, remarks, e, source)
 
-class DetectorAbortError(DetectorError):
-    def __init__(self, code:DetectorErrorCodes, remarks:str=None, e=None, source=None):            
+class DetectorAborted(DetectorException):
+    def __init__(self, code:DetectorExceptionCodes, remarks:str=None, e=None, source=None):            
         # Call the base class constructor with the parameters it needs
         super().__init__(code, remarks, e, source) 
+        
+class DetectorCancelled(DetectorException):
+    def __init__(self, code:DetectorExceptionCodes, remarks:str=None, e=None, source=None):            
+        # Call the base class constructor with the parameters it needs
+        super().__init__(code, remarks, e, source)    

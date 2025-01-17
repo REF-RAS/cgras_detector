@@ -40,8 +40,10 @@ class SampleManagerPage():
         # connect the system interval timer to the pending_sample_table and the tile_sample_retrieve_panel
         self.pending_sample_table.register_trigger('dashapp_interval_store')
         self.tile_sample_retrieve_panel.register_trigger('dashapp_interval_store')
+        self.tile_sample_search_panel.register_trigger('dashapp_interval_store')
         # connect the tile_sample_search_panel output to the input of processed_tile_sample_edit_table
-        self.processed_sample_table.register_trigger(self.tile_sample_search_panel.get_search_trigger_id())
+        self.processed_sample_table.register_trigger(self.tile_sample_search_panel.get_search_clicked_trigger_id())
+
 
         # putting the components together 
         rows = html.Div(id='scan-body', children =[

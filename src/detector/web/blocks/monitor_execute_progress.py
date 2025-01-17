@@ -42,7 +42,7 @@ class MonitorExecuteProgressBlock():
             html.Span('Record', className='text-success col-2'),
         ])
         
-        self._abort_button = dbc.Button('Abort', id=prefix+'abort_task_button', color='warning', size='sm', className='col-12')
+        self._abort_button = dbc.Button('Cancel', id=prefix+'cancel_task_button', color='warning', size='sm', className='col-12')
 
         self._panel = dbc.Col([
                 html.H4(dbc.Badge('TASK EXECUTION STATUS', className='ms-2 mb-4', color='white', text_color='secondary')),
@@ -66,8 +66,8 @@ class MonitorExecuteProgressBlock():
                            Output(prefix+'progress_4', 'value'),],
                         [Input(self.update_store_id, 'data')])(self._update_content())
         
-        self.app.callback([Output(prefix+'abort_task_button', 'n_clicks', allow_duplicate=True)],
-                        [Input(prefix+'abort_task_button', 'n_clicks')], prevent_initial_call=True)(self._abort_button_pressed()) 
+        self.app.callback([Output(prefix+'cancel_task_button', 'n_clicks', allow_duplicate=True)],
+                        [Input(prefix+'cancel_task_button', 'n_clicks')], prevent_initial_call=True)(self._cancel_button_pressed()) 
         
     def get_panel(self):
         return self._panel
@@ -123,7 +123,7 @@ class MonitorExecuteProgressBlock():
                     # elif state == SystemStates.D_UPDATE_HEALTH_INDEX:
                     #     progress_message = f'Doing health checks on the coral babies'
                     #     progress = (5, 5, 80, 5)
-                elif state == SystemStates.D_ABORTED:
+                elif state == SystemStates.D_FLAGGED:
                     progress_bar_style = {'visibility': 'hidden'}
                     progress_message = f'The task has been aborted'
                     return (progress_message, progress_bar_style, None, None, 0, 0, 0, 0,)
@@ -137,10 +137,10 @@ class MonitorExecuteProgressBlock():
 
         return update_content 
     
-    def _abort_button_pressed(self):
+    def _cancel_button_pressed(self):
         def abort_button_pressed(abort_button):
             if abort_button is None:
                 raise PreventUpdate
-            CALLBACK_MANAGER.fire_event(CallbackTypes.PROCESS_TILE_TO_ABORT)
+            CALLBACK_MANAGER.fire_event(CallbackTypes.PROCESS_TILE_TO_CANCEL)
             return (0, )
         return abort_button_pressed

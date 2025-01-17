@@ -25,11 +25,11 @@ class YoloModelFileImportBlock():
         self.default_max_end_day = default_max_end_day
         self.import_success_trigger_id = prefix + 'import_success'
         # define widgets
-        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', 
-                                style={'position': 'fixed', 'top': '10%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+        self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
+                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define tile sample spec import panel
         self.file_upload_area = dcc.Upload(id=prefix+'file_import_area', children=html.Div([
-            'Drag and Drop or ', html.A('Select a Yolo model file specification yaml file')]), style={
+            'Drag and Drop a Yolo model specification yaml file']), style={
             # 'width': '400px', 
             'height': '60px', 'lineHeight': '60px',
             'borderWidth': '1px', 'borderStyle': 'dashed', 'borderRadius': '5px',
@@ -50,7 +50,7 @@ class YoloModelFileImportBlock():
         self.file_upload_panel = html.Div([
                 dcc.Store(self.import_success_trigger_id),
                 dcc.Store(id=prefix+'imported_content'),
-                html.H4(dbc.Badge('IMPORT YOLO MODEL FILE SPEC', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('IMPORT YOLO MODEL SPEC FILE', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.P('Select the yaml file that specifies a yolo model for coral detection.', style={'display': 'inline-block'}),
                 self.file_upload_area,
                 self._toast,
@@ -112,17 +112,20 @@ class YoloModelFileImportBlock():
         def file_import_received(contents, filename, last_modified):       
             uploaded = {'contents': contents, 'filename': filename, 'last_modified': last_modified}
             content_type, content_string = contents.split(',')
-            decoded = base64.b64decode(content_string)
-            yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
-            is_valid, model = DETECT_DAO.validate_yolo_model_file_import(yaml_data)
-            species = yaml_data['species']
-            # extract species list from the 
-            note = ''
-            if not DETECT_DAO.exist_species_in_tile_sample(species):
-                note = f' (Note: the species {species} is new and not found in any tile sample)'
-            if not is_valid:
-                message = 'One or more problems have been found in the tile sample spec yaml file.'
-                return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
-            else:
-                return (True, 'Confirm to import this yolo model specification' + note, model.to_dict('records'), None, {'display': 'block'}, yaml_data, None, None,) 
+            try:
+                decoded = base64.b64decode(content_string)
+                yaml_data = yaml.load(io.BytesIO(decoded), Loader=yaml.Loader)
+                is_valid, model = DETECT_DAO.validate_yolo_model_file_import(yaml_data)
+                species = yaml_data['species']
+                # extract species list from the 
+                note = ''
+                if not DETECT_DAO.exist_species_in_tile_sample(species):
+                    note = f' (Note: the species {species} is new and not found in any tile sample)'
+                if not is_valid:
+                    message = 'One or more problems have been found in the tile sample spec yaml file.'
+                    return (True, 'Error in the uploaded file', model.to_dict('records'), message, {'display': 'none'}, yaml_data, None, None,)  
+                else:
+                    return (True, 'Confirm to import this yolo model specification' + note, model.to_dict('records'), None, {'display': 'block'}, yaml_data, None, None,) 
+            except:
+                return (True, 'Unrecognized import file format', None, None, {'display': 'none'}, None, None, None,) 
         return file_import_received 
