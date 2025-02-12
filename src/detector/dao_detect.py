@@ -196,8 +196,8 @@ class TaskStatusNames(Enum):
     UNKNOWN = -1
     PENDING = 0
     SUCCESS = 1
-    FAILED = 2
-    SOFT_FAILED = 3
+    FAIL = 2
+    RESOLVABLE_FAIL = 3
     REJECTED = 4
     
 class SampleStatusNames(Enum):

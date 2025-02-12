@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, yaml, numbers, random, time
+import os, math, yaml, numbers, random, time, traceback
 from enum import Enum
 from collections import defaultdict
 from datetime import datetime
@@ -17,7 +17,6 @@ import cv2
 import numpy as np
 
 from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper
-from cgras_detector.src.detector.models.imaging_tools import test_get_cgras_sample_images_as_list 
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.models.yolo_detector import YoloObjectDetector, YoloResult, ObjectType
 from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
@@ -27,17 +26,19 @@ class CoralObjectDetectModel():
     """ CoralDetectorModel uses an object detector to extract a list of objects detected in a 2d grid of images that represent a full coral aquaculture tile. The images which may overlap with one another are
         arranged in a 2d grid that implies the location with reference to the tile. The class uses an ImageReconstructionModel to map locations on individual images to  
     """
-    def __init__(self, images_2d_list:list, reco_model:ImageReconstructModel, yolo_model:YoloObjectDetector, locate_tile_model:LocateTileModel=None, progress_cb=None, **kwargs):
+    def __init__(self, images_2d_list:list, yolo_model:YoloObjectDetector, map_bbox_image_fn, map_normalize_bbox_tile_fn, tile_size:tuple, progress_cb=None, **kwargs):
         """ the constructor
 
         :param images_2d_list: A list of lists of images, each of which can be image paths (str typed) or image pixels (np.ndarray), arranged in a 2D grid
         :type images_2d_list: list
-        :param reco_model: The ImageReconstructModel computed for the 2d grid of images, which is used to map locations from image space to tile space
-        :type reco_model: ImageReconstructModel
         :param yolo_model: The YoloObjectDetector model to be used, which should be suitable for the coral species found in the images
         :type yolo_model: YoloObjectDetector
-        :param locate_tile_model: The LocateTileModel model computed for the 2d grid of images, which is used to map locations from reconstruction space to tile space, defaults to None
-        :type locate_tile_model: LocateTileModel, optional
+        :param map_bbox_image_fn: A function that maps a bbox in (image_grid_x, image_grid_y, bbox) to the space reconustructed image
+        :type map_bbox_image_fn: A function definition (image_grid_x, image_grid_y, bbox:list) -> bbox:list
+        :param map_normalize_bbox_tile_fn: A function that maps a bbox in reconstructed image space to the tile space normalized to (0, 1)
+        :type map_normalize_bbox_tile_fn: A function definition (bbox:list) -> bbox:list  
+        :param tile_size: The pixel size of the tile
+        :type tile_size: 2-tuple 
         """
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
@@ -48,15 +49,18 @@ class CoralObjectDetectModel():
         self.count_images_completed = 0
         # keep input parameters
         self.images_2d_list = images_2d_list
-        self.reco_model = reco_model
+        # self.reco_model = reco_model
+        # self.locate_tile_model = locate_tile_model
         self.yolo_model = yolo_model
-        self.locate_tile_model = locate_tile_model
+        self.map_bbox_image_fn = map_bbox_image_fn
+        self.map_normalize_bbox_tile_fn = map_normalize_bbox_tile_fn
+        self.tile_size = tile_size
         self.params = kwargs
         # extract useful information
-        self.tile_size = locate_tile_model.get_tile_size() if locate_tile_model is not None else None
-        if self.tile_size is None:  # if the tile size is not known from LocateTileModel 
-            whole_reco_image_size = reco_model.get_whole_reco_image_size()
-            self.tile_size = whole_reco_image_size
+        # self.tile_size = locate_tile_model.get_tile_size() if locate_tile_model is not None else None
+        # if self.tile_size is None:  # if the tile size is not known from LocateTileModel 
+        #     whole_reco_image_size = reco_model.get_whole_reco_image_size()
+        #     self.tile_size = whole_reco_image_size
         # extract other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
         if self.blob_size is None:
@@ -67,7 +71,8 @@ class CoralObjectDetectModel():
         self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         self.cod_model_cache_filename = kwargs.get(ModelsConfigNames.COD_MODEL_FILENAME.value, f'coral_object_detect_model.yaml')
         # init model parameters
-        self.image_grid_size = reco_model.get_image_map_size()
+        # self.image_grid_size = reco_model.get_image_map_size()
+        self.image_grid_size = (len(self.images_2d_list[0]), len(self.images_2d_list))
         self.object_list_of_images = dict()
         self.object_class_names = None
         self.annotated_blob_filename_dict_lists = dict()       # indexed lists of annotated blob filenames with each list indexed by the image location
@@ -88,7 +93,7 @@ class CoralObjectDetectModel():
                 if self.to_cancel:  # stop processing if abort signal is recieved
                     raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
                 # compute the coral object detect model (long process)
-                self.cod_model = CoralObjectDetectImageModel(image, col_index, row_index, self.reco_model, self.yolo_model, self.locate_tile_model, **self.params)
+                self.cod_model = CoralObjectDetectImageModel(image, col_index, row_index, self.yolo_model, self.map_bbox_image_fn, self.map_normalize_bbox_tile_fn, **self.params)
                 self.cod_model.build()
                 
                 index = (col_index, row_index)
@@ -110,9 +115,7 @@ class CoralObjectDetectModel():
         # step 4: save the object list and metadata to the cache file
         # step 5: clear data if not needed for model inference
         self.images_2d_list = None
-        self.reco_model = None
-        self.yolo_model = None
-        self.locate_tile_model = None     
+        self.yolo_model = None  
 
     def _merge_object_lists(self, include_invalidated=False) -> list:
         """ internal function to return as a single list all the coral objects detected in the 2d grid of images, the duplicated objects due to overlapping regions between neighbouring images are flagged invalidated.
@@ -312,7 +315,7 @@ class CoralObjectDetectImageModel():
         The class divides the image into a 2D grid of blobs. There may be overlapped regions between neighouring blobs, specified by the parameter cod_blob_overlap_pix. 
         The class removes any duplicate resulting from the overlappng regions before resolving the final list of objects. 
     """
-    def __init__(self, image:np.ndarray, image_col_index:int, image_row_index:int, reco_model:ImageReconstructModel, yolo_model:YoloObjectDetector, locate_tile_model:LocateTileModel=None, **kwargs): 
+    def __init__(self, image:np.ndarray, image_col_index:int, image_row_index:int, yolo_model:YoloObjectDetector, map_bbox_image_fn, map_normalize_bbox_tile_fn, **kwargs): 
         """ the constructor
         
         :param image: the source numpy image
@@ -321,21 +324,23 @@ class CoralObjectDetectImageModel():
         :type image_col_index: int
         :param image_row_index: the row index (y) of the image, used for reference with the ImageReconstructModel and for data 
         :type image_row_index: int
-        :param reco_model: The ImageReconstructModel computed for the 2d grid of images, which is used to map locations from image space to tile space
-        :type reco_model: ImageReconstructModel
         :param yolo_model: The YoloObjectDetector model to be used, which should be suitable for the coral species found in the images
         :type yolo_model: YoloObjectDetector        
-        :param locate_tile_model: The LocateTileModel model computed for the 2d grid of images, which is used to map locations from reconstruction space to tile space, defaults to None
-        :type locate_tile_model: LocateTileModel, optional
+        :param map_bbox_image_fn: A function that maps a bbox in (image_grid_x, image_grid_y, bbox) to the space reconustructed image
+        :type map_bbox_image_fn: A function definition (image_grid_x, image_grid_y, bbox:list) -> bbox:list
+        :param map_normalize_bbox_tile_fn: A function that maps a bbox in reconstructed image space to the tile space normalized to (0, 1)
+        :type map_normalize_bbox_tile_fn: A function definition (bbox:list) -> bbox:list  
         """
         # model variable for abort
         self.to_cancel = False
         # input parameters
         self.image = image
         self.image_col_index, self.image_row_index = image_col_index, image_row_index
-        self.reco_model = reco_model
+        # self.reco_model = reco_model
+        # self.locate_tile_model = locate_tile_model
         self.yolo_model = yolo_model
-        self.locate_tile_model = locate_tile_model
+        self.map_bbox_image_fn = map_bbox_image_fn
+        self.map_normalize_bbox_tile_fn = map_normalize_bbox_tile_fn
         self.params = kwargs
         # other keyword parameters - operational
         self.blob_size = kwargs.get(ModelsConfigNames.COD_BLOB_SIZE.value, None)
@@ -414,10 +419,12 @@ class CoralObjectDetectImageModel():
                         blob_metdata.update(speed_as_dict)
                         self.metadata_of_blobs[cache_index] = blob_metdata   # the data structure is for logdata
                         # extract the detected objects from the output of the yolo model of this blob
-                        object_list = self._extract_objects_from_result(yolo_result, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, self.reco_model, self.locate_tile_model)  
+                        object_list = self._extract_objects_from_result(yolo_result, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, 
+                                                                        self.map_bbox_image_fn, self.map_normalize_bbox_tile_fn)  
                         self.raw_object_list_of_blobs[cache_index] = object_list
                     except Exception as e:
-                        raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_ERROR, 'Error happened when the YoloModel is applied on an image blob', e=e)
+                        traceback.print_exc()
+                        raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_ERROR, f'Error happened when the YoloModel is applied on an image blob ({e})', e=e)
                     
                     # if the self.debug_blob_images is True, then generate the annotated image for this image blob and save to the logdata folder
                     if self.debug_blob_images and self.logdata_folder is not None:
@@ -463,9 +470,7 @@ class CoralObjectDetectImageModel():
             
         # step 6: clear data if not needed for model inference
         self.image = None
-        self.reco_model = None
-        self.yolo_model = None
-        self.locate_tile_model = None                  
+        self.yolo_model = None               
     
     def _merge_into_image_object_list(self) -> list:
         """ internal function to merge the object lists from the blobs into the overall list
@@ -558,7 +563,7 @@ class CoralObjectDetectImageModel():
         return False
 
     def _extract_objects_from_result(self, yolo_result:YoloResult, image_col_index:int, image_row_index:int, corner:tuple, blob_col_index:int, blob_row_index:int, 
-                                     reco_model:ImageReconstructModel, locate_tile_model:LocateTileModel=None) -> list:
+                                     map_bbox_image_fn, map_normalize_bbox_tile_fn) -> list:
         """ build a list of coral objects (CoralObject class) from the result of yolo model
 
         :param yolo_result: The result object received from prediction using a yolo model
@@ -573,12 +578,10 @@ class CoralObjectDetectImageModel():
         :type blob_col_index: int
         :param blob_row_index: The row (y) index of the blob in the 2d grid of blobs resulting from dividing an image 
         :type blob_row_index: int
-        :param reco_model: The image reconstruction model for the 2d grid of images of the tile, which is used for mapping locations from image space to the reconstructed image space
-        :type reco_model: ImageReconstructModel
-        :param locate_tile_model: The locate tile model for mapping a location in reconstructed image space to the tile space, considering the frame of the tile
-        :type locate_tile_model: LocateTileModel      
-        :param coral_classes: The list of classes from the yolo model that are considered as coral
-        :type coral_classes: list               
+        :param map_bbox_image_fn: A function that maps a bbox in (image_grid_x, image_grid_y, bbox) to the space reconustructed image
+        :type map_bbox_image_fn: A function definition (image_grid_x, image_grid_y, bbox:list) -> bbox:list
+        :param map_normalize_bbox_tile_fn: A function that maps a bbox in reconstructed image space to the tile space normalized to (0, 1)
+        :type map_normalize_bbox_tile_fn: A function definition (bbox:list) -> bbox:list                  
         :return: A list of CoralObject objects
         :rtype: list
         """
@@ -589,15 +592,16 @@ class CoralObjectDetectImageModel():
             # extract findings from one result
             bbox_in_blob = yolo_result.bbox
             bbox_in_image = (bbox_in_blob[0] + corner[0], bbox_in_blob[1] + corner[1], bbox_in_blob[2] + corner[0], bbox_in_blob[3] + corner[1])
-            bbox_in_reconstructed_image = reco_model.map_bbox(image_col_index, image_row_index, bbox_in_image)
+            bbox_in_reconstructed_image = map_bbox_image_fn(image_col_index, image_row_index, bbox_in_image)
             centre = (bbox_in_reconstructed_image[0] + yolo_result.size[0] // 2, bbox_in_reconstructed_image[1] + yolo_result.size[1] // 2,)
             bbox_in_tile = bbox_in_tile_normalized = None
-            # if the locatetile model is available, convert locations in the reconstructed image space into tile space, by considering the location of the frames
-            if locate_tile_model is not None:
-                bbox_in_tile = locate_tile_model.map_bbox(bbox_in_reconstructed_image)
-                bbox_in_tile_normalized = locate_tile_model.normalize_bbox(bbox_in_tile)
-                centre_normalized = ((bbox_in_tile_normalized[0] + bbox_in_tile_normalized[2]) / 2, (bbox_in_tile_normalized[1] + bbox_in_tile_normalized[3]) / 2,)
-                size_normalized = bbox_in_tile_normalized[2] - bbox_in_tile_normalized[0], bbox_in_tile_normalized[3] - bbox_in_tile_normalized[1] 
+            # convert locations in the recontructed image space into tile space, by considering the location of the frames
+            # bbox_in_tile = locate_tile_model.map_bbox(bbox_in_reconstructed_image)
+            # bbox_in_tile_normalized = locate_tile_model.normalize_bbox(bbox_in_tile)
+            
+            bbox_in_tile, bbox_in_tile_normalized = map_normalize_bbox_tile_fn(bbox_in_reconstructed_image)  # revised
+            centre_normalized = ((bbox_in_tile_normalized[0] + bbox_in_tile_normalized[2]) / 2, (bbox_in_tile_normalized[1] + bbox_in_tile_normalized[3]) / 2,)
+            size_normalized = bbox_in_tile_normalized[2] - bbox_in_tile_normalized[0], bbox_in_tile_normalized[3] - bbox_in_tile_normalized[1] 
             # compute the object class category fron cls_name
             class_category = ObjectClassCategories.NOT_CORAL.value
             if yolo_result.cls_name in self.coral_classes:
@@ -826,67 +830,3 @@ class CoralObjectDetectModelHelper():
         """
         return CoralObjectDetectModel.from_yaml_file(object_file)
 
-# ----------------------------------------------------------------------------------
-# Test functions
-
-def test_index_permutations():
-    # perm_list = CoralObjectListHelper.get_index_permutations(list(range(10)))
-    # for perm in perm_list:
-    #     print(perm)
-    for perm in CoralObjectListHelper.index_permutations(list(range(4))):
-        print(perm)
-
-def test_coral_object_detect_model(params, print=False):
-    """ Test loading a reco model, a loctile model and a YOLO model from the file system, and use them to construct the CoralObjectDetectModel from scratch
-    """
-    logger.info(f'test_coral_object_detect_model: started')
-    logdata_folder = params['logdata_folder']
-    # load a reco model
-    reco_model_file = os.path.join(logdata_folder, params['reco_model_filename'])
-    reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)
-    # load a loctile model
-    loctile_model_file = os.path.join(logdata_folder, params['loctile_model_filename'])
-    loctile_model:LocateTileModel = LocateTileModelHelper.from_yaml_file(loctile_model_file)
-    # load a yolo model
-    yolo_model_file = params['yolo_model_file']
-    yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file=yolo_model_file)
-    # retrieve source images for analysis, which had been used to build the reco and the loctile models
-    image_map_as_list = test_get_cgras_sample_images_as_list()   
-    # build a CoralOjbectDetectModel for the images 
-    cod_model = CoralObjectDetectModel(image_map_as_list, reco_model, yolo_model, loctile_model, **params)
-    cod_model_file = os.path.join(logdata_folder, params['cod_model_filename'])
-    CoralObjectDetectModelHelper.to_yaml_file(cod_model, cod_model_file)
-    if print:
-        cod_model.print_info()
-    return cod_model
-
-def test_load_coral_object_detect_model(params, print=False):
-    """ Test loading a CoralObjectDetectModel from a yaml file
-    """
-    logdata_folder = params['logdata_folder']
-    cod_model_file = os.path.join(logdata_folder, params['cod_model_filename'])
-    cod_model = CoralObjectDetectModelHelper.from_yaml_file(cod_model_file)
-    if print:
-        cod_model.print_info()
-    return cod_model
-
-if __name__ == '__main__':
-    logdata_folder = '/home/qcr/cgras_data/detector/data/2023Dec/2023Dec-P00003-CG1-202311201200/'
-    params = {
-        'logdata_folder': logdata_folder, 
-        'reco_model_filename': 'reco_model.yaml',
-        'loctile_model_filename': 'loctile_model.yaml',
-        'yolo_model_file': '/home/qcr/cgras_data/YoloModel/20240923_tiledimages_yolov8xseg_naive.pt',
-        'coral_classes': ['recruit_live_white', 'recruit_cluster_live_white', 'recruit_symbiotic', 
-                          'recruit_cluster_symbiotic', 'recruit_partial', 'recruit_cluster_partial'],
-        'cod_model_filename': 'coral_object_detect_model.yaml', 
-        'cod_debug_blob_images': True,
-        'cod_blob_size': (640, 640),
-        'cod_blob_overlap_pix': 32,
-        'cod_use_cached_object_detection': False,
-        'cod_duplicate_max_displacement_images': 16,
-        'cod_duplicate_max_displacement_blobs': 32,        
-    }   
-    test_coral_object_detect_model(params)
-    # test_load_coral_object_detect_model(params)
-    # test_index_permutations()

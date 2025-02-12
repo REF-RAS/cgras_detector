@@ -253,12 +253,11 @@ class HealthViewTable():
                 return (None, True, self._style_data_conditional, selected_rows)
             # update the href field of the button before enable it
             tile_id = model[selected_rows[0]]['tile_id']
-            href = f'/popup_count_display?tile_id={tile_id}'
+            href = f'/popup_viewer?tile_id={tile_id}'
             # highlight the selected row
             style_data_conditional = self._style_data_conditional + [
                 {"if": {"filter_query": "{{tile_id}} = '{}'".format(model[i]['tile_id']), "column_id": "tile_id"}, "backgroundColor": "yellow",}
                 for i in selected_rows
             ]
-
             return (href, False, style_data_conditional, selected_rows)
         return row_selected  

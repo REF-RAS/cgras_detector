@@ -30,7 +30,7 @@ def sample_reconstruct_params():
     return params
 
 def sample_tile_sample_filepath():
-    filepath = os.path.join(os.path.dirname(__file__), '../../../../docs/detector_tile_sample_import_chris_mis5_t01_241031.yaml')
+    filepath = os.path.join(os.path.dirname(__file__), '../../../../docs/detector_tile_sample_import_chris_mis5_t01_241119.yaml')
     return filepath
 
 def test_build_reco_model():
@@ -65,7 +65,15 @@ def test_load_reco_model():
     reco_model.print_info()    
     return reco_model
 
-
+def interactive_test():
+    reco_model = test_load_reco_model()
+    while True:
+        col_index = int(input('Enter image column index: '))
+        row_index = int(input('Enter image row index: '))    
+        x = int(input('Enter x: '))
+        y = int(input('Enter y: '))               
+        result = reco_model.map_locations(col_index, row_index, (x, y))
+        print(f'Point ({x, y}) is mapped to ({result})')
 
 if __name__ == '__main__':
     test_build_reco_model()

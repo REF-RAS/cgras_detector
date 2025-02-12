@@ -97,7 +97,7 @@ class ApplicationCoordinator(object):
         else:
             COORDINATOR_STATE.update(CoordinatorStates.SAFE)
                 
-        if COORDINATOR_STATE.get_state() not in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
+        if COORDINATOR_STATE.get_state() not in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN, CoordinatorStates.ERROR]:
             state = STATE.get_state()
             if state in [SystemStates.DETECT, SystemStates.WAIT_DETECT]:
                 the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
@@ -297,13 +297,13 @@ class ApplicationCoordinator(object):
                     if state == SystemStates.D_FAILED:
                         DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.REJECTED.value, exception.get_remarks())
                         DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, tile_sample_id, 
-                            start_time, time_lapsed, TaskStatusNames.FAILED.value, f'{DetectorExceptionCodes(exception.get_code()).name}')
+                            start_time, time_lapsed, TaskStatusNames.FAIL.value, f'{DetectorExceptionCodes(exception.get_code()).name}')
                         error_remarks = f'Failed at {current_stage}: {exception.get_remarks()}'
                         DETECT_DAO.set_error_flag(exception.get_code().value, tile_sample_id, error_remarks)
                     else:
                         DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.FLAGGED.value, exception.get_remarks())
                         DETECT_DAO.add_task_record(TaskTypes.DETECT_CORALS.value, tile_sample_id, 
-                            start_time, time_lapsed, TaskStatusNames.SOFT_FAILED.value, f'{DetectorExceptionCodes(exception.get_code()).name}')
+                            start_time, time_lapsed, TaskStatusNames.RESOLVABLE_FAIL.value, f'{DetectorExceptionCodes(exception.get_code()).name}')
                         error_remarks = f'Stopped at {current_stage}: {exception.get_remarks()}'
                         DETECT_DAO.set_error_flag(exception.get_code().value, tile_sample_id, error_remarks)                        
 
@@ -321,6 +321,10 @@ class ApplicationCoordinator(object):
                 elif state == SystemStates.SUSPENDED:
                     if COORDINATOR_STATE.get_state() in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
                         STATE.update_state(SystemStates.READY)                                                     
+
+                # check if connection to other component is lost
+                if not COORDINATOR_STATE.is_state(CoordinatorStates.UNKNOWN) and COORDINATOR_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CONNECTION_TIMEOUT, 30):
+                    COORDINATOR_STATE.update(CoordinatorStates.UNKNOWN)
 
             except DetectorFailed as e: 
                 logger.warning(f'Detector FAILED (Reject): {e}')

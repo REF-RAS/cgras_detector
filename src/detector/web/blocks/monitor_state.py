@@ -40,10 +40,10 @@ class MonitorStateBlock():
                 dbc.Row([html.Div('Number of CPU(s):', className='fs-6 col-6 text-end'),
                          dbc.Badge(f'{psutil.cpu_count()}', className='fs-6 col-6 text-start', color='white', text_color='secondary')
                     ], className='col-12 mb-2'),        
-                dbc.Row([html.Div('CPU Percent:', className='fs-6 col-6 text-end'),
+                dbc.Row([html.Div('CPU Usage:', className='fs-6 col-6 text-end'),
                          dbc.Progress(id=prefix+'cpu_percent', className='col-6 mt-1')
                     ], className='col-12 mb-2'),
-                dbc.Row([html.Div('RAM Percent:', className='fs-6 col-6 text-end'),
+                dbc.Row([html.Div('RAM Usage:', className='fs-6 col-6 text-end'),
                          dbc.Progress(id=prefix+'ram_percent', className='col-6 mt-1')
                     ], className='col-12 mb-2'),                
                                       
@@ -109,8 +109,8 @@ class MonitorStateBlock():
                 if self.current_detect_message is None:
                     self.current_detect_message = [
                         'Leave me alone. I am working hard to keep large and small corals happy in the playpen.',
-                        'The corals are too noisy. No more bandwidth to entertain you.',
-                        'Shhh! The corals are sleeping and I am counting their tentacles.'
+                        'The corals are noisy. No time to entertain you now.',
+                        'Shhh! The corals are sleeping and their tentacles are being counted.'
                     ][random.randrange(0, 3)]
                 self.banner_message = self.current_detect_message
             return (state.name, capturer_state.name, cpu_percent, f'{cpu_percent} %', mem_percent, f'{mem_percent} %', 

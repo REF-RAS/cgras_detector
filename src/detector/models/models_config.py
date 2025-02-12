@@ -30,6 +30,14 @@ class ModelsConfigNames(Enum):
     RECO_IMAGE_MATCHING_MIN_CONFIDENCE = 'reco_image_matching_min_confidence'
     RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE = 'reco_image2d_matching_min_confidence'
     RECO_WORKING_SCALE = 'reco_working_scale'
+    WHOLE_TILE_IAMGE_SIZE = 'whole_tile_image_size'     # the size of the tile (including tile holder) in pixels (for correction of rotated image and default value if the corner is not found)
+    TILE_HOLDER_WIDTH = 'tile_holder_width'             # the width of the tile holder in pixels
+    LOCTILE_BLUE_RATIO_MIN = 'loctile_blue_ratio_min'
+    LOCTILE_RED_RATIO_MAX = 'loctile_red_ratio_max'
+    LOCTILE_WORKING_SCALE = 'loctile_working_scale'
+    LOCTILE_TEMPLATE_SIZE = 'loctile_template_size'
+    LOCTILE_MATCHING_SCORE_MIN = 'loctile_matching_score_min'
+    LOCTILE_DEBUG_IMAGES = 'loctile_debug_images'
     COD_MODEL_FILENAME = 'cod_model_filename'
     COD_DEBUG_BLOB_IMAGES = 'cod_debug_blob_images'
     COD_BLOB_OVERLAP_PIX = 'cod_blob_overlap_pix'

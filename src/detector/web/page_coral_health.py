@@ -18,6 +18,7 @@ from cgras_datatools.logging_tools import logger
 from detector.model import STATE, SystemStates
 
 from detector.web.blocks import HealthViewTable
+from detector.web.blocks import HealthModelFileImportBlock, HealthModelTable
 
 dash.register_page(__name__)
 
@@ -33,6 +34,10 @@ class CoralHealthPage():
             self.refresh_cycle = 20
         # the component blocks
         self.health_view_table_panel = HealthViewTable(app, prefix)
+        # the health model blocks
+        self.health_model_file_import_panel = HealthModelFileImportBlock(app, prefix)
+        self.health_model_table_panel = HealthModelTable(app, prefix)
+        
         # define the page
         self._define_page()
     
@@ -42,12 +47,21 @@ class CoralHealthPage():
     def _define_page(self):
         # connect the system interval timer to the pending_sample_table and the tile_sample_retrieve_panel
         self.health_view_table_panel.register_trigger(self.dashapp_interval_store_id)
+        # connect the import health model and the table
+        self.health_model_table_panel.register_update_table_trigger(self.health_model_file_import_panel.get_import_success_trigger_id())
         
         # putting the GUI components together 
         self._panel = html.Div(id='scan-body',children = [
             dcc.Store(id=self.dashapp_interval_store_id),
             dbc.Row(html.H3(children = 'Coral Health Dashboard', className='mt-3 mb-3')),
             dbc.Row([self.health_view_table_panel.get_panel(), ], className='mx-auto col-12'),
+
+            dbc.Row(html.H4(children = 'Import Health Model', className='text-center mt-5 mb-3')),
+            dbc.Row([dbc.Col(self.health_model_file_import_panel.get_panel(), className='col-12 border'), 
+                     ], className='mx-auto'), 
+            dbc.Row(html.H4(children = 'Health Models', className='text-center mt-5 mb-3')),
+            dbc.Row([dbc.Col(self.health_model_table_panel.get_panel(), className='col-12 border'), 
+                     ], className='mx-auto'), 
 
         ])
         self._layout = dbc.Container(self._panel, fluid=True)

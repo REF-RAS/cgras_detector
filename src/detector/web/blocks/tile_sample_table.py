@@ -359,7 +359,7 @@ class TileSampleTable():
                     if mode == '_whole':
                         DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
                     elif mode == '_redo_detect':
-                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=False)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=False, delete_object_detection=True)
                     elif mode == '_redo_analysis':
                         ...
                         

@@ -180,7 +180,7 @@ def test_health_model_func(func=None):
 # test the HealthEvaluateTaskModel class
 def test_update_cache_tile_health_model():
     health_task_model = HealthEvaluateTaskModel()
-    health_task_model.detect_stat_to_cache_tile_health(season='2023Dec')
+    health_task_model.detect_stat_to_cache_tile_health(season='2024Oct')
 
     tile_df = DETECT_DAO.list_tiles_in_tile_sample()
     DETECT_DAO.add_tile_df_to_cache_tile_health(tile_df)

@@ -20,9 +20,9 @@ from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG
 class CoralObjectMapModelHelper():
     """ a collection of tools for the CoralObjectMapModel class
     """
-    # constant class names for the two default classes - "all classes" and "coral classes"
+    # constant class names for the two default classes - "all classes" and "coral objects"
     VISCLASS_ALL = {'label': 'all', 'value': '_all'}
-    VISCLASS_CORAL = {'label': 'coral classes', 'value': '_coral'}
+    VISCLASS_CORAL = {'label': 'coral objects', 'value': '_coral'}
     CLASS_OPTIONS = None
     
     @staticmethod
@@ -116,7 +116,7 @@ class CoralObjectMapModel():
         # NOTE: Not using the cache file 
         self.count_map_cache = {}
             
-    def compute_object_count_map(self, class_filter:str=None) -> Tuple[np.ndarray, np.ndarray]:
+    def compute_object_count_map(self, class_filter:str=None, count_range:tuple=None) -> Tuple[np.ndarray, np.ndarray]:
         """ return the object count map of a class detected objects on a tile_sample 
 
         :param tile_sample_id: The tile sample id
@@ -130,7 +130,7 @@ class CoralObjectMapModel():
         if class_filter not in self.count_map_cache:
             # load the detected object list from db and convert them into a list of CoralObject
             coral_object_list = self._load_coral_object_list(self.tile_sample_id, class_filter)
-            count_map, count_label_map = HeatmapHelper.compute_object_count_map(coral_object_list, self.map_size_default, None)
+            count_map, count_label_map = HeatmapHelper.compute_object_count_map(coral_object_list, self.map_size_default, class_filter=None, count_range=count_range)
             self.count_map_cache[class_filter] = count_map
             # NOTE: not applicable as cache file of count map is not used
             # save the generated map indexed by the class_filter to the yaml file for this tile_sample_id
@@ -167,7 +167,7 @@ class CoralObjectMapModel():
 def test_generate_heatmap(tile_sample_id:str):
     vt_model = CoralObjectMapModel(tile_sample_id)
     count_map, count_label_map = vt_model.compute_object_count_map()
-    HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, f'tile_sample_id: {tile_sample_id}', (1500, 500), output_file='heatmap_test_sample.jpg')
+    HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=f'tile_sample_id: {tile_sample_id}', fig_size=(1500, 500), output_file='heatmap_test_sample.jpg')
 
 if __name__ == '__main__':
     tile_sample_id = '2024-Nov-P00001-CG1-202411151200'  # tile_sample_id and the associated source images are assumed in the database

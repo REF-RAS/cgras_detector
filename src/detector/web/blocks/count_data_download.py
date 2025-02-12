@@ -28,6 +28,8 @@ class CountResultDownloadBlock():
         self.app = app 
         self.prefix = prefix = prefix + 'tdm_'
         self.tile_id_store_id = prefix+'tile_id_store'
+        # default charting parameters      
+        self.default_count_range = None
         # model variables
         self.get_trend_figure_func = None
         self.get_heatmap_figures_list_func = None
@@ -82,7 +84,7 @@ class CountResultDownloadBlock():
             if tile_id is None:
                 raise PreventUpdate
             coral_trend_model = DETECT_DAO.get_coral_count_trend_as_df(tile_id) 
-            href = f'/popup_count_display?tile_id={tile_id}'
+            href = f'/popup_viewer?tile_id={tile_id}'
             if len(coral_trend_model) == 0:
                 return (tile_id, None, {'visibility': 'hidden'},)
             return (tile_id, href, {'visibility': 'visible'},)
@@ -156,7 +158,7 @@ class CountResultDownloadBlock():
                     detected_objects_df.to_excel(writer, sheet_name=f'Detect-{row["batch_time"][:11]}', index=False)
                 latest_tile_sample_id = coral_count_trend_df.iloc[-1]['tile_sample_id']
                 vt_model = CoralObjectMapModel(latest_tile_sample_id)
-                count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'])
+                count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
                 count_map_df = pd.DataFrame(data=count_map)
                 count_map_df.to_excel(writer, sheet_name=f'CountMap-{coral_count_trend_df.iloc[-1]["batch_time"][:11]}', index=False)
                 writer.close()

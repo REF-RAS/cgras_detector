@@ -27,6 +27,7 @@ import cgras_datatools.hash_tools as hash_tools
 import detector.model as model
 from detector.model import CONFIG, SystemConfigNames, APP_FILE_MANAGER, CALLBACK_MANAGER, CallbackTypes
 from detector.web.dash import themes
+from detector.web.webapp_main import RESTX_API
 # from dash_bootstrap_components import themes
 
 SERVER = Flask(__name__)
@@ -45,6 +46,8 @@ APP = dash.Dash(__name__,
                 )
 
 APP.config['suppress_callback_exceptions'] = True
+
+RESTX_API.init_app(SERVER)
 
 # -- load the pages for the dash application which should appear after the above APP creation
 from . import page_count_display, page_dashboard, page_db_browse, page_models, page_sample_manager, page_coral_health, page_system_setup, popup_count_display
@@ -66,10 +69,10 @@ class DashApplicationMain():
         self._db_browse_page = page_db_browse.DBTableBrowsePage(self.app)   
         self._sample_manager_page = page_sample_manager.SampleManagerPage(self.app)     
         self._yolo_model_file_page = page_models.ModelsPage(self.app)     
-        self._count_display_page = page_count_display.CountDisplayPage(self.app)   
+        self._count_viewer_page = page_count_display.CountViewerPage(self.app)   
         self._page_coral_health = page_coral_health.CoralHealthPage(self.app)
         # define the popup
-        self._popup_count_display = popup_count_display.CountDisplayPopup(self.app) 
+        self._count_viewer_popup = popup_count_display.CountViewerPopup(self.app) 
         # initialize the application
         self._define_app()
 
@@ -85,7 +88,7 @@ class DashApplicationMain():
                     children=[
                         dbc.NavItem(dbc.NavLink('Monitor', href='/page_monitor')),
                         dbc.NavItem(dbc.NavLink('Sample', href='/page_sample_manager')), 
-                        dbc.NavItem(dbc.NavLink('Count', href='/page_count_display')), 
+                        dbc.NavItem(dbc.NavLink('View', href='/page_viewer')), 
                         # dbc.NavItem(dbc.NavLink('Health', href='/page_coral_health')), 
                         dbc.NavItem(dbc.NavLink('Model', href='/page_yolo_model')), 
                         dbc.NavItem(dbc.NavLink('System', href='/page_setup')),                                                 
@@ -142,13 +145,13 @@ class DashApplicationMain():
                     page_content = self._sample_manager_page.layout()    
                 elif pathname == '/page_yolo_model':
                     page_content = self._yolo_model_file_page.layout() 
-                elif pathname == '/page_count_display':
-                    page_content = self._count_display_page.layout() 
-                elif pathname == '/popup_count_display':
+                elif pathname == '/page_viewer':
+                    page_content = self._count_viewer_page.layout() 
+                elif pathname == '/popup_viewer':
                     tile_id = params.get('tile_id', None)
                     if tile_id is None:
                         raise PreventUpdate
-                    return (self._popup_count_display.layout(tile_id[0]), None,)               
+                    return (self._count_viewer_popup.layout(tile_id[0]), None,)               
                 elif pathname == '/page_coral_health':
                     page_content = self._page_coral_health.layout()   
                 elif pathname == '/page_setup':

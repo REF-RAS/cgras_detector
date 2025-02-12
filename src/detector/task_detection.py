@@ -18,10 +18,9 @@ import numpy as np
 import pandas as pd
 
 from cgras_datatools.lock_tools import synchronized
-from cgras_datatools.file_tools import replace_suffix 
 from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
 from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
-from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
+from detector.models.locate_tile_basic import LocateTileModel, LocateTileModelHelper
 from detector.html.lightbox import LightboxHelper
 from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG, SystemConfigNames     
 
@@ -202,7 +201,7 @@ class DetectionTaskModel():
         except Exception as e:
             raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
         # load the cached ImageReconstructModel if exists, or build a new model from captured images
-        reco_model_file = os.path.join(self.logdata_folder, self.params.get('reco_model_filename', 'reco_model.yaml'))
+        reco_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.RECO_MODEL_FILENAME, 'reco_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached ImageReconstructModel')
             self.reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)
@@ -221,7 +220,7 @@ class DetectionTaskModel():
     def execute_task_loctile(self):
         self.progress_model.start_stage(ProgressStages.LOCTILE)
         # load the cached LocateTileModel if exists, or build a new model from captured images and the ImageReconstructModel
-        loctile_model_file = os.path.join(self.logdata_folder, self.params.get('loctile_model_filename', 'loctile_model.yaml'))
+        loctile_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.LOCTILE_MODEL_FILENAME, 'loctile_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached LocateTileModelHelper')
             self.loctile_model:LocateTileModel = LocateTileModelHelper.from_yaml_file(loctile_model_file)
@@ -229,7 +228,7 @@ class DetectionTaskModel():
             logger.info(f'{type(self).__name__}: No cached file. Building the loctile_model_file from capture images')
             
         if self.loctile_model is None:
-            self.loctile_model = LocateTileModel(self.image_map_as_list, reco_model=self.reco_model, **self.params)
+            self.loctile_model = LocateTileModel(self.image_map_as_list, map_location_fn=self.reco_model.map_locations, **self.params)
             if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
@@ -241,7 +240,7 @@ class DetectionTaskModel():
         self.progress_model.start_stage(ProgressStages.OBJECT_DETECT)
         self.progress_model.update_stage_progress(ProgressStages.OBJECT_DETECT, 0, self.image_grid_dim[0] * self.image_grid_dim[1])
         # load the cached CoralObjectDetectionModel if exists, or build a new model from captured images, the ImageReconstructModel, and the yolo model
-        cod_model_file = os.path.join(self.logdata_folder, self.params.get('cod_model_filename', 'coral_object_detect_model.yaml'))
+        cod_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.COD_MODEL_FILENAME, 'coral_object_detect_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached CoralObjectDetectModel')
             self.cod_model = CoralObjectDetectModelHelper.from_yaml_file(cod_model_file)
@@ -264,7 +263,8 @@ class DetectionTaskModel():
             if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
-            self.cod_model = CoralObjectDetectModel(self.image_map_as_list, self.reco_model, yolo_model, self.loctile_model, self._execute_task_object_detection_cb, **self.params)
+            self.cod_model = CoralObjectDetectModel(self.image_map_as_list, yolo_model, self.reco_model.map_bbox, self.loctile_model.map_and_normalize_bbox, self.loctile_model.get_tile_size(),
+                                                    self._execute_task_object_detection_cb, **self.params)
             self.cod_model.build()
             try:
                 CoralObjectDetectModelHelper.to_yaml_file(self.cod_model, cod_model_file)  
@@ -279,7 +279,7 @@ class DetectionTaskModel():
     def execute_task_record(self):
         self.progress_model.start_stage(ProgressStages.COLLECT_STAT)        
         # extract statistics of the tile 
-        self.detection_stat['tile_pixel_x'], self.detection_stat['tile_pixel_y'] = self.reco_model.get_whole_reco_image_size()
+        self.detection_stat['tile_pixel_x'], self.detection_stat['tile_pixel_y'] = self.loctile_model.get_tile_size()
         # detection of coral objects is completed, save the results to the database
         logger.info(f'{type(self).__name__}: Saving all types of {self.cod_model.get_num_objects()} objects to database')
         

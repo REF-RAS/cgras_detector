@@ -62,12 +62,13 @@ class DashboardPage():
                 dbc.Col(self.monitor_state_panel.get_panel(), className='col-6 border'),
                 ], className='mx-auto col-12'),
             dbc.Row([
-                dbc.Col(self.monitor_execute_progress_panel.get_panel(), className='col-12 border'),
+                dbc.Col(self.monitor_execute_progress_panel.get_panel(), className='col-10 border'),
+                dbc.Col(self.monitor_task_stat_panel.get_panel(), className='col-2 border'),
                 ], className='mx-auto col-12 mt-3'), 
             dbc.Row([
                 dbc.Col(self.monitor_recent_task_table_panel.get_panel(), className='col-7 border'),
-                dbc.Col(self.monitor_error_table_panel.get_panel(), className='col-3 border'),
-                dbc.Col(self.monitor_task_stat_panel.get_panel(), className='col-2 border'),
+                dbc.Col(self.monitor_error_table_panel.get_panel(), className='col-5 border'),
+                
                 ], className='mx-auto col-12 mt-3'),           
         ])
         self._layout = dbc.Container(self._panel, fluid=True)

@@ -18,7 +18,7 @@ import numpy as np
 
 import plotly.express as px
 
-from detector.models.detect import CoralObject, test_load_coral_object_detect_model
+from detector.models.detect import CoralObject
 from detector.models import logger
 
 class HeatmapHelper():
@@ -26,7 +26,7 @@ class HeatmapHelper():
 
     """
     @staticmethod
-    def compute_object_count_map(object_list:list, map_size:tuple, class_filter=None, include_invalidated=False) -> np.ndarray:
+    def compute_object_count_map(object_list:list, map_size:tuple, class_filter=None, include_invalidated=False, count_range:tuple=None) -> np.ndarray:
         """ compute a 2d object count map as a numpy array from the locatios of the CoralObject in the input object_list
 
         :param object_list: the input list of CoralObjects
@@ -37,6 +37,8 @@ class HeatmapHelper():
         :type class_filter: Any, optional
         :param include_invalidated: include invalidated objects in the counting, defaults to False
         :type include_invalidated: bool, optional
+        :param count_range: a 1-tuple (min) or 2-tuple (min, max) defines the range of count values that are displayed in the heatmap
+        :type count_range: tuple, optional
         :return: the count map as a 2d numpy array
         :rtype: np.ndarray
         """
@@ -44,7 +46,7 @@ class HeatmapHelper():
             class_filter = [class_filter]
         # initialize a numpy array of the dimension for the heatmap
         count_map_array = np.zeros(shape=(map_size[1], map_size[0]), dtype=np.uint16)
-        count_map_label_array = np.full(shape=(map_size[1], map_size[0]), fill_value=' ')
+        count_map_label_array = np.full(shape=(map_size[1], map_size[0]), fill_value=' ', dtype=object)
         # iterates through the object list
         coral_object:CoralObject
         for coral_object in object_list:
@@ -56,11 +58,18 @@ class HeatmapHelper():
             x, y = int(coral_object.centre_normalized[0] * map_size[0]), int(coral_object.centre_normalized[1] * map_size[1])
             x, y = min(x, map_size[0] - 1), min(y, map_size[1] - 1)
             count_map_array[y, x] += 1
-            count_map_label_array[y, x] = str(count_map_array[y, x])
+            if count_range is not None and type(count_range) in (tuple, list) and len(count_range) >= 1:
+                try:
+                    if count_map_array[y, x] > count_range[0]:
+                        count_map_label_array[y, x] = str(count_map_array[y, x])
+                except:
+                    ...
+            else:
+                count_map_label_array[y, x] = str(count_map_array[y, x])
         return count_map_array, count_map_label_array
     
     @staticmethod
-    def generate_plotly_heatmap(count_map_array:np.ndarray, count_map_label_array:np.ndarray=None, title:str=None, fig_size:tuple=None, show_fig:bool=False, output_file:str=None):
+    def generate_plotly_heatmap(count_map_array:np.ndarray, count_map_label_array:np.ndarray=None, title:str=None, fig_size:tuple=None, count_range:tuple=None, show_fig:bool=False, output_file:str=None):
         """ returns a plotly figure object containing the heatmap generated from the given object count map
 
         :param count_map_array: the coral object count map to be converted into a graphical heatmap
@@ -75,11 +84,26 @@ class HeatmapHelper():
         :rtype: plotly.graph_objs._figure.Figure
         """
         title = ' ' if title is None else title
+        # set the range of count to be considered in colour indexing
+        z_min, z_max = 0, 100000000
+        if count_range is not None:
+            try:
+                z_min = count_range[0]
+                z_max = count_range[1]
+            except:
+                ...
+            
         # generate the heatmap as a figure
-        fig = px.imshow(count_map_array, text_auto=True, title=title)
+        fig = px.imshow(count_map_array, text_auto=True, title=title, 
+                        color_continuous_scale=px.colors.sequential.Viridis, zmin=z_min, zmax=z_max)
         # set the labels of the cells in the heatmap
+        # if count_map_label_array is not None:
+        #   fig.update_traces(text=count_map_label_array, texttemplate="%{text}", textfont_size=6)
         if count_map_label_array is not None:
             fig.update_traces(text=count_map_label_array, texttemplate="%{text}")
+        # adjust the coloraxis
+
+        fig.update_layout(coloraxis=dict(cmin=z_min, cmax=z_max))            
         # adjust the figure size if given fig_size
         if fig_size is not None and type(fig_size) in (list, tuple) and len(fig_size) >= 2:
             fig.update_layout(width=fig_size[0], height=fig_size[1])
@@ -94,24 +118,24 @@ class HeatmapHelper():
 # ----------------------------------------------------------------------------------
 # Test functions
     
-def test_build_spatial_distribute_model():
-    """ Test loading a CoralOjbectDetectModel from a yaml file
-    """
-    logdata_folder = '/home/qcr/cgras_data/detector/detect/'
-    logger.info('Loading CoralObjectDetect Model from a yaml file')
-    cod_model = test_load_coral_object_detect_model()
-    cod_model.print_info()
-    return cod_model
+# def test_build_spatial_distribute_model():
+#     """ Test loading a CoralOjbectDetectModel from a yaml file
+#     """
+#     logdata_folder = '/home/qcr/cgras_data/detector/detect/'
+#     logger.info('Loading CoralObjectDetect Model from a yaml file')
+#     cod_model = test_load_coral_object_detect_model()
+#     cod_model.print_info()
+#     return cod_model
 
-if __name__ == '__main__':
-    logdata_folder = '/home/qcr/cgras_data/detector/detect/'
-    output_file = os.path.join(logdata_folder, 'coral_count_heatmap.jpg')
+# if __name__ == '__main__':
+#     logdata_folder = '/home/qcr/cgras_data/detector/detect/'
+#     output_file = os.path.join(logdata_folder, 'coral_count_heatmap.jpg')
     
-    cod_model = test_build_spatial_distribute_model()
-    object_list = cod_model.get_object_list()
+#     cod_model = test_build_spatial_distribute_model()
+#     object_list = cod_model.get_object_list()
 
-    map_size = (120, 40)
-    fig_size = (3600, 1200)
-    count_map_array, count_map_label_array = HeatmapHelper.compute_object_count_map(object_list, map_size, None)
-    fig = HeatmapHelper.generate_plotly_heatmap(count_map_array, count_map_label_array, fig_size=(1200, 800), output_file=output_file)
-    input('Press Enter to Quit ')
+#     map_size = (120, 40)
+#     fig_size = (3600, 1200)
+#     count_map_array, count_map_label_array = HeatmapHelper.compute_object_count_map(object_list, map_size, None)
+#     fig = HeatmapHelper.generate_plotly_heatmap(count_map_array, count_map_label_array, fig_size=(1200, 800), output_file=output_file)
+#     input('Press Enter to Quit ')

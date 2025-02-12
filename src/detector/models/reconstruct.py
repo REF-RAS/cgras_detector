@@ -72,7 +72,7 @@ class ImageReconstructModel():
         self.reco_2d_model.build()  
         # retrieve major parameters from the model
         self.ncols, self.nrows = self.reco_2d_model.get_image_map_size()               # the number of rows and columns in the 2d grid of images
-        self.original_image_size = self.reco_2d_model.get_original_image_size()        # the size of the original images (assuming all images have the same size)
+        # self.original_image_size = self.reco_2d_model.get_original_image_size()        # the size of the original images (assuming all images have the same size)
         self.working_image_size = self.reco_2d_model.get_working_image_size()          # the size of the working image
         # retrieve the confidence matrix used to evaluate the feature matching between images in 1D rows and between rows
         self.confidence_matrix_list = self.reco_2d_model.get_confidence_matrix_list()                # a list containing confidence matrix of stitching images in a row
@@ -598,13 +598,13 @@ class ImageReconstruct2DModel():
         """
         return self.image_map.get_image_map_size()
     
-    def get_original_image_size(self) -> tuple:
-        """ This class assumes all images are of the same size
+    # def get_original_image_size(self) -> tuple:
+    #     """ This class assumes all images are of the same size
 
-        :return: The size (xdim, ydim) of the original images (before reduced to working scale)
-        :rtype: tuple
-        """
-        return self.image_map.get_image_size()
+    #     :return: The size (xdim, ydim) of the original images (before reduced to working scale)
+    #     :rtype: tuple
+    #     """
+    #     return self.image_map.get_image_size()
     
     def get_working_image_size(self) -> tuple:
         """ 
@@ -1105,71 +1105,3 @@ class ImageReconstruct1DModel():
             # cv2.imwrite(f'/home/qcr/cgras_data/detector/row_step_{index}.jpg', image_buffer)
             index += 1
         return image_buffer, warped_roi_corners, warped_roi_sizes    
-    
-# ----------------------------------------------------------------------------------
-# Test functions
-
-def test_get_sample_images_as_list():
-    image_row = []
-    image_row.append('/home/qcr/cgras_data/Source/2023/240216-1404-1A-208/captures/3465-3-1-0-0-240216-1412.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240216-1404-1A-208/captures/3466-3-1-1-0-240216-1413.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240216-1404-1A-208/captures/3467-3-1-2-0-240216-1413.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240216-1404-1A-208/captures/3468-3-1-3-0-240216-1413.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240216-1404-1A-208/captures/3469-3-1-4-0-240216-1414.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240216-1404-1A-208/captures/3470-3-1-5-0-240216-1414.jpg')
-    images_2d_list = [image_row]
-    return images_2d_list
-
-def test_get_poor_sample_images_as_list():
-    image_row = []
-    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3303-3-1-0-0-240130-1433.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3304-3-1-1-0-240130-1433.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3305-3-1-2-0-240130-1433.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3306-3-1-3-0-240130-1434.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3307-3-1-4-0-240130-1434.jpg')
-    image_row.append('/home/qcr/cgras_data/Source/2023/240130-1420-1A-202/captures/3308-3-1-5-0-240130-1435.jpg')
-    images_2d_list = [image_row]
-    return images_2d_list
-
-def test_build_reco_model(params):
-    # image_map_as_list = test_get_cgras_sample_images_as_list()    
-    # image_map_as_list = test_get_sample_images_as_list()    
-    image_map_as_list = test_get_poor_sample_images_as_list()    
-    logdata_folder = params['logdata_folder']
-    reco_model_file = os.path.join(logdata_folder, params['reco_model_filename'])
-    os.makedirs(logdata_folder, exist_ok=True)
-    reco_model = ImageReconstructModel(image_map_as_list, working_scale=0.1, **params) 
-    print('Saving object to file')
-    ImageReconstructModelHelper.to_yaml(reco_model, reco_model_file)
-    return reco_model
-
-def test_load_reco_model(params):
-    print('Loading object from file')
-    logdata_folder = params['logdata_folder']
-    reco_model_file = os.path.join(logdata_folder, params['reco_model_filename'])
-    reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)
-    reco_model.print_info()    
-    return reco_model
-
-if __name__ == '__main__':
-    logdata_folder = '/home/qcr/cgras_data/detector/data/2023Dec/2023Dec-P10001-CG1-202402161404/'
-    params = {
-        'logdata_folder': logdata_folder, 
-        'reco_model_filename': 'reco_model.yaml',
-        'reco_debug_images_at_original_scale': False,
-        'reco_debug_feature_matching_images': True,
-        'reco_feature_detector': 'sift',
-        'reco_feature_matching_confidence_threshold': 1.0,
-        'reco_image_matching_min_confidence': 1.5,
-        'reco_working_scale': 0.1, 
-    }    
-    reco_model = test_build_reco_model(params)
-    reco_model = test_load_reco_model(params)
-
-    while True:
-        col_index = int(input('Enter image column index: '))
-        row_index = int(input('Enter image row index: '))    
-        x = int(input('Enter x: '))
-        y = int(input('Enter y: '))               
-        result = reco_model.map_locations(col_index, row_index, (x, y))
-        print(f'Point ({x, y}) is mapped to ({result})')

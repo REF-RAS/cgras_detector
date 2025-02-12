@@ -30,7 +30,8 @@ class CountHeatmapBlock():
         self.update_trigger_id = 'tile_sample_id_update_trigger'
         # default charting parameters
         self.default_style = {'visibility': 'hidden'}
-        self.default_config = {'staticPlot': True}        
+        self.default_config = {'staticPlot': True}       
+        self.default_count_range = (10, ) 
         # model variables
         self.current_tile_id = None
         self.coral_trend_model = self.output_model = None
@@ -95,8 +96,8 @@ class CountHeatmapBlock():
 
     def _generate_heatmap(self, tile_sample_id, filter_class, title:str=None):
         vt_model = CoralObjectMapModel(tile_sample_id)
-        count_map, count_label_map = vt_model.compute_object_count_map(filter_class)
-        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title)
+        count_map, count_label_map = vt_model.compute_object_count_map(filter_class, count_range=self.default_count_range)
+        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(600, 600,), count_range=self.default_count_range)
         return fig, count_map
     
     def _generate_figures_list(self, coral_trend_model, filter_class, compare_to_index:str=None):
@@ -108,13 +109,13 @@ class CountHeatmapBlock():
             if index == len(coral_trend_model) - 1 or (compare_to_index is not None and (compare_to_index == index or compare_to_index >= latest_index)):
                 the_sample = coral_trend_model.iloc[index]
                 the_sample_id = the_sample['tile_sample_id']
-                title = f'The sample captured on {the_sample["batch_time"]}'
+                title = f'Captured on {the_sample["batch_time"]}'
                 if index == latest_index:
                     title += ' (Latest)'    
                 if self.class_options is not None:
                     for option in self.class_options:
                         if option['value'] == filter_class:
-                            title += f': number of {option["label"]} objects'
+                            title += f': # {option["label"]}'
                             break
                     
                 fig, count_map = self._generate_heatmap(the_sample_id, filter_class, title=title) 
@@ -128,7 +129,7 @@ class CountHeatmapBlock():
                 figures_graph_list.append(dcc.Graph(figure=fig, config=self.default_config, style={'visibility': 'visible'}),)
         # use the max_count to set the maximum value for the scale of the heatmap
         for fig in figures_list:
-            fig.update_layout(coloraxis=dict(cmin=0, cmax=max_count))
+            fig.update_layout(coloraxis=dict(cmax=max_count))
         return figures_graph_list, figures_list
     
     def _update_class_dropdown(self):
@@ -143,8 +144,8 @@ class CountHeatmapBlock():
         def update_panel(tile_id):
             if tile_id is None:
                 raise PreventUpdate
-            # the update is due to a new tile_id selected
-            if self.current_tile_id is None or tile_id != self.current_tile_id:
+            # the update is due to a new tile_id selected, or query again if the coral trend model has no data
+            if self.current_tile_id is None or tile_id != self.current_tile_id or self.coral_trend_model is None or len(self.coral_trend_model) == 0:
                 self.current_tile_id = tile_id
                 # update the coral_trend_model
                 self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)

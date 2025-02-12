@@ -28,7 +28,7 @@ class ImageMap():
         # input parameters
         self.working_scale = working_scale
         # model parameters
-        self.image_size_full = None
+        self.image_size_all = None
         self.map_image_scaled = defaultdict(lambda: None)
         # validate the image_map parameter
         if type(images_2d_list) not in (list, tuple):
@@ -57,14 +57,16 @@ class ImageMap():
                 # test if image_obj is a numpy image
                 if type(image_obj) is not np.ndarray:
                     raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Not An Valid Image File: {image_obj}')
-                # test if the image size is consistent with the first image
-                if self.image_size_full is None:
-                    self.image_size_full = image_obj.shape[:2][::-1]
-                else:
-                    if self.image_size_full[0] != image_obj.shape[1] or self.image_size_full[1] != image_obj.shape[0]:
-                        raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Dimension of Images Different: Image at grid index (row {row_index} col {col_index}) has a different resolution ')
+                # test if the image size is consistent with the first image (NOTE: this validity constraint is removed because the images can now be in different orientation)
+                # NOTE: perhaps an alternative test is to test the long side against long side and the same for short side 
+                # if self.image_size_all is None:
+                #     self.image_size_all = image_obj.shape[:2][::-1]
+                # else:
+                #     if self.image_size_all[0] != image_obj.shape[1] or self.image_size_all[1] != image_obj.shape[0]:
+                #         raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Dimension of Images Different: Image at grid index (row {row_index} col {col_index}) has a different resolution ')
+                
                 # resize the image to the work_scale
-                self.image_size_scale = (int(self.image_size_full[0] * self.working_scale), int(self.image_size_full[1] * self.working_scale))
+                self.image_size_scale = (int(image_obj.shape[1] * self.working_scale), int(image_obj.shape[0] * self.working_scale))
                 image_scaled = cv2.resize(image_obj, self.image_size_scale)
                 self.map_image_scaled[col_index, row_index] = image_scaled
     
@@ -130,12 +132,12 @@ class ImageMap():
         """
         return self.map_image_scaled
 
-    def get_image_size(self) -> tuple:
-        """ return the size of images at the original scale (width, height) and all images have the same size
+    # def get_image_size(self) -> tuple:
+    #     """ return the size of images at the original scale (width, height) and all images have the same size
 
-        :return: a tuple representing the (width, height) of the images
-        """
-        return self.image_size_full
+    #     :return: a tuple representing the (width, height) of the images
+    #     """
+    #     return self.image_size_all
     
     def get_scaled_image_size(self) -> tuple:
         """ return the size of images at downscale (width, height)

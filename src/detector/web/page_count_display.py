@@ -21,7 +21,7 @@ from detector.web.blocks import CountTileSelectTable, CoralCountTileInfoBlock, C
 dash.register_page(__name__)
 
 # -- define the GUI components of this page
-class CountDisplayPage():
+class CountViewerPage():
     def __init__(self, app):
         self.app = app
         prefix = self.prefix = 'count_display'
