@@ -39,9 +39,9 @@ images:
   x: 0
   y: 3
 importer: POLL_IMPORTER
-num_tabs:
-- 20
-- 20
+num_tabs: [20, 20]
+tile_size: [280, 280]
+frame_size: [294, 294]
 operator: Unknown
 season: 2024Oct
 settle_time: '2024-10-30'

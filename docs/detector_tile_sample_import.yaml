@@ -4,6 +4,8 @@ settle_time: 2023-11-12
 spawning_time: 2023-11-12
 season: 2023Dec
 num_tabs: [20, 8]
+tile_size: [280, 112]
+frame_size: [294, 118]
 batch_id: CG1-202311151200
 batch_time: 2023-11-15 12:00:00
 importer_id: YAML

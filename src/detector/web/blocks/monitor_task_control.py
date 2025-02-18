@@ -13,7 +13,6 @@ __status__ = 'Development'
 # dash modules
 import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
-import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, AUTOMATED_TASK_EXECUTION, CALLBACK_MANAGER, CallbackTypes, STATE, SystemStates, logger, TaskStatusNames, PERSISTENT_STORE_DAO, PersistentStoreDAO

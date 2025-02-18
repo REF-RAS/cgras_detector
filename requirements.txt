@@ -1,6 +1,5 @@
 dash
 dash_bootstrap_components
-dash_daq
 dash-auth
 dash-ag-grid==31.2.0
 plotly

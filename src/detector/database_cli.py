@@ -11,15 +11,14 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, sys
+import os, sys, json
 from detector.database_file import DBFile
 from cgras_datatools import db_tools
-from detector.model import APP_FILE_MANAGER, DETECT_DBFM
+from detector.model import APP_FILE_MANAGER, DETECT_DBFM, DetectorDAO
 
 COORDINATOR_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'coordinator.db')
 COORDINATOR_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'coordinator.db', {})
 DETECT_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'detector.db')
-
 
 # The function that supports interactive execution of sql statements 
 def run_db():
@@ -73,9 +72,25 @@ def run_db():
                     print(result)
                 except Exception as e:
                     print(f'Error: {e}')
+                    
+def run_update_tile_sample():
+    sql = 'SELECT * FROM tile_sample'
+    tile_sample_list = db_tools.query_for_list_of_dicts(DETECT_DBFILE, sql)
+    for tile_sample_dict in tile_sample_list:
+        tile_id, batch_id = tile_sample_dict['tile_id'], tile_sample_dict['batch_id']
+        tab_ncols, tab_nrows = tile_sample_dict['tab_ncols'], tile_sample_dict['tab_nrows']
+        metadata_dict = {
+            'tab_dim': (tab_ncols, tab_nrows),
+            'tile_size': (280, 280),
+            'frame_size': (294, 294),
+        }
+        metadata = json.dumps(metadata_dict)
+        sql = 'UPDATE tile_sample SET metadata = ? WHERE tile_id = ? AND batch_id = ?'
+        db_tools.update(DETECT_DBFILE, sql, (metadata, tile_id, batch_id,))
 
 # ------------------------------------------------
 # The main program for running a command line 
 # program for executing sql statements
 if __name__ == '__main__':
-        run_db()
+    run_db()
+    # run_update_tile_sample()

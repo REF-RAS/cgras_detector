@@ -13,7 +13,6 @@ import psutil
 # dash modules
 import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx
-import dash_daq as daq
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 # project modules

@@ -51,18 +51,27 @@ class TileSamplesDAO:
                 sample_dict = {'tile_id': tile_id, 'batch_id': batch_id}
                 c = conn.cursor() 
                 # populate the tile information
-                result = c.execute('SELECT species, spawn_time, settle_time, season FROM tile WHERE tile_id = ?', (tile_id,)).fetchone()
+                result = c.execute('SELECT species, spawn_time, settle_time, season, metadata FROM tile WHERE tile_id = ?', (tile_id,)).fetchone()
                 if result is None:
                     return None              
                 sample_dict['species'] = result[0]
                 sample_dict['spawn_time'] = result[1]
                 sample_dict['settle_time'] = result[2]
                 sample_dict['season'] = result[3]
+                metadata_json = result[4]
+                try:
+                    metadata = json.loads(metadata_json)
+                    sample_dict['tile_size'] = metadata.get('tile_size', None)
+                    sample_dict['frame_size'] = metadata.get('tile_size', None)
+                except:
+                    sample_dict['tile_size'] = None
+                    sample_dict['frame_size'] = None
                 # populate the num_tabs
                 result = c.execute('SELECT tab_ncols, tab_nrows FROM season WHERE title = ?', (sample_dict['season'],)).fetchone()
                 if result is None:
                     return None         
-                sample_dict['num_tabs'] = [result[0], result[1]]        
+                sample_dict['num_tabs'] = [result[0], result[1]]   
+                     
                 # populate the batch_time
                 result = c.execute('SELECT start_time FROM batch WHERE batch_id = ?', (batch_id,)).fetchone()
                 if result is None:

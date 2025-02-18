@@ -11,7 +11,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, datetime, time, shutil, numbers, yaml, traceback
+import os, datetime, time, shutil, json, numbers, yaml, traceback
 import pandas as pd
 from enum import Enum
 from datetime import datetime as dt
@@ -48,6 +48,7 @@ DETECT_DDL = {
         status integer DEFAULT -1,
         priority text,
         remarks text DEFAULT '',
+        metadata text DEFAULT NULL,
         UNIQUE (tile_id, batch_id)
     );
     """,
@@ -302,11 +303,13 @@ class DetectorDAO():
     # add a record to the tile_sample table, with species normalized to lower case
     @synchronized
     def add_tile_sample(self, tile_id:str, batch_id:str, batch_time:str, age:int, species:str, season:str, tab_ncols:int, tab_nrows:int, settle_time:str, spawn_time:str='', importer_id:str='', operator:str='', 
-                        status:int=SampleStatusNames.QUEUED.value):
-        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
+                        status:int=SampleStatusNames.QUEUED.value, metadata=None):
+        if metadata is not None and not isinstance(metadata, str):
+            metadata = json.dumps(metadata)
+        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
         tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, settle_time, spawn_time, importer_id, operator, status))
+        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status))
     
     # return True if a record of tile_sample exists given the tile_id and the batch_id
     @synchronized
@@ -535,6 +538,9 @@ class DetectorDAO():
         season = tile_sample_data.get('season', None)
         settle_time = tile_sample_data.get('settle_time', None)
         num_tabs = tile_sample_data.get('num_tabs', None)
+        tile_size = tile_sample_data.get('tile_size', None)
+        frame_size = tile_sample_data.get('frame_size', None)
+        
         importer_id = tile_sample_data.get('importer_id', 'Unknown')
         operator = tile_sample_data.get('operator', 'Unknown') 
         images_dict = dict()
@@ -548,7 +554,9 @@ class DetectorDAO():
         if species is None or season is None or settle_time is None:
             error_list.append(f'One of the mandatory fields (species, season, settle_time) is missing in the yaml file')       
         if num_tabs is None or type(num_tabs) not in (list, tuple) or len(num_tabs) != 2 or not all(n > 0 and isinstance(n, numbers.Number) for n in num_tabs):
-            error_list.append(f'One of the mandatory fields (num_tabs) is not a tuple of 2 positive integers')        
+            error_list.append(f'One of the mandatory fields (num_tabs) is not a tuple of 2 positive integers')   
+        if tile_size is None or frame_size is None:
+            error_list.append(f'One of the mandatory fields (tile_size, frame_size) is missing in the yaml file')               
         # iterate through the images list in the yaml file
         max_x, max_y = -1, -1
         for index, yaml_images in enumerate(yaml_images_list):
@@ -614,14 +622,23 @@ class DetectorDAO():
         season = tile_sample_data.get('season', None)
         settle_time = tile_sample_data.get('settle_time', None)
         num_tabs = tile_sample_data.get('num_tabs', None)
+        tile_size = tile_sample_data.get('tile_size', None)
+        frame_size = tile_sample_data.get('frame_size', None)
+        
         spawn_time = tile_sample_data.get('spawn_time', None)
         importer_id = tile_sample_data.get('importer_id', 'Unknown')
         operator = tile_sample_data.get('operator', 'Unknown') 
         image_files_parent_folder = tile_sample_data.get('image_files_parent_folder', None)
         tile_images_list = tile_sample_data.get('images', None)
+        # construct metadata dict
+        metadata = {
+            'tab_dim': num_tabs,
+            'tile_size': tile_size,
+            'frame_size': frame_size
+        }
         try:
             tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-            self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator)
+            self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator, metadata)
             self.delete_source_images_of_tile_sample(tile_sample_id)
             for index, tile_image in enumerate(tile_images_list):
                 x, y = tile_image.get('x', None), tile_image.get('y', None)

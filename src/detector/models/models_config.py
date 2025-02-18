@@ -30,8 +30,10 @@ class ModelsConfigNames(Enum):
     RECO_IMAGE_MATCHING_MIN_CONFIDENCE = 'reco_image_matching_min_confidence'
     RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE = 'reco_image2d_matching_min_confidence'
     RECO_WORKING_SCALE = 'reco_working_scale'
+    
     WHOLE_TILE_IAMGE_SIZE = 'whole_tile_image_size'     # the size of the tile (including tile holder) in pixels (for correction of rotated image and default value if the corner is not found)
     TILE_HOLDER_WIDTH = 'tile_holder_width'             # the width of the tile holder in pixels
+    
     LOCTILE_BLUE_RATIO_MIN = 'loctile_blue_ratio_min'
     LOCTILE_RED_RATIO_MAX = 'loctile_red_ratio_max'
     LOCTILE_WORKING_SCALE = 'loctile_working_scale'

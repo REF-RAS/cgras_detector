@@ -4,6 +4,8 @@ settle_time: 2024-10-30
 spawning_time: 2024-10-15
 season: 2024Oct
 num_tabs: [20, 20]
+tile_size: [280, 280]
+frame_size: [294, 294]
 batch_id: CG1-202411052300
 batch_time: 2024-11-05 23:00:00
 importer_id: YAML

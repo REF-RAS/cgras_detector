@@ -29,7 +29,7 @@ cgras_detector:
   # tile specification 
   # the size of tile (including tile holder) in pixels
   # whole_tile_image_size: [24280, 24460]   # pixels
-  tile_holder_width: 50                   # pixels
+  # tile_holder_width: 50                   # pixels
   # detection task parameters
   task_params_filename: params.yaml
   reco_model_filename: reco_model.yaml
