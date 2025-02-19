@@ -104,7 +104,14 @@ class CoralObjectMapModel():
         self.params = kwargs
         # gather information about the tile_sample_id from the database
         self.tile_sample_dict = DETECT_DAO.get_tile_sample(tile_sample_id)
-        self.map_size_default = (self.tile_sample_dict['tab_ncols'], self.tile_sample_dict['tab_nrows'],) 
+        # retrieve the map size default from tile_sample_dict
+        self.map_size = None
+        metadata = self.tile_sample_dict.get('metadata', None)
+        if metadata is not None and 'num_tabs' in metadata:
+            self.map_size = metadata.get('num_tabs', None)
+        if self.map_size is None:
+            self.map_size = (self.tile_sample_dict['tab_ncols'], self.tile_sample_dict['tab_nrows'],) 
+        
         # first check if a cache file exists: compute the location of the cache file
         # self.cache_file, _ = CoralObjectMapModelHelper.form_cache_file_path(tile_sample_id, self.map_size_default)      
         # first check if a cache file exists: attempt to load the cache file
@@ -130,7 +137,7 @@ class CoralObjectMapModel():
         if class_filter not in self.count_map_cache:
             # load the detected object list from db and convert them into a list of CoralObject
             coral_object_list = self._load_coral_object_list(self.tile_sample_id, class_filter)
-            count_map, count_label_map = HeatmapHelper.compute_object_count_map(coral_object_list, self.map_size_default, class_filter=None, count_range=count_range)
+            count_map, count_label_map = HeatmapHelper.compute_object_count_map(coral_object_list, self.map_size, class_filter=None, count_range=count_range)
             self.count_map_cache[class_filter] = count_map
             # NOTE: not applicable as cache file of count map is not used
             # save the generated map indexed by the class_filter to the yaml file for this tile_sample_id

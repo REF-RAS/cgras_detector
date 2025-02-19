@@ -107,6 +107,16 @@ class DetectionTaskModel():
              
         self.tile_id, self.batch_id, self.batch_time = self.tile_sample_dict['tile_id'], self.tile_sample_dict['batch_id'], self.tile_sample_dict['batch_time']
         self.species, self.settle_time, self.season = self.tile_sample_dict['species'], self.tile_sample_dict['settle_time'], self.tile_sample_dict['season']
+        
+        self.medadata = self.tile_sample_dict.get('metadata', None)
+        if self.medadata is not None:
+            self.tile_size, self.frame_size = self.medadata.get('tile_size', None), self.medadata.get('frame_size', None)
+        else:
+            self.tile_size = self.frame_size = None
+        # tile_size and frame_size are essential parameters
+        if self.tile_size is None or self.frame_size is None:
+            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Tile sample does not contain tile size or frame size', e = AssertionError('Tile sample error'))
+            
         # evaluate the number of days since settlement
         try:
             self.settle_date_dt, self.capture_date_dt = pd.to_datetime(self.settle_time, utc=True), pd.to_datetime(self.batch_time, utc=True)
@@ -140,6 +150,9 @@ class DetectionTaskModel():
         self.params['settle_date'] = self.settle_time
         self.params['species'] = self.species
         self.params['coral_age_in_days'] = self.days_since_settle
+        
+        self.params[ModelsConfigNames.TILE_SIZE_IN_MM.value] = self.tile_size
+        self.params[ModelsConfigNames.FRAME_SIZE_IN_MM.value] = self.frame_size
         # write the params to the log folder
         task_params_metadata_filename = self.params.get(ModelsConfigNames.TASK_PARAMS_FILENAME.value, '_params.yaml')
         try:

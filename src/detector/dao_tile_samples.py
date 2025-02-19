@@ -24,6 +24,13 @@ from detector.system_config import SystemConfig, SystemConfigNames
 
 CONFIG:SystemConfig = SystemConfig(os.path.join(os.path.dirname(__file__), '../../config/system_config.yaml'))
 
+# the enum class models the tile sample status
+class TileSampleStatusNames(Enum):
+    ACCEPTED = 1        # the tile sample is accepted 
+    REJECTED = -1       # the tile sample has been rejected 
+    ALL = 0             # a state for query
+    USABLE = 2          # the tile sample is usable and exportable
+
 class TileSamplesDAO:  
     def __init__(self, db_file:str, **kwargs):
         self.db_file = db_file
@@ -31,8 +38,8 @@ class TileSamplesDAO:
     @synchronized
     def query_to_export_sample_as_list_tuples(self) -> list:
         try:
-            sql = 'SELECT tile_id, batch_id from captured_tile_sample WHERE export_time IS NULL AND status > 0'
-            results_list = db_tools.query_for_list_of_dicts(self.db_file, sql)
+            sql = 'SELECT tile_id, batch_id from captured_tile_sample WHERE export_time IS NULL AND status == ?'
+            results_list = db_tools.query_for_list_of_dicts(self.db_file, sql, (TileSampleStatusNames.USABLE.value,))
             results = [(x['tile_id'], x['batch_id'],) for x in results_list]
             return results
         except Exception as e:

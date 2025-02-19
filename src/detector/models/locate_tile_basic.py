@@ -49,8 +49,8 @@ class LocateTileModel():
         # placement_grid
         self.placement_grid_dim = (len(self.images_2d_list[0]), len(self.images_2d_list))
         # optional input parameter (for fallback if a corner cannot be found)
-        self.whole_tile_image_size = kwargs.get(ModelsConfigNames.WHOLE_TILE_IAMGE_SIZE.value, (25000, 25365))
-        self.tile_holder_width = kwargs.get(ModelsConfigNames.TILE_HOLDER_WIDTH.value, None)
+        self.whole_tile_image_size = (25000, 25365)     # NOTE: hardcode for testing
+        self.tile_holder_width = 50                     # NOTE: hardcode for testing
         # model variables
         self.corners_in_reco_space = {}
         self.tile_offset = self.tile_size = None

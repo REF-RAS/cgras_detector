@@ -80,13 +80,16 @@ def run_update_tile_sample():
         tile_id, batch_id = tile_sample_dict['tile_id'], tile_sample_dict['batch_id']
         tab_ncols, tab_nrows = tile_sample_dict['tab_ncols'], tile_sample_dict['tab_nrows']
         metadata_dict = {
-            'tab_dim': (tab_ncols, tab_nrows),
+            'num_tabs': (tab_ncols, tab_nrows),
             'tile_size': (280, 280),
             'frame_size': (294, 294),
         }
         metadata = json.dumps(metadata_dict)
         sql = 'UPDATE tile_sample SET metadata = ? WHERE tile_id = ? AND batch_id = ?'
         db_tools.update(DETECT_DBFILE, sql, (metadata, tile_id, batch_id,))
+        sql = 'SELECT metadata FROM tile_sample'
+        df = db_tools.query(DETECT_DBFILE, sql)
+        print(df)
 
 # ------------------------------------------------
 # The main program for running a command line 

@@ -332,7 +332,13 @@ class DetectorDAO():
     @synchronized
     def get_tile_sample(self, tile_sample_id:str) -> dict:
         sql = 'SELECT * FROM tile_sample WHERE id = ?'
-        return db_tools.query_for_dict(self.db_file, sql, (tile_sample_id,))
+        tile_sample_dict = db_tools.query_for_dict(self.db_file, sql, (tile_sample_id,))
+        if 'metadata' in tile_sample_dict:
+            try:
+                tile_sample_dict['metadata'] = json.loads(tile_sample_dict['metadata'])
+            except:
+                tile_sample_dict['metadata'] = {}
+        return tile_sample_dict
     
     # return the list of unique season found in the table
     @synchronized
@@ -632,7 +638,7 @@ class DetectorDAO():
         tile_images_list = tile_sample_data.get('images', None)
         # construct metadata dict
         metadata = {
-            'tab_dim': num_tabs,
+            'num_tabs': num_tabs,
             'tile_size': tile_size,
             'frame_size': frame_size
         }
