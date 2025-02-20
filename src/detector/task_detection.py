@@ -141,6 +141,8 @@ class DetectionTaskModel():
         self.params[ModelsConfigNames.COD_BLOB_SIZE.value] = (self.yolo_model_dict['input_image_width'], self.yolo_model_dict['input_image_height'], )
         self.params[ModelsConfigNames.OBJECT_CLASSES_CORAL.value] = self.yolo_model_dict['coral_classes']
         self.params[ModelsConfigNames.OBJECT_CLASSES_DEAD_CORAL.value] = self.yolo_model_dict['dead_coral_classes']
+        self.params[ModelsConfigNames.TILE_SIZE_IN_MM.value] = self.tile_size
+        self.params[ModelsConfigNames.FRAME_SIZE_IN_MM.value] = self.frame_size        
         # add other tile info to the params for metadata yaml file output
         self.params['tile_sample_id'] = self.tile_sample_id
         self.params['tile_id'] = self.tile_id
@@ -151,8 +153,6 @@ class DetectionTaskModel():
         self.params['species'] = self.species
         self.params['coral_age_in_days'] = self.days_since_settle
         
-        self.params[ModelsConfigNames.TILE_SIZE_IN_MM.value] = self.tile_size
-        self.params[ModelsConfigNames.FRAME_SIZE_IN_MM.value] = self.frame_size
         # write the params to the log folder
         task_params_metadata_filename = self.params.get(ModelsConfigNames.TASK_PARAMS_FILENAME.value, '_params.yaml')
         try:
@@ -219,7 +219,7 @@ class DetectionTaskModel():
             logger.info(f'{type(self).__name__}: Attempting to load cached ImageReconstructModel')
             self.reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)
         except Exception as e:
-            logger.info(f'{type(self).__name__}: No cached file. Building the ImageReconstructModel from capture images')
+            logger.info(f'{type(self).__name__}: No valid cached file. Building the ImageReconstructModel from capture images')
         
         if self.reco_model is None:
             self.reco_model = ImageReconstructModel(self.image_map_as_list, working_scale=0.1, **self.params) 
@@ -238,7 +238,7 @@ class DetectionTaskModel():
             logger.info(f'{type(self).__name__}: Attempting to load cached LocateTileModelHelper')
             self.loctile_model:LocateTileModel = LocateTileModelHelper.from_yaml_file(loctile_model_file)
         except:
-            logger.info(f'{type(self).__name__}: No cached file. Building the loctile_model_file from capture images')
+            logger.info(f'{type(self).__name__}: No valid cached file. Building the loctile_model_file from capture images')
             
         if self.loctile_model is None:
             self.loctile_model = LocateTileModel(self.image_map_as_list, map_location_fn=self.reco_model.map_locations, **self.params)
@@ -258,7 +258,7 @@ class DetectionTaskModel():
             logger.info(f'{type(self).__name__}: Attempting to load cached CoralObjectDetectModel')
             self.cod_model = CoralObjectDetectModelHelper.from_yaml_file(cod_model_file)
         except:
-            logger.info(f'{type(self).__name__}: No cached file. Building the CoralObjectDetectModel from capture images, reco model, loctile model, and yolo model')
+            logger.info(f'{type(self).__name__}: No valid cached file. Building the CoralObjectDetectModel from capture images, reco model, loctile model, and yolo model')
             
         if self.cod_model is None:
             # load the yolo_model first

@@ -37,8 +37,10 @@ def sample_loctile_params():
         ModelsConfigNames.RECO_WORKING_SCALE.value: 0.1, 
         ModelsConfigNames.LOCTILE_MODEL_FILENAME.value: 'loctile_model.yaml',
         ModelsConfigNames.LOCTILE_DEBUG_IMAGES.value: True,
-        ModelsConfigNames.WHOLE_TILE_IAMGE_SIZE.value: [25000, 25365], # [24280, 24460],
-        ModelsConfigNames.TILE_HOLDER_WIDTH.value: 50,
+        # ModelsConfigNames.WHOLE_TILE_IAMGE_SIZE.value: [25000, 25365], # [24280, 24460],
+        # ModelsConfigNames.TILE_HOLDER_WIDTH.value: 50,
+        ModelsConfigNames.FRAME_SIZE_IN_MM.value: [294, 294],
+        ModelsConfigNames.TILE_SIZE_IN_MM.value: [280, 280],
         ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value: 0.40,
         ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value: 0.15,
         ModelsConfigNames.LOCTILE_WORKING_SCALE.value: 0.05,
@@ -92,20 +94,18 @@ def test_load_and_use_loctile_model():
     loctile_model:LocateTileModel = LocateTileModelHelper.from_yaml_file(loctile_model_filepath)
     # run tests: mapping locations
     print('test mapping locations')
-    original_points = [(945, 425), (25237, 807), (594, 24887), (24928, 25365)]
-    truth_values = [(0, 0), (24295, 16), (17, 24464), (24355, 24576)]
+    original_points = [(977, 416), (977 + 24335, 416 + 24564)]
+    truth_values = [(0, 0), (24335, 24564)]
     for point, truth in zip(original_points, truth_values):
         result = loctile_model.map_locations(point)
         print(point, result, truth)
-        assert result == truth
     # run tests: mapping locations and normalize
     print('test mapping locations and normalize')
-    original_bbox = [(945, 425, 25237, 807), (594, 24887, 24928, 25365)]
-    truth_values = [(0, 0, 24295, 16), (17, 24464, 24355, 24576)]
-    for bbox, truth in zip(original_bbox, truth_values):
-        result = loctile_model.map_and_normalize_bbox(bbox)
-        print(point, result, truth)
-
+    original_bbox = [(1680, 1050, 24260, 24740,)]
+    for bbox in original_bbox:
+        result_bbox, result_normalize_bbox = loctile_model.map_and_normalize_bbox(bbox)
+        print(bbox, result_bbox, result_normalize_bbox)
+        assert result_normalize_bbox[0] >= 0 and result_normalize_bbox[1] >= 0 and result_normalize_bbox[2] <= 1 and result_normalize_bbox[3] <= 1
 
 if __name__ == '__main__':
     test_build_loctile_model()

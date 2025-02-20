@@ -31,6 +31,7 @@ class CountHeatmapBlock():
         # default charting parameters
         self.default_style = {'visibility': 'hidden'}
         self.default_config = {'staticPlot': True}       
+        self.reversed_heatmaps = False
         self.default_count_range = (10, ) 
         # model variables
         self.current_tile_id = None
@@ -39,6 +40,9 @@ class CountHeatmapBlock():
         self.class_options = None
         # define widgets
         _sample_select_datatable = dash_table.DataTable(id=prefix+'sample_select_datatable', row_selectable=False, cell_selectable=True, style_cell={'fontSize': 14})
+        _count_threshold_slider = dcc.Slider(0, 30, 1, value=5, id=prefix+'count_threshold_slider',
+                                               marks = {i: f'{i}' for i in range(0, 30, 5)}, tooltip={"always_visible": False,},className='mt-5')
+        # define the main panel
         self._panel = html.Div(id=prefix+'top_panel', children=[
                 dcc.Store(self.update_trigger_id),
                 html.H4(dbc.Badge('SPATIAL DISTRIBUTION OF AN OBJECT CLASS ON THE TILE', className='ms-1 me-2', color='white', text_color='secondary')),
@@ -46,7 +50,9 @@ class CountHeatmapBlock():
                     dbc.Col([
                             html.P('Select object class', className='mt-5'),
                             dcc.Dropdown(id=prefix+'class_list_dropdown', searchable=False, clearable=False, style={'fontSize': 14}),
-                            html.P('Click and select a sample below to compare with the latest sample', style={'margin-top': '120px'}),
+                            html.P('Count range not to be shown', className='mt-5'),
+                            _count_threshold_slider,
+                            html.P('Click and select a sample below to compare with the latest sample', style={'margin-top': '40px'}),
                             _sample_select_datatable,
                             dbc.Button('Reverse Order', id=prefix+'reverse_button', color='secondary', className='mt-5'),
                         ], className='col-2', style={'background-color': '#dddddd'}),
@@ -54,6 +60,7 @@ class CountHeatmapBlock():
                 ], className='mx-auto col-12'),            
             ], className='text-center')
         
+        # define callbacks
         self.app.callback([Output(prefix+'chart_panel', 'children', allow_duplicate=True),],
                         [Input(prefix+'reverse_button', 'n_clicks'),
                          State(prefix+'chart_panel', 'children'),], 
@@ -61,8 +68,10 @@ class CountHeatmapBlock():
         
         self.app.callback([Output(self.prefix+f'chart_panel', 'children', allow_duplicate=True)],
                         [Input(self.prefix+'class_list_dropdown', 'value'),
-                         Input(self.prefix+'sample_select_datatable', 'active_cell')], prevent_initial_call=True)(self._update_chart_panel())   
-            
+                         Input(self.prefix+'sample_select_datatable', 'active_cell'),
+                         Input(self.prefix+'count_threshold_slider', 'value')], prevent_initial_call=True)(self._update_chart_panel())   
+    
+    # function called by the parent to link up a trigger from another block to update the heatmap block 
     def register_trigger(self, trigger_id:str):
         # build the output list
         output_list = [Output(self.prefix+f'top_panel', 'style', allow_duplicate=True),  
@@ -77,13 +86,16 @@ class CountHeatmapBlock():
         self.app.callback([Output(self.prefix+'class_list_dropdown', 'options', allow_duplicate=True),
                             Output(self.prefix+'class_list_dropdown', 'value', allow_duplicate=True)],
                          [Input(trigger_id, 'data'),], prevent_initial_call=True)(self._update_class_dropdown())         
-        
+    
+    # return the main panel of this block
     def get_panel(self):
         return self._panel
     
+    # return the heatmap figures as a list for export
     def get_figures_as_list(self):
         return self.heatmap_figures_list
 
+    # generate the coral count trend model
     def _get_coral_trend_model(self, tile_id):
         coral_trend_model = DETECT_DAO.get_coral_count_trend_as_df(tile_id) 
         coral_trend_model['batch_time'] = pd.to_datetime(coral_trend_model['batch_time']).dt.date
@@ -94,13 +106,18 @@ class CountHeatmapBlock():
             output_model.loc[len(output_model)] = ['Whole History']
         return coral_trend_model, output_model
 
-    def _generate_heatmap(self, tile_sample_id, filter_class, title:str=None):
+    def _generate_heatmap(self, tile_sample_id, filter_class, title:str=None, show_count_threshold:int=None):
+        count_range = (show_count_threshold, ) if show_count_threshold is not None else self.default_count_range
+        # generate the object count maps as dataframes
         vt_model = CoralObjectMapModel(tile_sample_id)
-        count_map, count_label_map = vt_model.compute_object_count_map(filter_class, count_range=self.default_count_range)
-        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(600, 600,), count_range=self.default_count_range)
+        # count_map stores the counts as integers and count_label_map is the string representation
+        count_map, count_label_map = vt_model.compute_object_count_map(filter_class, count_range=count_range)
+        # generate the heatmap for the given tile_sample_id
+        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(600, 600,), count_range=count_range)
         return fig, count_map
     
-    def _generate_figures_list(self, coral_trend_model, filter_class, compare_to_index:str=None):
+    # internal function for generating the heatmaps based on the given filter_class, the indices of tile samples to show in additional to the most recent one, and the count show threshold 
+    def _generate_figures_list(self, coral_trend_model, filter_class, compare_to_index:str=None, show_count_threshold:int=None):
         figures_graph_list = []
         figures_list = []
         latest_index = len(coral_trend_model) - 1
@@ -118,7 +135,7 @@ class CountHeatmapBlock():
                             title += f': # {option["label"]}'
                             break
                     
-                fig, count_map = self._generate_heatmap(the_sample_id, filter_class, title=title) 
+                fig, count_map = self._generate_heatmap(the_sample_id, filter_class, title=title, show_count_threshold=show_count_threshold) 
                 max_count = max(max_count, count_map.max())                   
                 fig.update_layout(
                     margin=dict(l=5, r=5, b=10, t=50, pad=0),
@@ -149,6 +166,8 @@ class CountHeatmapBlock():
                 self.current_tile_id = tile_id
                 # update the coral_trend_model
                 self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
+                # reset the reverse heatmap display state
+                self.reversed_heatmaps = False
                 
             if len(self.coral_trend_model) > 0:
                 return [{}, self.output_model.to_dict('records'), None, []]   
@@ -157,15 +176,21 @@ class CountHeatmapBlock():
         return update_panel
     
     def _update_chart_panel(self):
-        def update_chart_panel(filter_class, active_cell):
+        def update_chart_panel(filter_class, active_cell, slider_value):
             graph_list = None
             compare_to_index = None
             # update the latest figure
             if len(self.coral_trend_model) > 0:
                 if active_cell is not None:
                     compare_to_index = active_cell['row']
+                # set the slider value as the show count threshold
+                show_count_threshold = slider_value
                 # generate history of heatmaps
-                graph_list, self.heatmap_figures_list = self._generate_figures_list(self.coral_trend_model, filter_class, compare_to_index)
+                graph_list, self.heatmap_figures_list = self._generate_figures_list(self.coral_trend_model, filter_class, compare_to_index, show_count_threshold)
+                # if the state of heatmap display list is reversed, reverse the figures now
+                if self.reversed_heatmaps:
+                    graph_list.reverse()
+                    self.heatmap_figures_list.reverse()
                 return [graph_list]   
             else:
                 return [None,]           
@@ -176,6 +201,9 @@ class CountHeatmapBlock():
         def reverse_button_pressed(n_clicks, graph_list):
             if n_clicks is None or graph_list is None:
                 raise PreventUpdate
+            # update the state variable
+            self.reversed_heatmaps = not self.reversed_heatmaps
+            # reverse the current figures in the list to update the display
             graph_list.reverse()
             self.heatmap_figures_list.reverse()
             return (graph_list,)

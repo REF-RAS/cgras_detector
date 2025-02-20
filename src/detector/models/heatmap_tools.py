@@ -94,16 +94,16 @@ class HeatmapHelper():
                 ...
             
         # generate the heatmap as a figure
-        fig = px.imshow(count_map_array, text_auto=True, title=title, 
-                        color_continuous_scale=px.colors.sequential.Viridis, zmin=z_min, zmax=z_max)
+        # fig = px.imshow(count_map_array, text_auto=True, title=title, color_continuous_scale=px.colors.sequential.Viridis, zmin=z_min, zmax=z_max)
+        fig = px.imshow(count_map_array, text_auto=True, title=title, color_continuous_scale=px.colors.sequential.Viridis, zmax=z_max)        
         # set the labels of the cells in the heatmap
         # if count_map_label_array is not None:
         #   fig.update_traces(text=count_map_label_array, texttemplate="%{text}", textfont_size=6)
         if count_map_label_array is not None:
             fig.update_traces(text=count_map_label_array, texttemplate="%{text}")
         # adjust the coloraxis
-
-        fig.update_layout(coloraxis=dict(cmin=z_min, cmax=z_max))            
+        # fig.update_layout(coloraxis=dict(cmin=z_min, cmax=z_max))  
+                  
         # adjust the figure size if given fig_size
         if fig_size is not None and type(fig_size) in (list, tuple) and len(fig_size) >= 2:
             fig.update_layout(width=fig_size[0], height=fig_size[1])

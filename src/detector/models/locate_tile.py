@@ -13,6 +13,9 @@ import os, math, yaml, numbers
 from enum import Enum
 import numpy as np
 import cv2
+import pickle
+
+from detector.models.frame_detector import FrameDetector
 
 from detector.models.imaging_tools import ImageMap, test_get_cgras_sample_images_as_list
 from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper
@@ -104,10 +107,9 @@ class LocateTileModel():
         self._write_rotated_whole_image() 
 
         # estimate the whole tile image size if not found in the input parameters
-
-        detected_frame_x = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.TOP_RIGHT]))
-        detected_frame_y = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT]))
-        self.detected_frame_size_in_px = (detected_frame_x, detected_frame_y,)
+        detected_frame_size_x = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.TOP_RIGHT]))
+        detected_frame_size_y = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT]))
+        self.detected_frame_size_in_px = (detected_frame_size_x, detected_frame_size_y,)
         logger.info(f'LocateTileModel estimated detected_frame_size: {self.detected_frame_size_in_px}')
         # self.affine_transform_matrix = cv2.getAffineTransform(input_pts, output_pts)
         self.origin_offset = (self.detected_frame_size_in_px[0] // 2 + self.corners_in_reco_space[WhichCorner.TOP_LEFT][0], self.detected_frame_size_in_px[1] // 2 + self.corners_in_reco_space[WhichCorner.TOP_LEFT][1])
@@ -121,20 +123,24 @@ class LocateTileModel():
         # update the detected frame_size in px
         detected_frame_size_in_px = (frame_bottomright_corrected[0] - frame_offset[0], frame_bottomright_corrected[1] - frame_offset[1],)
         # compute the detected tile size in pixels from the tile size and frame size
-        approx_pixel_per_mm_x = detected_frame_x / self.frame_size_in_mm[0]
-        approx_pixel_per_mm_y = detected_frame_y / self.frame_size_in_mm[1]        
-        approx_pixel_per_mm = int((approx_pixel_per_mm_x - approx_pixel_per_mm_y) / 2)
+        approx_pixel_per_mm_x = detected_frame_size_x / self.frame_size_in_mm[0]
+        approx_pixel_per_mm_y = detected_frame_size_y / self.frame_size_in_mm[1]        
+        approx_pixel_per_mm = (approx_pixel_per_mm_x + approx_pixel_per_mm_y) / 2
+        
+        logger.info(f'Type: {self.frame_size_in_mm} {detected_frame_size_x}')
+        logger.info(f'Type: {approx_pixel_per_mm_x} {approx_pixel_per_mm_y} {self.frame_size_in_mm} {self.tile_size_in_mm}')
         logger.info(f'LocateTile frame_offset: {frame_offset}')
         logger.info(f'LocateTile frame_size: {detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm})')
         # compute tile offset, assuming that the frame holder width is the same on all sides
         frame_width_in_pixel = ((self.frame_size_in_mm[0] - self.tile_size_in_mm[0]) / 2) * approx_pixel_per_mm
         self.tile_offset_in_px = (frame_offset[0] + frame_width_in_pixel, frame_offset[1] + frame_width_in_pixel,)
-        self.tile_size_in_px = (detected_frame_size_in_px[0] - 2 * frame_width_in_pixel, detected_frame_size_in_px[1] - 2 * frame_width_in_pixel, )
+        self.tile_size_in_px = (int(detected_frame_size_in_px[0] - 2 * frame_width_in_pixel), int(detected_frame_size_in_px[1] - 2 * frame_width_in_pixel, ))
         logger.info(f'LocateTile tile_offset: {self.tile_offset_in_px}')
         logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (frame_width in pixels: {frame_width_in_pixel})')        
         
     def _locate_corner(self, original_image:np.ndarray, which_corner:WhichCorner):
-        image = self._apply_tile_filter(original_image)
+        # image = self._apply_tile_filter(original_image)
+        image = self._apply_tile_filter_classifier(original_image)
         # find approximate corner at working_scale
         down_width, down_height = int(image.shape[1] * self.working_scale), int(image.shape[0] * self.working_scale)
         image_downscaled = cv2.resize(image, (down_width, down_height,))
@@ -156,9 +162,11 @@ class LocateTileModel():
         image_extracted = image[search_bbox[1]:search_bbox[3], search_bbox[0]:search_bbox[2]]
         res = cv2.matchTemplate(image_extracted, template, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        # if nothing is found, use the low resolution result as a fallback
         if max_val < self.matching_score_min:
-            return None
-        corner = (int(search_bbox[0] + max_loc[0] + self.template_size / 2), int(search_bbox[1] + max_loc[1] + self.template_size / 2))
+            ...
+        else:
+            corner = (int(search_bbox[0] + max_loc[0] + self.template_size / 2), int(search_bbox[1] + max_loc[1] + self.template_size / 2))
         # write annotated image related to corner detection
         if self.write_debug_images is not None and self.logdata_folder is not None:
             try:
@@ -286,6 +294,10 @@ class LocateTileModel():
         image = np.where(ratio_met, 255, 0).astype(np.uint8)
         return image
     
+    def _apply_tile_filter_classifier(self, image:np.ndarray):
+        frame_detector = FrameDetector(os.path.join(os.path.dirname(__file__), 'training_data/train_set_1.model'))
+        return frame_detector.classify_image(image)
+    
     def map_and_normalize_bbox(self, bbox:tuple):
         """ converts a bounding box in the reconstructed image space to the tile space according to a detection of the frame or holder of the tile and then normalize the bbox to range [0, 1], 
         returns both bbox representations
@@ -400,10 +412,11 @@ class LocateTileModelHelper():
         :rtype: str
         """
         object_dict = {
-            'tile_offset': loctile_model.tile_offset_in_px,
-            'tile_size': loctile_model.tile_size_in_px,
+            'tile_offset_in_px': loctile_model.tile_offset_in_px,
+            'tile_size_in_px': loctile_model.tile_size_in_px,
             'affine_transform_matrix': loctile_model.affine_transform_matrix.tolist(),
-            'whole_tile_image_size': loctile_model.whole_tile_image_size,
+            'frame_size_in_mm': loctile_model.frame_size_in_mm,
+            'tile_size_in_mm': loctile_model.tile_size_in_mm,
             'origin_offset': loctile_model.origin_offset,
                        }
         if object_file is None:
@@ -448,9 +461,10 @@ class LocateTileModelHelper():
         :rtype: LocateTileModel
         """
         loctile_model = LocateTileModel(None, None)
-        loctile_model.tile_offset_in_px = data['tile_offset']
-        loctile_model.tile_size_in_px = data['tile_size']
-        loctile_model.whole_tile_image_size = data['whole_tile_image_size']
+        loctile_model.tile_offset_in_px = data['tile_offset_in_px']
+        loctile_model.tile_size_in_px = data['tile_size_in_px']
+        loctile_model.frame_size_in_mm = data['frame_size_in_mm']
+        loctile_model.tile_size_in_mm = data['tile_size_in_mm']
         loctile_model.affine_transform_matrix = np.asarray(data['affine_transform_matrix'])
         loctile_model.origin_offset = data['origin_offset']
         return loctile_model

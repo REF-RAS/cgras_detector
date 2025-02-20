@@ -746,12 +746,13 @@ class ImageReconstruct2DModel():
                                                                                                                                 images_list_scaling_factor)
             if logdata_folder is not None:
                 output_file = os.path.join(logdata_folder, f'row_reco_image_{row_index}_original_scale.jpg')
-                self.logger.info(f'{self.__name__}: Writing full-scale row reconstructed image to file {output_file}')
+                self.logger.info(f'{type(self).__name__}: Writing full-scale row reconstructed image to file {output_file}')
                 if not cv2.imwrite(output_file, row_reco_image_original_scale):
-                    raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write whole reconstructed image at original scale to {output_file}')
+                   raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write whole reconstructed image at original scale to {output_file}')
                 
             row_reco_image_original_scale = cv2.rotate(row_reco_image_original_scale, cv2.ROTATE_90_COUNTERCLOCKWISE)
             row_recoimages_list.append(row_reco_image_original_scale)
+            
         # generate the whole merged image from the rotated row reconstructed images
         whole_reco_image_original_scale, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(row_recoimages_list, camera_transforms_between_rows, 
                                                                                                                             images_list_scaling_factor)
