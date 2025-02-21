@@ -62,10 +62,11 @@ class ImageReconstructModel():
             self.logger.error(f'System configuration parameter working scale is beyond valid range between 0.01 and 1.00: {self.working_scale}')
             raise AssertionError(f'System configuration parameter working scale is beyond valid range between 0.01 and 1.00: {self.working_scale}')
         self.scaling_factor = 1 / self.working_scale                                 # the scaling factor to restore locations at the original scale
+        self.params['scaling_factor'] = self.scaling_factor
 
     def build(self):
         # build the model
-        self.logger.info(f'ImageReconstructModel working_scale: {self.working_scale}')
+        self.logger.info(f'ImageReconstructModel working_scale: {self.working_scale} (scaling: {self.scaling_factor})')
         self.reco_2d_model = ImageReconstruct2DModel(self.images_2d_list, **self.params)  
         if self.to_cancel:  # stop processing if abort signal is recieved
             raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')         
@@ -453,7 +454,7 @@ class ImageReconstruct2DModel():
     """ ImageReconstruct2DModel models the parameters for the reconstruction of a 2D grid of images. It uses the class ImageReconstruct1DModel to handle the reconustruction of 1D sequence of images, 
         including every row of images in the 2d grid and the row reconstructed images (a merged image of each row)
     """
-    def __init__(self, images_2d_list:list, working_scale:float=0.1, **kwargs):
+    def __init__(self, images_2d_list:list, **kwargs):
         """ The constructor, which accepts a list of lists of images in row-major manner. The top-level list contains lists 
         of images in one row. The images are part of a larger image, and the order of the images in the data structure is consistent
         of that the images are foudnd in the larger image
@@ -472,9 +473,9 @@ class ImageReconstruct2DModel():
         self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         self.debug_images_at_original_scale = kwargs.get(ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value, False)
         self.debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
+        self.working_scale = kwargs.get(ModelsConfigNames.RECO_WORKING_SCALE.value, 0.1)
         # model variables     
-        self.working_scale = working_scale              # the working scale and its inverse
-        self.scaling_factor = 1 / working_scale
+        self.scaling_factor = 1 / self.working_scale #  the working scale and its inverse
         self.image_map = ImageMap(images_2d_list, working_scale=self.working_scale)   # the image map model that validates the 2d image list and loads the images from the file system if needed
         # list of data structure for recording the results of operations involved in image reconstruction
         self.reco_row_model_list = []                   # a list containing 1d reconstruction models for each row

@@ -127,16 +127,21 @@ class LocateTileModel():
         approx_pixel_per_mm_y = detected_frame_size_y / self.frame_size_in_mm[1]        
         approx_pixel_per_mm = (approx_pixel_per_mm_x + approx_pixel_per_mm_y) / 2
         
-        logger.info(f'Type: {self.frame_size_in_mm} {detected_frame_size_x}')
-        logger.info(f'Type: {approx_pixel_per_mm_x} {approx_pixel_per_mm_y} {self.frame_size_in_mm} {self.tile_size_in_mm}')
+        logger.info(f'LocateTile frame size in mm and detected in px: {self.frame_size_in_mm} {detected_frame_size_x}')
+        logger.info(f'LocateTile approx_pixel_per_mm: {approx_pixel_per_mm_x:.2f} {approx_pixel_per_mm_y:.2f} (frame and tile size in mm: {self.frame_size_in_mm} {self.tile_size_in_mm})')
         logger.info(f'LocateTile frame_offset: {frame_offset}')
-        logger.info(f'LocateTile frame_size: {detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm})')
+        logger.info(f'LocateTile frame_size: {detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm:.2f})')
+        
         # compute tile offset, assuming that the frame holder width is the same on all sides
-        frame_width_in_pixel = ((self.frame_size_in_mm[0] - self.tile_size_in_mm[0]) / 2) * approx_pixel_per_mm
-        self.tile_offset_in_px = (frame_offset[0] + frame_width_in_pixel, frame_offset[1] + frame_width_in_pixel,)
-        self.tile_size_in_px = (int(detected_frame_size_in_px[0] - 2 * frame_width_in_pixel), int(detected_frame_size_in_px[1] - 2 * frame_width_in_pixel, ))
+        holder_width_in_pixel = ((self.frame_size_in_mm[0] - self.tile_size_in_mm[0]) / 2) * approx_pixel_per_mm
+        # NOTE: for testing - override by the param 'test_only_holder_width_in_px' 
+        if 'test_only_holder_width_in_px' in self.params:
+            holder_width_in_pixel = self.params['test_only_holder_width_in_px']
+        # compute the tile offset using the frame offset and the holder width
+        self.tile_offset_in_px = (frame_offset[0] + holder_width_in_pixel, frame_offset[1] + holder_width_in_pixel,)
+        self.tile_size_in_px = (int(detected_frame_size_in_px[0] - 2 * holder_width_in_pixel), int(detected_frame_size_in_px[1] - 2 * holder_width_in_pixel, ))
         logger.info(f'LocateTile tile_offset: {self.tile_offset_in_px}')
-        logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (frame_width in pixels: {frame_width_in_pixel})')        
+        logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (frame_width in pixels: {holder_width_in_pixel})')        
         
     def _locate_corner(self, original_image:np.ndarray, which_corner:WhichCorner):
         # image = self._apply_tile_filter(original_image)
