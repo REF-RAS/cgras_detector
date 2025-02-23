@@ -491,7 +491,7 @@ class DetectorDAO():
         else:
             sql = 'SELECT * FROM tile_sample WHERE status NOT IN (?, ?)'
             param_list.append(SampleStatusNames.QUEUED.value)
-            param_list.append(SampleStatusNames.REJECTED.value)
+            param_list.append(SampleStatusNames.DONE.value)
         if season_title:
             sql += ' AND season = ?'
             param_list.append(season_title)            
@@ -643,19 +643,31 @@ class DetectorDAO():
             'frame_size': frame_size
         }
         try:
-            tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-            self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator, metadata)
-            self.delete_source_images_of_tile_sample(tile_sample_id)
-            for index, tile_image in enumerate(tile_images_list):
-                x, y = tile_image.get('x', None), tile_image.get('y', None)
-                filepath = tile_image.get('file', None)
-                # metadata in yaml string format
-                metadata = tile_image.get('metadata', {}) # dump an empty dictionary as default
-                metadata_yaml = yaml.dump(metadata, Dumper=yaml.Dumper)
-                if image_files_parent_folder is not None:
-                    filepath = os.path.join(image_files_parent_folder, filepath)
-                capture_id = tile_image.get('capture_id', f'{tile_sample_id}-{x}-{y}')
-                self.add_source_image(capture_id, tile_sample_id, x, y, filepath, metadata_yaml)
+            with db_tools.create_connection(self.db_file) as conn:
+                c = conn.cursor()
+                tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
+                metadata = json.dumps(metadata)
+                sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
+                c.execute(sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, num_tabs[0], num_tabs[1], metadata, settle_time, spawn_time, 
+                                importer_id, operator, SampleStatusNames.QUEUED.value,))
+                # self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator, metadata=metadata)
+                sql = 'DELETE FROM source_image WHERE tile_sample_id = ?'
+                c.execute(sql, (tile_sample_id,))
+                # self.delete_source_images_of_tile_sample(tile_sample_id)
+                for index, tile_image in enumerate(tile_images_list):
+                    x, y = tile_image.get('x', None), tile_image.get('y', None)
+                    filepath = tile_image.get('file', None)
+                    # metadata in yaml string format
+                    metadata = tile_image.get('metadata', {}) # dump an empty dictionary as default
+                    metadata_yaml = yaml.dump(metadata, Dumper=yaml.Dumper)
+                    if image_files_parent_folder is not None:
+                        filepath = os.path.join(image_files_parent_folder, filepath)
+                    capture_id = tile_image.get('capture_id', f'{tile_sample_id}-{x}-{y}')
+                    c.execute('INSERT INTO source_image (capture_id, tile_sample_id, capture_x, capture_y, file_path, metadata) '
+                        'VALUES (?, ?, ?, ?, ?, ?)', (capture_id, tile_sample_id, x, y, filepath, metadata_yaml,))
+                    # self.add_source_image(capture_id, tile_sample_id, x, y, filepath, metadata_yaml)
+                conn.commit()
             return True
         except Exception as e:
             traceback.print_exc()
@@ -838,7 +850,7 @@ class DetectorDAO():
         # load and validate the data in the yaml config file which has been converted to a YamlConfig object
         name = yolo_spec_data.get('name', None)
         model_file_path = yolo_spec_data.get('file', None)
-        species = yolo_spec_data.get('species', None)
+        species = yolo_spec_data.get('species').lower()
         valid_start_day = yolo_spec_data.get('valid_start_day', default_start_day)
         valid_end_day = yolo_spec_data.get('valid_end_day', default_end_day)
         input_image_width = yolo_spec_data.get('input_image_width')

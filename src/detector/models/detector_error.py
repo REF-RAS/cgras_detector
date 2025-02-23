@@ -31,6 +31,7 @@ class DetectorExceptionCodes(Enum):
     DB_ERROR = 22
     OS_ERROR = 31
     DISK_SPACE_ERROR = 32
+    UNEXPECTED_ERROR = 80
 
 class DetectorException(Exception):
     def __init__(self, code:DetectorExceptionCodes, remarks:str=None, e=None, source=None):            

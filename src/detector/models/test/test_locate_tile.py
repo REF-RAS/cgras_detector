@@ -41,8 +41,9 @@ def sample_loctile_params():
         # ModelsConfigNames.TILE_HOLDER_WIDTH.value: 50,
         ModelsConfigNames.FRAME_SIZE_IN_MM.value: [294, 294],
         ModelsConfigNames.TILE_SIZE_IN_MM.value: [280, 280],
-        ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value: 0.40,
-        ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value: 0.15,
+        # not applicable in the machine learning classifier version 
+        # ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value: 0.40,
+        # ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value: 0.15,
         ModelsConfigNames.LOCTILE_WORKING_SCALE.value: 0.05,
         ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value: 20,
         ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value: 0.5,
@@ -75,7 +76,7 @@ def test_build_loctile_model():
     params = sample_loctile_params() 
     # create LocateTileModel
     try:
-        loctile_model = LocateTileModel(images_2d_list=images_2d_list, map_location_fn=reco_model.map_locations, **params)
+        loctile_model = LocateTileModel(images_2d_list=images_2d_list, map_location_fn=reco_model.map_locations, image_size_in_px=reco_model.get_whole_reco_image_size(), **params)
         loctile_model.build()
     except Exception as e:
         raise AssertionError(f'Error in building LocateTileModel: {e}')

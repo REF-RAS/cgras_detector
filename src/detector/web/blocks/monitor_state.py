@@ -30,10 +30,10 @@ class MonitorStateBlock():
         self._panel = dbc.Col([
                 html.H4(dbc.Badge('SYSTEM MONITOR', className='ms-2 mb-4', color='white', text_color='secondary')),
                 dcc.Store(id=self.update_store_id),
-                dbc.Row([html.Div('Counting and Visualization State:', className='fs-6 col-6 text-end'),
+                dbc.Row([html.Div('Counting and Visualization SyStem:', className='fs-6 col-6 text-end'),
                          dbc.Badge(id=prefix+'vis_state', className='fs-6 col-6 text-start', color='white', text_color='primary')
                     ], className='col-12 mb-2'),
-                dbc.Row([html.Div('Image Acquisition State:', className='fs-6 col-6 text-end'),
+                dbc.Row([html.Div('Image Acquisition System:', className='fs-6 col-6 text-end'),
                          dbc.Badge(id=prefix+'capturer_state', className='fs-6 col-6 text-start', color='white', text_color='primary')
                     ], className='col-12 mb-2'),                
                 dbc.Row([html.Div('Number of CPU(s):', className='fs-6 col-6 text-end'),

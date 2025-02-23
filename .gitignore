@@ -3,6 +3,9 @@
 /.vscode
 /.gitqut
 /.gitref
+/src/detector/test/image_folder/
+/src/detector/test/*.db
+/src/detector/test/.permanent_backup.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

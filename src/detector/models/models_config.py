@@ -37,18 +37,21 @@ class ModelsConfigNames(Enum):
     TILE_SIZE_IN_MM = 'tile_size_in_mm'     # the size of the tile in mm (width, height)
     FRAME_SIZE_IN_MM = 'frame_size_in_mm'   # the size of the frame in mm (width, height)
     
-    LOCTILE_BLUE_RATIO_MIN = 'loctile_blue_ratio_min'
-    LOCTILE_RED_RATIO_MAX = 'loctile_red_ratio_max'
+    # LOCTILE_BLUE_RATIO_MIN = 'loctile_blue_ratio_min'     # NOTE: not used because the background classifier is a machine learning model
+    # LOCTILE_RED_RATIO_MAX = 'loctile_red_ratio_max'       # NOTE: not used because the background classifier is a machine learning model
+    
     LOCTILE_WORKING_SCALE = 'loctile_working_scale'
     LOCTILE_TEMPLATE_SIZE = 'loctile_template_size'
     LOCTILE_MATCHING_SCORE_MIN = 'loctile_matching_score_min'
     LOCTILE_DEBUG_IMAGES = 'loctile_debug_images'
+    
     COD_MODEL_FILENAME = 'cod_model_filename'
     COD_DEBUG_BLOB_IMAGES = 'cod_debug_blob_images'
     COD_BLOB_OVERLAP_PIX = 'cod_blob_overlap_pix'
     COD_USE_CACHED_OBJECT_DETECTION = 'cod_use_cached_object_detection'
     COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES = 'cod_duplicate_max_displacement_images'
     COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS = 'cod_duplicate_max_displacement_blobs'
+    
     # the following are parameters generated dynamically during task execution
     LOGDATA_FOLDER = 'logdata_folder'
     COD_BLOB_SIZE = 'cod_blob_size'

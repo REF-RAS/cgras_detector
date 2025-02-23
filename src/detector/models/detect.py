@@ -9,18 +9,18 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, yaml, numbers, random, time, traceback
+import os, sys, math, yaml, numbers, random, time, traceback
 from enum import Enum
 from collections import defaultdict
 from datetime import datetime
 import cv2
 import numpy as np
 
-from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper
-from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.models.yolo_detector import YoloObjectDetector, YoloResult, ObjectType
 from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
-from detector.model import CoralObject, ObjectClassCategories
+from detector.dao_detect import CoralObject, ObjectClassCategories
+
+from cgras_datatools.opencv_tools import CompareTools
 
 class CoralObjectDetectModel():
     """ CoralDetectorModel uses an object detector to extract a list of objects detected in a 2d grid of images that represent a full coral aquaculture tile. The images which may overlap with one another are
@@ -71,9 +71,9 @@ class CoralObjectDetectModel():
         self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         self.cod_model_cache_filename = kwargs.get(ModelsConfigNames.COD_MODEL_FILENAME.value, f'coral_object_detect_model.yaml')
         # init model parameters
-        # self.image_grid_size = reco_model.get_image_map_size()
+        self.object_list = None     # the master list of detected objects
         self.image_grid_size = (len(self.images_2d_list[0]), len(self.images_2d_list))
-        self.object_list_of_images = dict()
+        self.object_list_of_images = dict()  # the list of detected objects of each image
         self.object_class_names = None
         self.annotated_blob_filename_dict_lists = dict()       # indexed lists of annotated blob filenames with each list indexed by the image location
         self.annotated_image_filename_dict_list = []      # list of annotated image filenames 
@@ -98,7 +98,7 @@ class CoralObjectDetectModel():
                 
                 index = (col_index, row_index)
                 # extract the list of detected objects from the cod_model
-                self.object_list_of_images[index] = self.cod_model.get_object_list(include_invalidated=False)
+                self.object_list_of_images[index] = self.cod_model.get_object_list(include_invalidated=True)
                 # record the class names if not already known
                 if self.object_class_names is None:
                     self.object_class_names = self.cod_model.get_object_class_names() 
@@ -166,13 +166,20 @@ class CoralObjectDetectModel():
         return self.annotated_image_filename_dict_list   
 
 
-    def get_object_list(self) -> list:
+    def get_object_list(self, include_invalidated=False) -> list:
         """ returns the list of CoralObject objects
 
         :return: the finalized list of CoralObject, which may include invalidated object
         :rtype: list
         """
-        return self.object_list
+        if include_invalidated:
+            return self.object_list
+        validate_objects_list = []
+        coral_object:CoralObject
+        for coral_object in self.object_list:
+            if not coral_object.invalidated:
+                validate_objects_list.append(coral_object)
+        return validate_objects_list
     
     def get_num_objects(self) -> int:
         """ return the number of objects, which may include invalidated objects
@@ -265,9 +272,12 @@ class CoralObjectDetectModel():
         :return: the new CoralObjectDetectModel object
         :rtype: CoralObjectDetectModel
         """
-        cod_model = cls(None, None, None)
+        cod_model = cls(None, None, None, None, None)
         cod_model._load_object_list_of_images(object_file)
         return cod_model
+    
+    def _filter_valid_objects(self, object_list:list):
+        return [obj for obj in object_list if not obj.invalidated]
 
     def _invalidate_duplicate_objects(self, object_list_of_images:dict, images_grid_size:tuple, max_displacement:float) -> int:
         """ a generic function for invalidating objects associated with every image in the 2d grid of images that are found to be duplicates.
@@ -282,31 +292,43 @@ class CoralObjectDetectModel():
         :rtype: int
         """
         total_duplicates_removed = 0
+        overlap_sets_list = []
         # iterate through each row and then each grid locations along a row
         for row_index in range(images_grid_size[1]):
-            for col_index in range(images_grid_size[0] - 1):
+            for col_index in range(images_grid_size[0]):
                 # abort the process
                 if self.to_cancel:
                     raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
-                # resolve diplicate between (col_index, row_index) and (col_index + 1, row_index)
-                object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index)
-                num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
-                total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
+                if col_index < images_grid_size[0] - 1:
+                    # resolve diplicate between (col_index, row_index) and (col_index + 1, row_index)
+                    object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index)
+                    CoralObjectListHelper.invalidate_duplicate_objects_greedy(self._filter_valid_objects(object_list_of_images[object_list_index_1]), 
+                                                                                self._filter_valid_objects(object_list_of_images[object_list_index_2]), overlap_sets_list)
+                    #logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
                 if row_index >= images_grid_size[1] - 1:
                     continue
                 # resolve diplicate between (col_index, row_index) and (col_index, row_index + 1)
                 object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index, row_index + 1)
-                num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
-                total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}') 
-                total_duplicates_removed += num_duplicates_removed  
-                # resolve diplicate between (col_index, row_index) and (col_index + 1, row_index + 1)
-                object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index + 1)
-                num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(object_list_of_images[object_list_index_1], object_list_of_images[object_list_index_2], max_displacement)
-                total_duplicates_removed += num_duplicates_removed
-                logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')  
-                total_duplicates_removed += num_duplicates_removed     
+                CoralObjectListHelper.invalidate_duplicate_objects_greedy(self._filter_valid_objects(object_list_of_images[object_list_index_1]), 
+                                                                            self._filter_valid_objects(object_list_of_images[object_list_index_2]), overlap_sets_list)
+                # logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}') 
+                if col_index < images_grid_size[0] - 1:
+                    # resolve diplicate between (col_index, row_index) and (col_index + 1, row_index + 1)
+                    object_list_index_1, object_list_index_2 = (col_index, row_index), (col_index + 1, row_index + 1)
+                    CoralObjectListHelper.invalidate_duplicate_objects_greedy(self._filter_valid_objects(object_list_of_images[object_list_index_1]), 
+                                                                                self._filter_valid_objects(object_list_of_images[object_list_index_2]), overlap_sets_list)
+                    # logger.info(f'Number of duplicate removed between images {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')  
+  
+        # go through the overlap sets one at a time
+        for overlap_set in overlap_sets_list:
+            # find the one with the largest size and mark all other invalidate
+            largest_object:CoralObject = max(overlap_set, key=lambda x: x.size[0] * x.size[1])
+            for obj in overlap_set:
+                if obj == largest_object:
+                    obj.invalidated = False
+                else:
+                    obj.invalidated = True
+                    total_duplicates_removed += 1    
         logger.info(f'Total number of duplicates removed from overlapping regions between images: {total_duplicates_removed}')    
         return total_duplicates_removed     
        
@@ -648,29 +670,48 @@ class CoralObjectDetectImageModel():
         :rtype: int
         """
         total_duplicates_removed = 0
+        overlap_sets_list = []
         # iterate through each row and then each grid locations along a row
         for blob_row_index in range(image_blob_grid_size[1]):
-            for blob_col_index in range(image_blob_grid_size[0] - 1):
-                # resolve diplicate between (blob_col_index, blob_row_index) and (blob_col_index + 1, blob_row_index)
-                object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
-                object_list_index_2 = (image_col_index, image_row_index, blob_col_index + 1, blob_row_index)
-                num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], raw_object_list_of_blobs[object_list_index_2], max_displacement)
-                total_duplicates_removed += num_duplicates_removed
-                # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
+            for blob_col_index in range(image_blob_grid_size[0]):
+                if blob_col_index < image_blob_grid_size[0] - 1:
+                    # resolve diplicate between (blob_col_index, blob_row_index) and (blob_col_index + 1, blob_row_index)
+                    object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
+                    object_list_index_2 = (image_col_index, image_row_index, blob_col_index + 1, blob_row_index)
+                    CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], 
+                                                                                                       raw_object_list_of_blobs[object_list_index_2], overlap_sets_list)
+                    # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
                 if blob_row_index >= image_blob_grid_size[1] - 1:
                     continue
                 # resolve diplications between (blob_col_index, blob_row_index) and (blob_col_index, blob_row_index + 1)
                 object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
                 object_list_index_2 = (image_col_index, image_row_index, blob_col_index, blob_row_index + 1)
-                num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], raw_object_list_of_blobs[object_list_index_2], max_displacement)
+                CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], 
+                                                                                                   raw_object_list_of_blobs[object_list_index_2], overlap_sets_list)
                 # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
-                total_duplicates_removed += num_duplicates_removed
-                # resolve diplicate between (blob_col_index, blob_row_index) and (blob_col_index + 1, blob_row_index + 1)
-                object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
-                object_list_index_2 = (image_col_index, image_row_index, blob_col_index + 1, blob_row_index + 1)
-                num_duplicates_removed = CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], raw_object_list_of_blobs[object_list_index_2], max_displacement)
-                # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
-                total_duplicates_removed += num_duplicates_removed     
+                if blob_col_index < image_blob_grid_size[0] - 1:
+                    # resolve diplicate between (blob_col_index, blob_row_index) and (blob_col_index + 1, blob_row_index + 1)
+                    object_list_index_1 = (image_col_index, image_row_index, blob_col_index, blob_row_index)
+                    object_list_index_2 = (image_col_index, image_row_index, blob_col_index + 1, blob_row_index + 1)
+                    CoralObjectListHelper.invalidate_duplicate_objects_greedy(raw_object_list_of_blobs[object_list_index_1], 
+                                                                                                       raw_object_list_of_blobs[object_list_index_2], overlap_sets_list)
+                    # logger.info(f'Number of duplicate removed between blobs {object_list_index_1} and {object_list_index_2} (max disp: {max_displacement}): {num_duplicates_removed}')
+                    
+        # go through the overlap sets one at a time
+        for overlap_set in overlap_sets_list:
+            # find the one with the largest size and mark all other invalidate
+            largest_object:CoralObject = max(overlap_set, key=lambda x: x.size[0] * x.size[1])
+            # to_print = False
+            # if largest_object.index_str in ['(1, 0, 6, 8)', '(1, 0, 6, 9)']:
+            #     to_print = True
+            #     logger.warning(f'largest_Object: {largest_object}')
+            for obj in overlap_set:
+                if obj == largest_object:
+                    obj.invalidated = False
+                else:
+                    obj.invalidated = True
+                    total_duplicates_removed += 1 
+                    
         logger.info(f'Total number of duplicates removed from overlapped regions between blobs: {total_duplicates_removed}')  
         return total_duplicates_removed     
     
@@ -679,53 +720,50 @@ class CoralObjectListHelper():
     """ CoralObjectListHelper provides generic functions for processing lists of coral objects
 
     """
+
     @staticmethod            
-    def invalidate_duplicate_objects_greedy(object_list_1:list, object_list_2:list, max_displacement:float, verbose=False) -> int:
-        """ a generic function for invalidating objects from two lists if they are found to co-locate in the tile space, subject to a maximum distance, using the greedy algorithm
+    def invalidate_duplicate_objects_greedy(object_list_1:list, object_list_2:list, overlap_sets_list:list, verbose=False) -> int:
+        """ a generic function for invalidating objects from two lists if they are found to co-locate in the tile space, subject to a maximum distance, 
+        using the greedy algorithm. The two objects may be of different class because one of them may be partial that results in a different class
 
         :param object_list_1: a list of CoralObject objects
         :type object_list_1: list
         :param object_list_2: another list of CoralObject objects
         :type object_list_2: list
-        :param max_displacement: the threshold distance beyond which two objects can be considered as duplicates
-        :type max_displacement: float
+        :param overlap_sets_list: a list of sets of overlapped objects of the same class
+        :type overlap_sets_list: list
         :return: the number of object invalidated in this function
         :rtype: int
         """
         object_1:CoralObject
         object_2:CoralObject
-        nearest_match_list = [None] * len(object_list_1)
-        # distance calculated below is squared distance, so max_displacement is squared
-        max_displacement = max_displacement * max_displacement
-        # for every object in object_list_1
+        # compare the objects from two lists of objects
         for index_1, object_1 in enumerate(object_list_1):
-            if object_1.invalidated:
-                continue
-            # find the object in object_list_2 which is the nearest to object_1
-            nearest_index, nearest_dist = None, None
             for index_2, object_2 in enumerate(object_list_2): 
-                if index_2 in nearest_match_list:
+                # if the two objects do not overlap, ignore them
+                if not CompareTools.overlap_bbox(object_1.bbox, object_2.bbox):
                     continue
-                if object_2.invalidated:
-                    continue
-                dist = math.pow(object_1.centre[0] - object_2.centre[0], 2) + math.pow(object_1.centre[1] - object_2.centre[1], 2)
-                # if the distance between them is beyond the max displacement
-                if dist > max_displacement:
-                    continue
-                if nearest_dist is None or dist < nearest_dist:
-                    nearest_index, nearest_dist = index_2, dist
-            if nearest_index is not None:
-                nearest_match_list[index_1] = nearest_index
-        # invalidate one of the matching pairs
-        num_duplicates = 0
-        for index_1, index_2 in enumerate(nearest_match_list):
-            if index_2 is not None:
-                object_list_2[index_2].invalidated = True
-                if verbose:
-                    logger.info(f'Duplicate: {object_list_1[index_1]}\n{object_list_2[index_2]}')
-                num_duplicates += 1
-        return num_duplicates 
-    
+                # if the two objects are of different classes, ignore them
+                if object_1.cls_name != object_2.cls_name:
+                    continue                
+                # search for object_1 in the overlap sets list
+                object_1_set = [s for s in overlap_sets_list if object_1 in s]
+                object_2_set = [s for s in overlap_sets_list if object_2 in s]
+                object_1_set:set = object_1_set[0] if object_1_set else None
+                object_2_set:set = object_2_set[0] if object_2_set else None
+                if object_1_set is None and object_2_set is None:
+                    overlap_sets_list.append(set((object_1, object_2,)))
+                elif object_1_set is None:
+                    object_2_set.add(object_1)
+                elif object_2_set is None:
+                    object_1_set.add(object_2)
+                # if object_1 and object_2 are in different overlap sets, combine them 
+                # if object_1 and object_2 are in the same set, nothing needs to do
+                elif object_1_set != object_2_set:
+                    object_1_set.union(object_2_set)
+                    overlap_sets_list.remove(object_2_set)
+
+        
     @staticmethod 
     def annotate_image_with_objects(object_list:list, output_image:np.ndarray, print_name=True, include_invalidated=False) -> np.ndarray:
         """ draw objects from a list at their locations on the given numpy image

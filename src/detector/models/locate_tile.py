@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import os, math, yaml, numbers
+import os, math, yaml, numbers, random
 from enum import Enum
 import numpy as np
 import cv2
@@ -35,13 +35,15 @@ class LocateTileModel():
 
     """ LocateTileModel uses computer vision means to detect the 4 corners of tile frames so to enable transformation from reconstructed image space to the tile space
     """
-    def __init__(self, images_2d_list:list, map_location_fn, **kwargs):
+    def __init__(self, images_2d_list:list, map_location_fn, image_size_in_px:tuple, **kwargs):
         """ The constructor
 
         :param images_2d_list: The 2D grid of input source images as a list of lists  
         :type images_2d_list: list
-        :param reco_model: The ImageReconstructModel computed for the 2D grid of input images
-        :type reco_model: ImageReconstructModel
+        :param map_location_fn: A function that maps (image_x, image_y, x, y) to the whole reconstructed space (x, y)
+        :type map_location_fn: function object
+        :param image_size_in_px: The size of the whole reconstructed image
+        :type image_size_in_px: 2-tuple        
         """
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
@@ -49,6 +51,7 @@ class LocateTileModel():
         self.images_2d_list = images_2d_list
         self.params = kwargs
         self.map_location_fn = map_location_fn
+        self.image_size_in_px = image_size_in_px
         # placement_grid
         self.placement_grid_dim = (len(self.images_2d_list[0]), len(self.images_2d_list))
         
@@ -67,8 +70,8 @@ class LocateTileModel():
         # other input parameters
         self.logdata_folder = kwargs.get('logdata_folder', None)
         self.write_debug_images = kwargs.get(ModelsConfigNames.LOCTILE_DEBUG_IMAGES.value, False)
-        self.blue_ratio_min = kwargs.get(ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value, 0.35)
-        self.red_ratio_max = kwargs.get(ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value, 0.15)
+        # self.blue_ratio_min = kwargs.get(ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value, 0.35)
+        # self.red_ratio_max = kwargs.get(ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value, 0.15)
         self.working_scale = kwargs.get(ModelsConfigNames.LOCTILE_WORKING_SCALE.value, 0.05)
         self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 21)
         self.matching_score_min = kwargs.get(ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value, 0.5)
@@ -111,15 +114,20 @@ class LocateTileModel():
         detected_frame_size_y = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT]))
         self.detected_frame_size_in_px = (detected_frame_size_x, detected_frame_size_y,)
         logger.info(f'LocateTileModel estimated detected_frame_size: {self.detected_frame_size_in_px}')
+        # compute affine transformation (this is obsolete, only rotation is assumed)
         # self.affine_transform_matrix = cv2.getAffineTransform(input_pts, output_pts)
-        self.origin_offset = (self.detected_frame_size_in_px[0] // 2 + self.corners_in_reco_space[WhichCorner.TOP_LEFT][0], self.detected_frame_size_in_px[1] // 2 + self.corners_in_reco_space[WhichCorner.TOP_LEFT][1])
-        # self.origin_offset = (2567 // 2, 2592 // 2)
+        # compute the origin (this is obsolete because the transformed/rotated corners do not give good estimation of the original)
+        # self.origin_offset = (self.detected_frame_size_in_px[0] // 2 + self.corners_in_reco_space[WhichCorner.TOP_LEFT][0], self.detected_frame_size_in_px[1] // 2 + self.corners_in_reco_space[WhichCorner.TOP_LEFT][1])
+        # use the reco image as the reference to determin the origin (assumed only rotation occured)
+        self.image_origin_offset = (self.image_size_in_px[0] // 2, self.image_size_in_px[1] // 2)
+        
         # the affirm transform matrix is defined in the space of the tile holder
-        self.affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, self.origin_offset)
-        logger.info(f'AffineTransform matrix: {self.affine_transform_matrix} rotation origin offset {self.origin_offset}')  
+        # the reconstructed image size is used as the reference of the origin, so if the affine transform matrix is used to operate in the frame/tile space, offset the result is required
+        self.affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, self.image_origin_offset)
+        logger.info(f'AffineTransform matrix: {self.affine_transform_matrix} rotation origin offset {self.image_origin_offset}')  
 
-        frame_offset = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT]) 
-        frame_bottomright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT]) 
+        frame_offset = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT], adjust_offset=False) 
+        frame_bottomright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT], adjust_offset=False) 
         # update the detected frame_size in px
         detected_frame_size_in_px = (frame_bottomright_corrected[0] - frame_offset[0], frame_bottomright_corrected[1] - frame_offset[1],)
         # compute the detected tile size in pixels from the tile size and frame size
@@ -143,7 +151,7 @@ class LocateTileModel():
         logger.info(f'LocateTile tile_offset: {self.tile_offset_in_px}')
         logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (frame_width in pixels: {holder_width_in_pixel})')        
         
-    def _locate_corner(self, original_image:np.ndarray, which_corner:WhichCorner):
+    def _locate_corner(self, original_image:np.ndarray, which_corner:WhichCorner, fine_search:bool=False):
         # image = self._apply_tile_filter(original_image)
         image = self._apply_tile_filter_classifier(original_image)
         # find approximate corner at working_scale
@@ -158,20 +166,21 @@ class LocateTileModel():
         # compute the corner at working scale
         top_left = max_loc
         bottom_right = (max_loc[0] + self.template_size, max_loc[1] + self.template_size)
-        corner = (int((top_left[0] + bottom_right[0]) / 2), int((top_left[1] + bottom_right[1]) / 2))
-        # scale up to the original resolution
-        corner = (int(corner[0] / self.working_scale), int(corner[1] / self.working_scale))
-        # extract a local search region for fine tuning
-        search_rectangle_size = int(2 / self.working_scale) 
-        search_bbox = (corner[0] - search_rectangle_size,  corner[1] - search_rectangle_size, corner[0] + search_rectangle_size, corner[1] + search_rectangle_size)
-        image_extracted = image[search_bbox[1]:search_bbox[3], search_bbox[0]:search_bbox[2]]
-        res = cv2.matchTemplate(image_extracted, template, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, max_loc = cv2.minMaxLoc(res)
-        # if nothing is found, use the low resolution result as a fallback
-        if max_val < self.matching_score_min:
-            ...
-        else:
-            corner = (int(search_bbox[0] + max_loc[0] + self.template_size / 2), int(search_bbox[1] + max_loc[1] + self.template_size / 2))
+        # calciulate corner and scale up to the original resolution
+        corner = (int((top_left[0] + bottom_right[0]) / self.working_scale / 2), int((top_left[1] + bottom_right[1]) / self.working_scale / 2))
+        if fine_search:
+            # extract a local search region for fine tuning
+            search_rectangle_size = int(2 / self.working_scale) 
+            search_bbox = (corner[0] - search_rectangle_size,  corner[1] - search_rectangle_size, corner[0] + search_rectangle_size, corner[1] + search_rectangle_size)
+            image_extracted = image[search_bbox[1]:search_bbox[3], search_bbox[0]:search_bbox[2]]
+            res = cv2.matchTemplate(image_extracted, template, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(res)
+            # if nothing is found, use the low resolution result as a fallback
+            if max_val < self.matching_score_min:
+                ...
+            else:
+                corner = (int(search_bbox[0] + max_loc[0] + self.template_size / 2), int(search_bbox[1] + max_loc[1] + self.template_size / 2))
+
         # write annotated image related to corner detection
         if self.write_debug_images is not None and self.logdata_folder is not None:
             try:
@@ -185,15 +194,18 @@ class LocateTileModel():
     
     @classmethod
     def _compute_affine_transform_only_rotation(cls, corners:dict, origin_offset:tuple):
-        def _estimate_angle(P1, P2, P3):
+        def _estimate_rotated_angle(P1, P2, P3):
+            # the angle with P1 as the vertex, P1 - P2 and P1 - P3
+            # P2 is the target position so that the tile is aligned
+            # return the angle required to restore the tile back to aligned
             result = math.atan2(P3[1] - P1[1], P3[0] - P1[0]) - math.atan2(P2[1] - P1[1], P2[0] - P1[0])
             return result
         # consider only rotation
-        angle_sample_1 = _estimate_angle(corners[WhichCorner.TOP_LEFT], (corners[WhichCorner.TOP_RIGHT][0], corners[WhichCorner.TOP_LEFT][1]), corners[WhichCorner.TOP_RIGHT])       
-        angle_sample_2 = _estimate_angle(corners[WhichCorner.TOP_LEFT], (corners[WhichCorner.TOP_LEFT][0], corners[WhichCorner.BOTTOM_LEFT][1]), corners[WhichCorner.BOTTOM_LEFT])   
+        angle_sample_1 = _estimate_rotated_angle(corners[WhichCorner.TOP_LEFT], (corners[WhichCorner.TOP_RIGHT][0], corners[WhichCorner.TOP_LEFT][1]), corners[WhichCorner.TOP_RIGHT])       
+        angle_sample_2 = _estimate_rotated_angle(corners[WhichCorner.TOP_LEFT], (corners[WhichCorner.TOP_LEFT][0], corners[WhichCorner.BOTTOM_LEFT][1]), corners[WhichCorner.BOTTOM_LEFT])   
         rotate_angle = (angle_sample_1 + angle_sample_2) / 2
         rotate_angle = np.degrees(rotate_angle)
-        logger.info(f'_estimate_affine_transform angle: {angle_sample_1} {angle_sample_2} degrees {rotate_angle} origin_offset {origin_offset}')
+        logger.info(f'_estimate_affine_transform angle for correction: {angle_sample_1:3f} {angle_sample_2:3f} degrees {rotate_angle:2f} origin_offset {origin_offset}')
         affine_transform_matrix = cv2.getRotationMatrix2D(origin_offset, rotate_angle, 1.0)
         # test the affine transform matrix
         result:np.ndarray = np.matmul(affine_transform_matrix, np.float32([origin_offset[0], origin_offset[1], 1]).T).astype(np.int32)
@@ -215,14 +227,19 @@ class LocateTileModel():
         # logger.info(f'input_pts: {input_pts}')
         # logger.info(f'output_pts: {output_pts}')
 
-    def _apply_affine_transform(self, point_in_tile_holder_space:tuple):
+    def _apply_affine_transform(self, point_in_image_space:tuple, adjust_offset:bool=False):
         if self.affine_transform_matrix is not None:
             # point = (point[0] - self.origin_offset[0], point[1] - self.origin_offset[1])
-            result:np.ndarray = np.matmul(self.affine_transform_matrix, np.float32([point_in_tile_holder_space[0], point_in_tile_holder_space[1], 1]).T).astype(np.int32)
-            offset:np.ndarray = np.matmul(self.affine_transform_matrix, np.float32([0, 0, 1]).T).astype(np.int32)
-            result = tuple((result - offset).tolist())
-            return result
-        return point_in_tile_holder_space
+            transformed:np.ndarray = np.matmul(self.affine_transform_matrix, np.float32([point_in_image_space[0], point_in_image_space[1], 1]).T).astype(np.int32)
+            if adjust_offset:
+                # the transformed location has to be adjusted by the offset distance because the affine transformation is computed using the origin of the image 
+                offset:np.ndarray = np.matmul(self.affine_transform_matrix, np.float32([0, 0, 1]).T).astype(np.int32)
+                # to obtain the transformed location in the tile holder space, the offset is needed
+                result = tuple((transformed - offset).tolist())     
+                return result
+            else:
+                return tuple(transformed.tolist())
+        return point_in_image_space
         
     def _write_annotate_whole_image(self):
         if self.write_debug_images is not None and self.logdata_folder is not None:
@@ -258,7 +275,7 @@ class LocateTileModel():
                 return    
             # compute the affine tranform matrix based on the detected corners
             affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
-            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (reco_whole_image.shape[1] * 2, reco_whole_image.shape[0] * 2))
+            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.05), int(reco_whole_image.shape[0] * 1.05)))
             rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, 'rotated_whole_reco_image.jpg')
             cv2.imwrite(rotated_reco_whole_image_filepath, rotated_whole_image) 
 
@@ -291,13 +308,13 @@ class LocateTileModel():
             print(np.mean(image_ratio[:500, 4000:]))
             print(np.mean(image_ratio[500:, 4000:]))
 
-    def _apply_tile_filter(self, image:np.ndarray):
-        pixel_sum_image = image.sum(axis=2)
-        blue_ratio_met = np.divide(image[ :, :, 0], pixel_sum_image) >= self.blue_ratio_min
-        red_ratio_met = np.divide(image[ :, :, 2], pixel_sum_image) <= self.red_ratio_max
-        ratio_met = np.logical_and(blue_ratio_met, red_ratio_met)
-        image = np.where(ratio_met, 255, 0).astype(np.uint8)
-        return image
+    # def _apply_tile_filter(self, image:np.ndarray):
+    #     pixel_sum_image = image.sum(axis=2)
+    #     blue_ratio_met = np.divide(image[ :, :, 0], pixel_sum_image) >= self.blue_ratio_min
+    #     red_ratio_met = np.divide(image[ :, :, 2], pixel_sum_image) <= self.red_ratio_max
+    #     ratio_met = np.logical_and(blue_ratio_met, red_ratio_met)
+    #     image = np.where(ratio_met, 255, 0).astype(np.uint8)
+    #     return image
     
     def _apply_tile_filter_classifier(self, image:np.ndarray):
         frame_detector = FrameDetector(os.path.join(os.path.dirname(__file__), 'training_data/train_set_1.model'))
@@ -337,7 +354,7 @@ class LocateTileModel():
         results = []
         for point in points:
             # apply affine transformation
-            point_corrected_space = self._apply_affine_transform(point) 
+            point_corrected_space = self._apply_affine_transform(point, adjust_offset=False) 
             point_in_tile_space = (point_corrected_space[0] - self.tile_offset_in_px[0], point_corrected_space[1] - self.tile_offset_in_px[1],)
             if single_point:
                 return point_in_tile_space
@@ -416,14 +433,21 @@ class LocateTileModelHelper():
         :return: The string content of the yaml file
         :rtype: str
         """
+        affine_transform_matrix = loctile_model.affine_transform_matrix.tolist()
         object_dict = {
             'tile_offset_in_px': loctile_model.tile_offset_in_px,
             'tile_size_in_px': loctile_model.tile_size_in_px,
-            'affine_transform_matrix': loctile_model.affine_transform_matrix.tolist(),
+            'affine_transform_matrix': affine_transform_matrix,
             'frame_size_in_mm': loctile_model.frame_size_in_mm,
             'tile_size_in_mm': loctile_model.tile_size_in_mm,
-            'origin_offset': loctile_model.origin_offset,
+            'image_size_in_px': loctile_model.image_size_in_px,
+            'image_origin_offset': loctile_model.image_origin_offset,
                        }
+        try:
+            rotation = np.degrees(math.acos(affine_transform_matrix[0][0]))
+            object_dict['rotation_in_deg'] = float(rotation)
+        except:
+            ...
         if object_file is None:
             return yaml.dump(object_dict)
         else:
@@ -465,13 +489,14 @@ class LocateTileModelHelper():
         :return: An ImageReconstructModel object
         :rtype: LocateTileModel
         """
-        loctile_model = LocateTileModel(None, None)
+        loctile_model = LocateTileModel(None, None, None)
         loctile_model.tile_offset_in_px = data['tile_offset_in_px']
         loctile_model.tile_size_in_px = data['tile_size_in_px']
         loctile_model.frame_size_in_mm = data['frame_size_in_mm']
         loctile_model.tile_size_in_mm = data['tile_size_in_mm']
+        loctile_model.image_size_in_px = data['image_size_in_px']
         loctile_model.affine_transform_matrix = np.asarray(data['affine_transform_matrix'])
-        loctile_model.origin_offset = data['origin_offset']
+        loctile_model.image_origin_offset = data['image_origin_offset']
         return loctile_model
     
 # ----------------------------------------------------------------------------------
@@ -482,7 +507,7 @@ def test_build_model(params, reco_model:ImageReconstructModel):
     logdata_folder = params['logdata_folder']
     loctile_model_file = os.path.join(logdata_folder, params['loctile_model_filename'])
     os.makedirs(logdata_folder, exist_ok=True)
-    loctile_model = LocateTileModel(image_map_as_list, reco_model=reco_model, **params) 
+    loctile_model = LocateTileModel(image_map_as_list, map_location_fn=reco_model.map_locations, image_size_in_px=reco_model.get_whole_reco_image_size(), **params) 
     logger.info('Saving LocateTileModel model to file')
     LocateTileModelHelper.to_yaml(loctile_model, loctile_model_file)
     return loctile_model

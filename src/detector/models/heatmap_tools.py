@@ -69,7 +69,7 @@ class HeatmapHelper():
         return count_map_array, count_map_label_array
     
     @staticmethod
-    def generate_plotly_heatmap(count_map_array:np.ndarray, count_map_label_array:np.ndarray=None, title:str=None, fig_size:tuple=None, count_range:tuple=None, show_fig:bool=False, output_file:str=None):
+    def generate_plotly_heatmap(count_map_array:np.ndarray, count_map_label_array:np.ndarray=None, title:str=None, fig_size:tuple=None, count_range:tuple=None, color_scale:str=None, show_fig:bool=False, output_file:str=None):
         """ returns a plotly figure object containing the heatmap generated from the given object count map
 
         :param count_map_array: the coral object count map to be converted into a graphical heatmap
@@ -95,7 +95,9 @@ class HeatmapHelper():
             
         # generate the heatmap as a figure
         # fig = px.imshow(count_map_array, text_auto=True, title=title, color_continuous_scale=px.colors.sequential.Viridis, zmin=z_min, zmax=z_max)
-        fig = px.imshow(count_map_array, text_auto=True, title=title, color_continuous_scale=px.colors.sequential.Viridis, zmax=z_max)        
+        
+        color_scale = px.colors.sequential.Viridis if color_scale is None else color_scale
+        fig = px.imshow(count_map_array, text_auto=True, title=title, color_continuous_scale=color_scale, zmax=z_max)  
         # set the labels of the cells in the heatmap
         # if count_map_label_array is not None:
         #   fig.update_traces(text=count_map_label_array, texttemplate="%{text}", textfont_size=6)

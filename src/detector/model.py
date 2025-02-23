@@ -56,8 +56,8 @@ class SystemStates(Enum):
 class CoordinatorStates(Enum):
     ERROR = -1
     UNKNOWN = 0
-    SAFE = 1
-    UNSAFE = 2
+    IDLE = 1
+    WORKING = 2
     
 # General Class for synchronized set to a value 
 class ValueHolder:

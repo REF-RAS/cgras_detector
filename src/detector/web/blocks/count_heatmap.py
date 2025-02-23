@@ -19,7 +19,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
 from cgras_datatools.logging_tools import logger
-from detector.model import DETECT_DAO
+from detector.model import DETECT_DAO, CONFIG, SystemConfigNames
 from detector.models.visualize import CoralObjectMapModel, CoralObjectMapModelHelper
 from detector.models.heatmap_tools import HeatmapHelper
 
@@ -39,9 +39,10 @@ class CountHeatmapBlock():
         self.heatmap_figures_list = None
         self.class_options = None
         # define widgets
+        heatmap_show_label_slider_max = CONFIG.get(SystemConfigNames.HEATMAP_SHOW_LABEL_SLIDER_MAX, 30)
         _sample_select_datatable = dash_table.DataTable(id=prefix+'sample_select_datatable', row_selectable=False, cell_selectable=True, style_cell={'fontSize': 14})
-        _count_threshold_slider = dcc.Slider(0, 30, 1, value=5, id=prefix+'count_threshold_slider',
-                                               marks = {i: f'{i}' for i in range(0, 30, 5)}, tooltip={"always_visible": False,},className='mt-5')
+        _count_threshold_slider = dcc.Slider(0, heatmap_show_label_slider_max, 1, value=5, id=prefix+'count_threshold_slider',
+                                               marks = {i: f'{i}' for i in range(0, heatmap_show_label_slider_max, 5)}, tooltip={"always_visible": False,},className='mt-5')
         # define the main panel
         self._panel = html.Div(id=prefix+'top_panel', children=[
                 dcc.Store(self.update_trigger_id),
@@ -113,7 +114,8 @@ class CountHeatmapBlock():
         # count_map stores the counts as integers and count_label_map is the string representation
         count_map, count_label_map = vt_model.compute_object_count_map(filter_class, count_range=count_range)
         # generate the heatmap for the given tile_sample_id
-        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(600, 600,), count_range=count_range)
+        color_scale = CONFIG.get(SystemConfigNames.HEATMAP_COLOUR_SCALE, None)
+        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(600, 600,), count_range=count_range, color_scale=color_scale)
         return fig, count_map
     
     # internal function for generating the heatmaps based on the given filter_class, the indices of tile samples to show in additional to the most recent one, and the count show threshold 

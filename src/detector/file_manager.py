@@ -42,6 +42,8 @@ class ApplicationFileManager():
         os.makedirs(self.detector_folder, exist_ok=True)
         # create the subfolders under the two platforms
         self._create_platform_subfolders(self.detector_folder)
+        # generate path to the error_log_file
+        self.error_log_file = os.path.join(self.cgras_data_folder, 'detector_system_error.log')
     
     @staticmethod
     def _create_platform_subfolders(platform_home):
@@ -68,6 +70,18 @@ class ApplicationFileManager():
         if subfolder not in [ApplicationFileManager.SYSTEM_SUBFOLDER, ApplicationFileManager.DATA_SUBFOLDER, ApplicationFileManager.TEMP_SUBFOLDER]:
             raise AssertionError(f'{type(self).__name__}: invalid parameter (subfolder): {subfolder} ')
         return self.get_subfolder(self.detector_folder, subfolder, *args)   
+    
+    def dump_exc_to_error_log(self, header=None):
+        try:
+            with open(self.error_log_file, 'a') as outfile:
+                outfile.write('----------------------------------------------------------\n')
+                outfile.write(f'Timestamp: {datetime.now().strftime("%d/%b/%Y %H:%M:%S")}\n')
+                if header is not None:
+                    outfile.write(f'Title: {header}\n')
+                traceback.print_exc(file=outfile)      
+                outfile.write('---- End ----\n\n')   
+        except:
+            logger.warning(f'Unable to dump exception message to the error log file')
     
     @staticmethod
     def get_subfolder(parent_folder:str, *args) -> str:

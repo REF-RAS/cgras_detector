@@ -19,8 +19,11 @@ import pandas as pd
 
 from cgras_datatools.lock_tools import synchronized
 from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
-from detector.models.detect import ImageReconstructModel, ImageReconstructModelHelper, CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
-from detector.models.locate_tile_basic import LocateTileModel, LocateTileModelHelper
+from detector.models.detect import CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ObjectClassCategories
+
+from detector.models.reconstruct_best import ImageReconstructModel, ImageReconstructModelHelper
+
+from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.html.lightbox import LightboxHelper
 from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG, SystemConfigNames     
 
@@ -241,7 +244,7 @@ class DetectionTaskModel():
             logger.info(f'{type(self).__name__}: No valid cached file. Building the loctile_model_file from capture images')
             
         if self.loctile_model is None:
-            self.loctile_model = LocateTileModel(self.image_map_as_list, map_location_fn=self.reco_model.map_locations, **self.params)
+            self.loctile_model = LocateTileModel(self.image_map_as_list, map_location_fn=self.reco_model.map_locations, image_size_in_px=self.reco_model.get_whole_reco_image_size(), **self.params)
             if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
@@ -294,7 +297,9 @@ class DetectionTaskModel():
         # extract statistics of the tile 
         self.detection_stat['tile_pixel_x'], self.detection_stat['tile_pixel_y'] = self.loctile_model.get_tile_size()
         # detection of coral objects is completed, save the results to the database
-        logger.info(f'{type(self).__name__}: Saving all types of {self.cod_model.get_num_objects()} objects to database')
+        num_objects = self.cod_model.get_num_objects()
+        num_invalid_objects = self.cod_model.get_num_invalidated_objects()
+        logger.info(f'{type(self).__name__}: Saving objects of all classes to database (valid/all): {num_objects - num_invalid_objects} {num_objects}')
         
         DETECT_DAO.delete_detected_objects_of_tile_sample(self.tile_sample_id)  # DB operation
          

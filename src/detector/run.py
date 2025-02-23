@@ -44,7 +44,7 @@ class ApplicationCoordinator(object):
         self.counter = 0
         # operation mode
         AUTOMATED_TASK_EXECUTION.set_value(bool(CONFIG.get(SystemConfigNames.TASK_AUTOMATION_MODE, False)))
-
+        self.suspend_when_capturing_image = CONFIG.get(SystemConfigNames.SUSPEND_WHEN_CAPTURING_IMAGE, False)
         # ros topic names
         self.state_pub_name = CONFIG.get(SystemConfigNames.ROS_DETECTOR_STATE_TOPIC, '/cgras/detector/state')
         self.coordinator_state_sub_name = CONFIG.get(SystemConfigNames.ROS_COORDINATOR_STATE_TOPIC, '/cgras/coordinator/state')  
@@ -90,22 +90,31 @@ class ApplicationCoordinator(object):
         
     def cb_coordinator(self, msg:Int8): 
         received_coordinator_state_value = msg.data
+        # assign coordinator state according to the state value
         if received_coordinator_state_value < 0:
             COORDINATOR_STATE.update(CoordinatorStates.ERROR)
         elif received_coordinator_state_value > 20:
-            COORDINATOR_STATE.update(CoordinatorStates.UNSAFE)
+            COORDINATOR_STATE.update(CoordinatorStates.WORKING)
         else:
-            COORDINATOR_STATE.update(CoordinatorStates.SAFE)
-                
-        if COORDINATOR_STATE.get_state() not in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN, CoordinatorStates.ERROR]:
-            state = STATE.get_state()
-            if state in [SystemStates.DETECT, SystemStates.WAIT_DETECT]:
-                the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
-                if the_detection_task:
-                    the_detection_task.cancel_task()
-            with self.state_lock:
-                # switch the state to SUSPENDED to avoid task execution
-                STATE.update_state(SystemStates.SUSPENDED)
+            COORDINATOR_STATE.update(CoordinatorStates.IDLE)
+        # do not attempt to suspend if the config parameter 'suspend_when_capturing_image' is not set
+        if not self.suspend_when_capturing_image:
+            return
+        # test if the state of the coordinator is working, and change to SUSPENDED state and abort current detector task      
+        if COORDINATOR_STATE.get_state() not in [CoordinatorStates.IDLE, CoordinatorStates.UNKNOWN, CoordinatorStates.ERROR]:
+            try:
+                state = STATE.get_state()
+                if state in [SystemStates.DETECT, SystemStates.WAIT_DETECT]:
+                    the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
+                    if the_detection_task:
+                        the_detection_task.cancel_task()
+                with self.state_lock:
+                    # switch the state to SUSPENDED to avoid task execution
+                    STATE.update_state(SystemStates.SUSPENDED)
+            except:
+                logger.warning(f'Unexpected error in cb_coordinator (ignored)')
+                # dump the exception to the error log file
+                APP_FILE_MANAGER.dump_exc_to_error_log('Exception happens in _detect_work')
                 
     def _pub_detector_state(self):
         # logger.info(f'pub {STATE.get_state()}')
@@ -120,10 +129,11 @@ class ApplicationCoordinator(object):
                 logger.warning(f'_console_callback: received CANCEL callback')
                 self.cancel_current_task()
                 
-                
     def cancel_current_task(self) -> bool:
-        STATE.set_var('exception', DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Cancelled by the system'))          
-        STATE.update_state(SystemStates.D_CANCELLED, info=STATE.get())
+        with self.state_lock:
+            STATE.set_var('exception', DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Cancelled by the system'))  
+            STATE.update_state(SystemStates.D_CANCELLED, info=STATE.get())
+        
         the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
         if the_detection_task:   
             the_detection_task.cancel_task()     
@@ -190,9 +200,17 @@ class ApplicationCoordinator(object):
             with self.state_lock:
                 STATE.update_state(SystemStates.D_CANCELLED)   
 
-        except Exception as e:
-            traceback.print_exc()
-            logger.error(e)     
+        except:
+            # an unexpected error has occurred
+            traceback.print_exc(file=sys.stderr)  
+            # dump the exception to the error log file
+            APP_FILE_MANAGER.dump_exc_to_error_log('Exception happens in _detect_work')
+            # switch to manual operation to prevent trapped in an error loop
+            AUTOMATED_TASK_EXECUTION.set_value(False)            
+            # set error flag to notify the user
+            DETECT_DAO.set_error_flag(DetectorExceptionCodes.UNEXPECTED_ERROR.value, "System", '*** Unexpected Error Occurred ***: examine the error log file under the CGRAS Data Folder') 
+            # cancel the current task, which will change to D_CANCELLED state
+            self.cancel_current_task()
     
     def _timer_callback(self, event, *args):
         self._pub_detector_state()
@@ -213,7 +231,7 @@ class ApplicationCoordinator(object):
                         STATE.update(SystemStates.CLICK_START)
                 
                 elif state == SystemStates.AUTO_START:
-                    if COORDINATOR_STATE.get_state() in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
+                    if COORDINATOR_STATE.get_state() in [CoordinatorStates.IDLE, CoordinatorStates.UNKNOWN]:
                         if len(args) > 1:
                             if args[0] % 10 == 1:
                                 STATE.update(SystemStates.POLL_IMPORT_SAMPLE)
@@ -319,7 +337,7 @@ class ApplicationCoordinator(object):
                     STATE.update_state(SystemStates.READY)                       
                     
                 elif state == SystemStates.SUSPENDED:
-                    if COORDINATOR_STATE.get_state() in [CoordinatorStates.SAFE, CoordinatorStates.UNKNOWN]:
+                    if COORDINATOR_STATE.get_state() in [CoordinatorStates.IDLE, CoordinatorStates.UNKNOWN]:
                         STATE.update_state(SystemStates.READY)                                                     
 
                 # check if connection to other component is lost
@@ -341,9 +359,16 @@ class ApplicationCoordinator(object):
                 STATE.set_var('exception', e) 
                 STATE.update_state(SystemStates.D_CANCELLED)                
 
-            except Exception as e:
-                traceback.print_exc()
-                logger.error(e)
+            except:
+                # an unexpected error has occurred
+                traceback.print_exc(file=sys.stderr)  
+                # dump the exception to the error log file
+                APP_FILE_MANAGER.dump_exc_to_error_log('Exception happened in _timer_callback')
+                # switch to manual operation to prevent trapped in an error loop
+                AUTOMATED_TASK_EXECUTION.set_value(False)            
+                # set error flag to notify the user
+                DETECT_DAO.set_error_flag(DetectorExceptionCodes.UNEXPECTED_ERROR.value, "System", '*** Unexpected Error Occurred ***: examine the error log file under the CGRAS Data Folder') 
+                # switch to READY
                 STATE.update_state(SystemStates.READY)
             
     def process_exportable_tile_samples(self, exportable_tile_samples_list:list):

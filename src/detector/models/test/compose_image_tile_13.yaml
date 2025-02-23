@@ -1,0 +1,55 @@
+images_set:
+  - 
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_00.jpg
+      bbox: [860, 675, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_02.jpg
+      bbox: [0, 889, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241105/CGRAS_Amag_241105_T02_01.jpg
+      bbox: [0, 661, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241105/CGRAS_Amag_241105_T02_03.jpg
+      bbox: [0, 820, 7550, 5503]
+  - 
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241112/CGRAS_Amag_241112_T02__00.jpg
+      bbox: [1010, 467, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241112/CGRAS_Amag_241112_T02__02.jpg
+      bbox: [0, 953, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241119/CGRAS_Amag_241119_T02_01.jpg
+      bbox: [0, 577, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241119/CGRAS_Amag_241119_T02_03.jpg
+      bbox: [0, 820, 7758, 5503]
+  -
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_08.jpg
+      bbox: [779, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_10.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241105/CGRAS_Amag_241105_T02_09.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241105/CGRAS_Amag_241105_T02_11.jpg
+      bbox: [0, 0, 7458, 5503]
+  -
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241112/CGRAS_Amag_241112_T02__08.jpg
+      bbox: [866, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241112/CGRAS_Amag_241112_T02_10.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241119/CGRAS_Amag_241119_T02_09.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241119/CGRAS_Amag_241119_T02_11.jpg
+      bbox: [0, 0, 7719, 5503]
+  - 
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_16.jpg
+      bbox: [762, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_18.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241105/CGRAS_Amag_241105_T02_17.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241105/CGRAS_Amag_241105_T02_19.jpg
+      bbox: [0, 0, 7362, 5503]
+  -
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241112/CGRAS_Amag_241112_T02_16.jpg
+      bbox: [773, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241112/CGRAS_Amag_241112_T02_18.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241119/CGRAS_Amag_241119_T02_17.jpg
+      bbox: [0, 0, 8255, 5503]
+    - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241119/CGRAS_Amag_241119_T02_19.jpg
+      bbox: [0, 0, 7551, 5503]

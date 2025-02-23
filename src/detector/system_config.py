@@ -32,6 +32,7 @@ class SystemConfigNames(Enum):
     AUX_WEB_DIRECTORY = 'aux_web_directory'
     # automation mode (whether the task execution is automated)
     TASK_AUTOMATION_MODE = 'task_automation' 
+    SUSPEND_WHEN_CAPTURING_IMAGE = 'suspend_when_capturing_image'
     # default ros topics
     ROS_COORDINATOR_STATE_TOPIC = 'ros_coordinator_state_topic' 
     ROS_DETECTOR_STATE_TOPIC = 'ros_detector_state_topic' 
@@ -40,6 +41,9 @@ class SystemConfigNames(Enum):
     DASHBOARD_REFRESH_CYCLES = 'dashboard_refresh_cycles'        # the refresh rate of 'auto-refresh pages' in the dashboard the number of cycles of system timer
     # yolo model range
     MAX_CORAL_AGE = 'max_coral_age'
+    # heatmap
+    HEATMAP_COLOUR_SCALE = 'heatmap_colour_scale'
+    HEATMAP_SHOW_LABEL_SLIDER_MAX = 'heatmap_show_label_slider_max'
     # connection timeout
     CONNECTION_TIMEOUT = 'connection_timeout'
 

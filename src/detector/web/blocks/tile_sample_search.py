@@ -41,7 +41,7 @@ class TileSampleSearchBlock():
                                        searchable=False, clearable=False, className='ms-2', style={'width': '240px', 'zIndex': 10})
         # the status filter
         self.status_options = [
-            {'label': 'Done or Flagged', 'value': SampleStatusNames.UNKNOWN.value},
+            {'label': 'Rejected or Flagged', 'value': SampleStatusNames.UNKNOWN.value},
             {'label': 'Done', 'value': SampleStatusNames.DONE.value},
             {'label': 'Flagged', 'value': SampleStatusNames.FLAGGED.value},
             {'label': 'Rejected', 'value': SampleStatusNames.REJECTED.value},
@@ -116,7 +116,7 @@ class TileSampleSearchBlock():
             for season_title in season_titles_list:
                 period_options.append({'label': f'{season_title} Season', 'value': season_title})
             value = 0
-            return ('', '', period_options, value, 10, SampleStatusNames.UNKNOWN.value,)
+            return ('', '', period_options, value, 10, SampleStatusNames.REJECTED.value,)
         return reset_filter_button_clicked
     
     def _refresh_table_clicked(self):

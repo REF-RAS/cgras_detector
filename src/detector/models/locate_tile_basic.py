@@ -31,14 +31,17 @@ class WhichCorner(Enum):
 class LocateTileModel():
 
     """ LocateTileModel uses computer vision means to detect the 4 corners of tile frames so to enable transformation from reconstructed image space to the tile space
+        NOTE: This basic version considers that there is no frame, and so the tile occupies the whole image
     """
-    def __init__(self, images_2d_list:list, map_location_fn, **kwargs):
+    def __init__(self, images_2d_list:list, map_location_fn, image_size_in_px:tuple, **kwargs):
         """ The constructor
 
         :param images_2d_list: The 2D grid of input source images as a list of lists  
         :type images_2d_list: list
-        :param reco_model: The ImageReconstructModel computed for the 2D grid of input images
-        :type reco_model: ImageReconstructModel
+        :param map_location_fn: A function that maps (image_x, image_y, x, y) to the whole reconstructed space (x, y)
+        :type map_location_fn: function object
+        :param image_size_in_px: The size of the whole reconstructed image
+        :type image_size_in_px: 2-tuple  
         """
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
@@ -46,25 +49,33 @@ class LocateTileModel():
         self.images_2d_list = images_2d_list
         self.params = kwargs
         self.map_location_fn = map_location_fn
+        self.image_size_in_px = image_size_in_px
         # placement_grid
         self.placement_grid_dim = (len(self.images_2d_list[0]), len(self.images_2d_list))
         # optional input parameter (for fallback if a corner cannot be found)
-        self.whole_tile_image_size = (25000, 25365)     # NOTE: hardcode for testing
-        self.tile_holder_width = 50                     # NOTE: hardcode for testing
+        # self.whole_tile_image_size = (25000, 25365)     # NOTE: hardcode for testing
+        # self.tile_holder_width = 50                     # NOTE: hardcode for testing
+        
+        # the info coming from the tile information
+        self.tile_size_in_mm = kwargs.get(ModelsConfigNames.TILE_SIZE_IN_MM.value, None)
+        self.frame_size_in_mm = kwargs.get(ModelsConfigNames.FRAME_SIZE_IN_MM.value, None)
         # model variables
         self.corners_in_reco_space = {}
-        self.tile_offset = self.tile_size = None
+        self.tile_offset = None
+        self.tile_size_in_px = None
         self.origin_offset = None
         self.affine_transform_matrix = None
 
     def build(self):
+        # consider the whole image is filled by the tile
         self.tile_offset = (0, 0)
-        self.tile_size = self.whole_tile_image_size
+        self.tile_size_in_px = self.image_size_in_px
+        self.origin_offset = (self.image_size_in_px[0] // 2, self.image_size_in_px[1] // 2)
+        # consider the corners of the image as the corners of the tiles
         self.corners_in_reco_space[WhichCorner.TOP_LEFT] = self.tile_offset
-        self.corners_in_reco_space[WhichCorner.TOP_RIGHT] = (self.tile_size[0], self.tile_offset[1])
-        self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] = (self.tile_offset[0], self.tile_size[1])
-        self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] = self.tile_size
-
+        self.corners_in_reco_space[WhichCorner.TOP_RIGHT] = (self.tile_size_in_px[0], self.tile_offset[1])
+        self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] = (self.tile_offset[0], self.tile_size_in_px[1])
+        self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] = self.tile_size_in_px
     
     def map_and_normalize_bbox(self, bbox:tuple):
         """ converts a bounding box in the reconstructed image space to the tile space according to a detection of the frame or holder of the tile and then normalize the bbox to range [0, 1]
@@ -128,7 +139,7 @@ class LocateTileModel():
         # iterate through each point in the tile space and normalize by dividing by the size of the tile
         results = []
         for point in mapped_points:
-            mapped_point = (point[0] / self.tile_size[0], point[1] / self.tile_size[1],)
+            mapped_point = (point[0] / self.tile_size_in_px[0], point[1] / self.tile_size_in_px[1],)
             if single_point:
                 return mapped_point
             results.append(mapped_point)
@@ -140,7 +151,7 @@ class LocateTileModel():
         :return: _description_
         :rtype: tuple
         """
-        return self.tile_size
+        return self.tile_size_in_px
     
     def get_corners_roi(self) -> list:
         """ returns the region of the tile frame specified by its corners from top-right clockwise 
@@ -159,7 +170,7 @@ class LocateTileModel():
     def print_info(self):
         """ prints the key parameters of the LocateTileModel object
         """
-        logger.info(f'Tile Offset: {self.tile_offset}\nTile Size: {self.tile_size}')
+        logger.info(f'Tile Offset: {self.tile_offset}\nTile Size: {self.tile_size_in_px}')
         
 
 class LocateTileModelHelper():
@@ -178,12 +189,14 @@ class LocateTileModelHelper():
         :rtype: str
         """
         object_dict = {
-            'tile_offset': loctile_model.tile_offset,
-            'tile_size': loctile_model.tile_size,
+            'tile_offset_in_px': loctile_model.tile_offset,
+            'tile_size_in_px': loctile_model.tile_size_in_px,
+            'frame_size_in_mm': loctile_model.frame_size_in_mm,
+            'tile_size_in_mm': loctile_model.tile_size_in_mm,
             'affine_transform_matrix': None,
-            'whole_tile_image_size': loctile_model.whole_tile_image_size,
+            'image_size_in_px': loctile_model.image_size_in_px,
             'origin_offset': loctile_model.origin_offset,
-                       }
+        }
         if object_file is None:
             return yaml.dump(object_dict)
         else:
@@ -226,9 +239,11 @@ class LocateTileModelHelper():
         :rtype: LocateTileModel
         """
         loctile_model = LocateTileModel(None, None)
-        loctile_model.tile_offset = data['tile_offset']
-        loctile_model.tile_size = data['tile_size']
-        loctile_model.whole_tile_image_size = data['whole_tile_image_size']
+        loctile_model.tile_offset = data['tile_offset_in_px']
+        loctile_model.tile_size_in_px = data['tile_size_in_px']  
+        loctile_model.frame_size_in_mm = data.get('frame_size_in_mm', None)
+        loctile_model.tile_size_in_mm = data.get('tile_size_in_mm', None)
+        loctile_model.image_size_in_px = data.get('image_size_in_px', None)
         loctile_model.affine_transform_matrix = None
         loctile_model.origin_offset = None
         return loctile_model
