@@ -1,23 +1,58 @@
 # YAML file for the system
 ---
-# ---
-# Dash agent (detector) setting
-cgras.detector.web.host: 0.0.0.0
-cgras.detector.web.port: 8023
-cgras.detector.web.debug.mode: True
-cgras.detector.web.launch_browser: False
+cgras_detector:
+  web_host: 0.0.0.0
+  web_port: 8023
+  web_debug_mode: True
+  web_debug_hot_reload: False
+  # auxillary web server
+  aux_web_host: 0.0.0.0
+  aux_web_port: 8024
+  aux_web_directory: /home/qcr/cgras_data/detector/data
+  # automation mode (whether the task execution is automated)
+  task_automation: False  
+   # suspend operation when executing capture image program
+  suspend_when_capturing_image: False
+  # default ros topics
+  ros_coordinator_state_topic: '/cgras/coordinator/state' 
+  ros_detector_state_topic: '/cgras/detector/state' 
+  # timers for driving the system and refresh the GUI
+  system_timer: 0.5  # seconds
+  dashboard_refresh_cycles: 2  # refresh rate of dashboard, the unit is system timer cycles
+  # the data folder
+  cgras_data_folder: /home/qcr/cgras_data
+  # the import image folder
+  cgras_captured_images_folder: /home/qcr/cgras_data/images/{tile_id}_{batch_id}/Export
 
-# Main system timers for the detector implemented by Dash
-cgras.detector.system.timer: 1  # seconds
-cgras.detector.dashboard.refresh: 1  # seconds
+  # connection timeout
+  connection_timeout: 120   # seconds
+  # yolo model range
+  max_coral_age: 120  # days
+  # heatmap
+  heatmap_colour_scale: viridis
+  heatmap_show_label_slider_max: 30
+  # detection task parameters
+  task_params_filename: params.yaml
+  reco_model_filename: reco_model.yaml
+  loctile_model_filename: loctile_model.yaml
+  reco_working_scale: 0.1
+  reco_debug_images_at_original_scale: False
+  reco_debug_feature_matching_images: True
+  reco_feature_detector: brisk               # sift, orb, brisk, akaze (this parameter is only used by reconstruct and not reconstruct_best)
+  reco_feature_matching_confidence_threshold: 1.2
+  reco_image_matching_min_confidence: 1.0   # between rows matching confidence
+  reco_image2d_matching_min_confidence: 1.0 # row matching confidence
+  tile_size_in_mm: [294, 294]
+  frame_size_in_mm: [280, 280]
 
-# The data folder
-cgras.data.folder: /home/qcr/cgras_data
-cgras.detector.subfolder: detector
-
-# User interface parameters
-cgras.detector.max_coral_days: 120
-
-# --- 
-# Connection with other components
-cgras.connection.timeout: 120
+  cod_model_filename: coral_object_detect_model.yaml 
+  cod_debug_blob_images: True
+  cod_blob_overlap_pix: 128
+  cod_use_cached_object_detection: True
+  # the following config parameters are not used
+  # cod_duplicate_max_displacement_images: 32
+  # cod_duplicate_max_displacement_blobs: 32 
+  # the following config parameters are not used and replaced by physcial measurement in the tile excel importt
+  # the size of tile (including tile holder) in pixels
+  # whole_tile_image_size: [24280, 24460]   # pixels
+  # tile_holder_width: 50   

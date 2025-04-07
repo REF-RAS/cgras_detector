@@ -1,0 +1,68 @@
+tile_id: 2023Dec-P00001
+species: Acropora palmata
+settle_time: 2023-11-12
+spawning_time: 2023-11-12
+season: 2023Dec
+num_tabs: [20, 8]
+tile_size: [280, 112]
+frame_size: [294, 118]
+batch_id: CG1-202311151200
+batch_time: 2023-11-15 12:00:00
+importer_id: YAML
+operator: luia2
+image_files_parent_folder: /home/qcr/cgras_data/Source/AnnotatedTile_1_1
+images:
+  - x: 0
+    y: 0
+    file: Tile_1_1_0_0.jpg
+  - x: 1
+    y: 0
+    file: Tile_1_1_1_0.jpg
+  - x: 2
+    y: 0
+    file: Tile_1_1_2_0.jpg
+  - x: 3
+    y: 0
+    file: Tile_1_1_3_0.jpg
+  - x: 4
+    y: 0
+    file: Tile_1_1_4_0.jpg
+  - x: 5
+    y: 0
+    file: Tile_1_1_5_0.jpg
+  - x: 0
+    y: 1
+    file: Tile_1_1_0_1.jpg
+  - x: 1
+    y: 1
+    file: Tile_1_1_1_1.jpg
+  - x: 2
+    y: 1
+    file: Tile_1_1_2_1.jpg
+  - x: 3
+    y: 1
+    file: Tile_1_1_3_1.jpg
+  - x: 4
+    y: 1
+    file: Tile_1_1_4_1.jpg
+  - x: 5
+    y: 1
+    file: Tile_1_1_5_1.jpg
+  - x: 0
+    y: 2
+    file: Tile_1_1_0_2.jpg
+  - x: 1
+    y: 2
+    file: Tile_1_1_1_2.jpg
+  - x: 2
+    y: 2
+    file: Tile_1_1_2_2.jpg
+  - x: 3
+    y: 2
+    file: Tile_1_1_3_2.jpg
+  - x: 4
+    y: 2
+    file: Tile_1_1_4_2.jpg
+  - x: 5
+    y: 2
+    file: Tile_1_1_5_2.jpg

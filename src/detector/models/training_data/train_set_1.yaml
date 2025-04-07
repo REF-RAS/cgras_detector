@@ -1,0 +1,31 @@
+train_set:
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241031/CGRAS_Amag_241031_T01_00.jpg
+    frame: [[549, 129, 260, 1690], [1068, 448, 2071, 117]]
+    tile: [[922, 628, 1065, 1275]]
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241105/CGRAS_Amag_241105_T01_00.jpg
+    frame: [[367, 557, 361, 832], [1022, 324, 2288, 100]]
+    tile: [[801, 544, 716, 845]]  
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241112/CGRAS_Amag_241112_T01__00.jpg
+    frame: [[606, 150, 352, 802], [2823, 132, 1108, 208]]
+    tile: [[993, 363, 502, 509]]
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241119/CGRAS_Amag_241119_T01_00.jpg
+    frame: [[624, 97, 269, 1139], [2968, 110, 1126, 239]]
+    tile: [[942, 367, 722, 1188]]
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241126/CGRAS_Amag_241126_T1_00.jpg
+    frame: [[560, 1137, 369, 993], [3567, 248, 942, 381]]
+    tile: [[993, 629, 883, 1109]]    
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241211/CGRAS_Amag_241211_T01_00.jpg
+    frame: [[548, 115, 439, 1479], [3585, 46, 1362, 242]]
+    tile: [[1068, 329, 998, 1322]]   
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T02_241031/CGRAS_Amag_241031_T02_00.jpg
+    frame: [[346, 254, 456, 1519], [3083, 115, 1835, 387]]
+    tile: [[883, 664, 860, 1247]]  
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T03_241031/CGRAS_Amag_241031_T03_00.jpg
+    frame: [[299, 746, 496, 1451], [3012, 73, 1855, 361]]
+    tile: [[869, 685, 747, 931]] 
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T04_241031/CGRAS_Amag_241031_T04_00.jpg
+    frame: [[496, 496, 306, 1768], [1080, 421, 2119, 110]]
+    tile: [[895, 641, 1605, 1657]]    
+  - image_file: /home/qcr/cgras_data/Source/2024/Chris_MIS5_T05_241031/CGRAS_Amag_241031_T05_00.jpg
+    frame: [[438, 1062, 347, 751], [1062, 427, 676, 115]]
+    tile: [[924, 606, 797, 1051]]  
