@@ -19,7 +19,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
 from cgras_datatools.logging_tools import logger
-from detector.model import DETECT_DAO, ObjectClassCategories
+from detector.model import DETECT_DAO, ClassHierarchyPresentation
 
 
 class CountScatterMapBlock():
@@ -31,14 +31,14 @@ class CountScatterMapBlock():
         self.default_style = {'visibility': 'hidden'}
         self.default_config = {'staticPlot': True}        
         # model variables
-        self.current_tile_id = None
+        # self.current_tile_id = None
         self.coral_trend_model = self.output_model = None
         self.latest_graph = None
         self.class_options = None
         self.figures_list = []
         # a fixed discrete color map
         self.scatter_plot_discrete_colour_map = {} 
-        for i, cat in enumerate(ObjectClassCategories):
+        for i, cat in enumerate(ClassHierarchyPresentation):
             self.scatter_plot_discrete_colour_map[cat.name] = px.colors.qualitative.G10[i]
         # define widgets
         _sample_select_datatable = dash_table.DataTable(id=prefix+'sample_select_datatable', row_selectable=False, cell_selectable=True, style_cell={'fontSize': 14})
@@ -88,10 +88,11 @@ class CountScatterMapBlock():
 
     
     def _generate_scatter_plot(self, tile_sample_id, title:str=None):
-        detected_object_df = DETECT_DAO.query_detected_objects(tile_sample_id)
-        detected_object_df['class_category'] = detected_object_df['class_category'].apply(lambda cell: ObjectClassCategories(cell).name)
+        detected_object_df = DETECT_DAO.query_detected_objects(tile_sample_id, 
+                                        present_classes=(ClassHierarchyPresentation.ALIVE_CORAL.value, ClassHierarchyPresentation.DEAD_CORAL.value, ClassHierarchyPresentation.OTHER.value))
+        detected_object_df['present_class'] = detected_object_df['present_class'].apply(lambda cell: ClassHierarchyPresentation(cell).name)
         
-        fig = px.scatter(detected_object_df, x='centre_x', y='centre_y', color='class_category', width=480, height=520, title=title, color_discrete_map=self.scatter_plot_discrete_colour_map)
+        fig = px.scatter(detected_object_df, x='centre_x', y='centre_y', color='present_class', width=480, height=520, title=title, color_discrete_map=self.scatter_plot_discrete_colour_map)
         fig.update_layout(
                 margin=dict(l=5, r=5, t=60, b=5),
                 plot_bgcolor='rgba(64, 64, 64, 1)',
@@ -109,12 +110,12 @@ class CountScatterMapBlock():
             if tile_id is None:
                 raise PreventUpdate
             # the update is due to a new tile_id selected
-            if self.current_tile_id is None or tile_id != self.current_tile_id:
-                self.current_tile_id = tile_id
-                # update the coral_trend_model
-                self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
-                self.latest_graph = None
-                
+            # if self.current_tile_id is None or tile_id != self.current_tile_id:
+            #     self.current_tile_id = tile_id
+
+            # update the coral_trend_model
+            self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
+            self.latest_graph = None                
             if len(self.coral_trend_model) > 0:
                 return [{}, self.output_model.to_dict('records'), None, []]   
             else:

@@ -32,9 +32,13 @@ class WhichCorner(Enum):
     BOTTOM_LEFT = 3
 
 class LocateTileModel():
-
     """ LocateTileModel uses computer vision means to detect the 4 corners of tile frames so to enable transformation from reconstructed image space to the tile space
     """
+    # constants
+    WHOLE_RECO_IMAGE_FILENAME = 'whole_reco_image.jpg'
+    LOCTILE_WHOLE_RECO_IMAGE_FILENAME = 'loctile_whole_reco_image.jpg'
+    ROTATED_WHOLE_RECO_IMAGE_FILENAME = 'rotated_whole_reco_image.jpg'
+    
     def __init__(self, images_2d_list:list, map_location_fn, image_size_in_px:tuple, **kwargs):
         """ The constructor
 
@@ -45,6 +49,7 @@ class LocateTileModel():
         :param image_size_in_px: The size of the whole reconstructed image
         :type image_size_in_px: 2-tuple        
         """
+
         # ignore the constructor if the object is loaded from yaml file
         if images_2d_list is None:
             return
@@ -248,7 +253,7 @@ class LocateTileModel():
             if reco_working_scale is None:
                 return
             # attempt to load the whole_reco_image
-            reco_whole_image_filepath = os.path.join(self.logdata_folder, 'whole_reco_image.jpg')
+            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.WHOLE_RECO_IMAGE_FILENAME)
             reco_whole_image = cv2.imread(reco_whole_image_filepath)
             if reco_whole_image is None:
                 return
@@ -261,7 +266,7 @@ class LocateTileModel():
             annotated_reco_whole_image = cv2.polylines(reco_whole_image, [pts], True, [0, 0, 255], 2)
             if self.write_debug_images is not None and self.logdata_folder is not None:
                 try:
-                    annotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, 'loctile_whole_reco_image.jpg')
+                    annotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.LOCTILE_WHOLE_RECO_IMAGE_FILENAME)
                     cv2.imwrite(annotated_reco_whole_image_filepath, annotated_reco_whole_image)
                 except:
                     raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching output to {annotated_reco_whole_image_filepath}')            
@@ -269,15 +274,17 @@ class LocateTileModel():
     def _write_rotated_whole_image(self):
         if self.write_debug_images is not None and self.logdata_folder is not None:
             # attempt to load the whole_reco_image
-            reco_whole_image_filepath = os.path.join(self.logdata_folder, 'whole_reco_image.jpg')
+            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.WHOLE_RECO_IMAGE_FILENAME)
             reco_whole_image = cv2.imread(reco_whole_image_filepath)
             if reco_whole_image is None:
                 return    
             # compute the affine tranform matrix based on the detected corners
             affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
             rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.05), int(reco_whole_image.shape[0] * 1.05)))
-            rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, 'rotated_whole_reco_image.jpg')
-            cv2.imwrite(rotated_reco_whole_image_filepath, rotated_whole_image) 
+            rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)
+            cv2.imwrite(rotated_reco_whole_image_filepath, rotated_whole_image)
+            return rotated_reco_whole_image_filepath
+        return None
 
     def _adjust_gamma(self, image, gamma=1.0):
         # build a lookup table mapping the pixel values [0, 255] to
@@ -390,13 +397,21 @@ class LocateTileModel():
             results.append(mapped_point)
         return results
     
-    def get_tile_size(self) -> tuple:
+    def get_tile_size_in_image_space(self) -> tuple:
         """ returns the size (xdim, ydim) of the tile as a rectangle
 
         :return: _description_
         :rtype: tuple
         """
         return self.tile_size_in_px
+    
+    def get_tile_origin_in_image_space(self) -> tuple:
+        """ returns the origin (x, y) of the tile in the image space
+
+        :return: _description_
+        :rtype: tuple
+        """
+        return self.tile_offset_in_px
     
     def get_corners_roi(self) -> list:
         """ returns the region of the tile frame specified by its corners from top-right clockwise 

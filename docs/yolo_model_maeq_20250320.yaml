@@ -1,6 +1,6 @@
-name: Amag 20250320
+name: Maeq 20250320
 file: /home/qcr/cgras_data/YoloModel/cgras_20250320_yolov8nseg_640p_first30.pt
-species: acropora 
+species: montipora aequituberculata 
 input_image_width: 640
 input_image_height: 640
 valid_start_day: 0

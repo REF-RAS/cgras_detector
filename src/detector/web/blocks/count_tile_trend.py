@@ -59,7 +59,7 @@ class CountTileTrendBlock():
         coral_trend_model = DETECT_DAO.get_coral_count_trend_as_df(tile_id) 
         coral_trend_model['batch_time'] = pd.to_datetime(coral_trend_model['batch_time']).dt.date
         coral_trend_model['batch_time'] = coral_trend_model.apply(lambda row: f'{row["batch_time"]} ({row["age"]} days)', axis=1)
-        table_model = coral_trend_model[['batch_time', 'coral_object_count']]
+        table_model = coral_trend_model[['batch_time', 'coral_alive_count']]
         table_model.columns = ['Date', '# Corals']
         return coral_trend_model, table_model
 
@@ -72,7 +72,7 @@ class CountTileTrendBlock():
             config = {}
             # generate the coral trend tabl
             coral_trend_model, table_model = self._get_coral_trend_model(tile_id)
-            self.trend_figure = px.line(coral_trend_model, x='age', y='coral_object_count')            
+            self.trend_figure = px.line(coral_trend_model, x='age', y='coral_alive_count')            
             # generate the chart illustrating coral trends
             if len(table_model) == 0:
                 return (table_model.to_dict('records'), None,  {'visibility': 'hidden'})

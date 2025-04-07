@@ -33,19 +33,24 @@ class YoloResult():
             raise AssertionError(f'{type(self).__name__}: Input parameter yolo_predict_results does not contain the expected one result')
         self.yolo_predict_results = yolo_predict_results
 
-    def get_processes_speed_as_dict(self) -> dict:
+    def get_processes_speed_as_dict(self, total_speed_dict:dict=None) -> dict:
         """ return the time taken for individual stages in the predict processing
 
         :return: a dict containing key-value pairs representing the time taken for every stage
         """
         speed_dict = dict(self.yolo_predict_results[0].speed)
+        if total_speed_dict is None:
+            total_speed_dict = speed_dict
+        else:
+            for key in total_speed_dict:
+                total_speed_dict[key] += speed_dict.get(key, 0)
+        # iterate through the values in the speed attribute of the result object from YOLO to update the total time
         total_time = 0
-        # iterate through the values in the speed attribute of the result object from YOLO
-        for value in speed_dict.values():
+        for value in total_speed_dict.values():
             total_time += value
         # populate the total time taken
-        speed_dict['total_time'] = total_time
-        return speed_dict
+        total_speed_dict['total_time'] = total_time
+        return total_speed_dict
 
     def get_class_names(self):
         """ return the names of the object classes as a list
@@ -96,7 +101,7 @@ class YoloResult():
         :return: the color palette as an array of 3-tuple of RGB values in the range (0, 255)
         """
         if not hasattr(cls, 'palette'):
-            palette = sns.color_palette("hls", 24)
+            palette = sns.color_palette(palette='tab20', n_colors=24)  # previously 'hls'
             cls.palette = []
             # convert the palette from sns which is normalized (0, 1) to the range (0, 255) suitable for opencv drawing
             for color in palette:
@@ -126,13 +131,18 @@ class YoloObjectDetector():
     """ A wrapper class for YOLO so that the results of object detection are presented as an object of YoloResult class providing
         convenient functions
     """
-    def __init__(self, yolo_model_file:str):
+    def __init__(self, yolo_model_file:str, blob_size:tuple, classes_map:dict):
         """ the constructor
 
         :param yolo_model_file: the path to the .pt yolo model file 
+        :param blob_size: a tuple of two integer indicating the input image size for the yolo model
+        :param classes_map: a dict that contains mapping between yolo model classes and internal coral classes
         """
         assert yolo_model_file is not None, 'Parameter (yolo_model_file) is None'
         self.model:YOLO = YOLO(yolo_model_file)
+        # assign other input parameters
+        self.blob_size = blob_size
+        self.classes_map = classes_map
     
     def detect(self, image_cv:np.ndarray) -> YoloResult:
         """ apply the Yolo model on the given numpy image and return the results as a YoloResult object
@@ -149,6 +159,20 @@ class YoloObjectDetector():
         :return: the class names in a list
         """
         return self.model.names
+    
+    def get_blob_size(self) -> tuple:
+        """ return tuple of two integer indicating the input image size for the yolo model
+
+        :return: a tuple of two integer indicating the input image size for the yolo model
+        """
+        return self.blob_size
+    
+    def get_classes_map(self) -> list:
+        """ return a dict that contains mapping between yolo model classes and internal coral classes
+
+        :return: a dict that contains mapping between yolo model classes and internal coral classes
+        """
+        return self.classes_map
 
     # a test function
     def _test(self):
@@ -160,5 +184,9 @@ class YoloObjectDetector():
 if __name__ == '__main__':
     # yolo_model_file = ' /home/qcr/cgras_data/YoloModel/20240926_cgras_tiled_yolov8n_seg_640p.pt'
     yolo_model_file = ' /home/qcr/cgras_data/YoloModel/20240923_tiledimages_yolov8xseg_naive.pt'
-    yolo_detector = YoloObjectDetector(yolo_model_file)
+    classes_map = {'POLYP_KEYPART': ['alive'],
+                        'POLYP_MULTI': ['mask_live'],
+                        'DEAD_CORAL': ['dead', 'mask_dead'],
+                        }
+    yolo_detector = YoloObjectDetector(yolo_model_file, blob_size=(640, 640), classes_map=classes_map)
     print(yolo_detector.info())

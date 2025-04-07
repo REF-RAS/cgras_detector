@@ -17,7 +17,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
 import dash_bootstrap_components as dbc
 from dash.dash_table.Format import Format, Padding
 from dash.exceptions import PreventUpdate
-from detector.model import DETECT_DAO, CONFIG, SystemConfigNames
+from detector.model import DETECT_DAO, CONFIG, SystemConfigNames, ClassHierarchyCoral
 from cgras_datatools.logging_tools import logger
 
 class YoloModelTable():
@@ -48,8 +48,16 @@ class YoloModelTable():
         
         model_name_label = dbc.Row([dbc.Label('Model Name:', width=2), dbc.Label(id=prefix+'name_label', width=10), ])
         model_file_label = dbc.Row([dbc.Label('Model File:', width=2), dbc.Label(id=prefix+'file_label', width=10), ])
-        model_coral_class_label = dbc.Row([dbc.Label('Coral Classes:', width=2), dbc.Label(id=prefix+'coral_classes_label', width=10), ])
-        model_dead_coral_class_label = dbc.Row([dbc.Label('Dead Coral Classes:', width=2), dbc.Label(id=prefix+'dead_coral_classes_label', width=10), ])
+        classes_map_label =  dbc.Row([dbc.Label('Class Map:', width=2),         
+                                      dbc.ListGroup([dbc.ListGroupItem(id=prefix+'class_map_1', action=False, style={'border': 'none'}),
+                                                       dbc.ListGroupItem(id=prefix+'class_map_2', action=False, style={'border': 'none'}),
+                                                       dbc.ListGroupItem(id=prefix+'class_map_3', action=False, style={'border': 'none'}),
+                                                       dbc.ListGroupItem(id=prefix+'class_map_4', action=False, style={'border': 'none'}),  
+            ]
+        , className='col-10'),])  
+
+        # model_coral_class_label = dbc.Row([dbc.Label('Coral Classes:', width=2), dbc.Label(id=prefix+'coral_classes_label', width=10), ])
+        # model_dead_coral_class_label = dbc.Row([dbc.Label('Dead Coral Classes:', width=2), dbc.Label(id=prefix+'dead_coral_classes_label', width=10), ])
         
         species_input = dbc.Row([
             dbc.Label('Species', html_for=prefix+'species_input', width=2),
@@ -67,7 +75,7 @@ class YoloModelTable():
                     }, tooltip={"placement": "bottom", "always_visible": True}))
         ])
         
-        define_yolo_model_form = dbc.Form([model_name_label, model_file_label, model_coral_class_label, model_dead_coral_class_label, species_input, range_input]) 
+        define_yolo_model_form = dbc.Form([model_name_label, model_file_label, classes_map_label, species_input, range_input]) 
                 
         self._editdata_modal = dbc.Modal(id=prefix+'edit_modal', children=[
                 dbc.ModalHeader(dbc.ModalTitle(children='Edit Model Attributes',)),
@@ -107,8 +115,10 @@ class YoloModelTable():
         self.app.callback([Output(prefix+'edit_modal', 'is_open', allow_duplicate=True),
                            Output(prefix+'name_label', 'children'),
                            Output(prefix+'file_label', 'children'),
-                           Output(prefix+'coral_classes_label', 'children'),
-                           Output(prefix+'dead_coral_classes_label', 'children'),
+                           Output(prefix+'class_map_1', 'children'),
+                           Output(prefix+'class_map_2', 'children'),
+                           Output(prefix+'class_map_3', 'children'),
+                           Output(prefix+'class_map_4', 'children'),
                            Output(prefix+'species_input', 'value'),
                            Output(prefix+'range_input', 'value'),],
             [Input(prefix+'row_edit_store', 'data')], prevent_initial_call=True)(self._edit_row_received())    
@@ -220,7 +230,14 @@ class YoloModelTable():
             start_day, end_day = row['start_day'], row['end_day']
             if end_day is None or end_day < 0:
                 end_day = self.default_max_end_day
-            return (True, row['name'], row['model_file_path'], ' '.join(row['coral_classes']), ' '.join(row['dead_coral_classes']), row['species'], (start_day, end_day,),)
+            try:
+                class_map_str_1 = f'POLYP_SINGLE: {row["classes_map"][ClassHierarchyCoral.POLYP_SINGLE.value]}'
+                class_map_str_2 = f'POLYP_MULTI: {row["classes_map"][ClassHierarchyCoral.POLYP_MULTI.value]}'
+                class_map_str_3 = f'POLYP_KEYPART: {row["classes_map"][ClassHierarchyCoral.POLYP_KEYPART.value]}'
+                class_map_str_4 = f'DEAD_CORAL: {row["classes_map"][ClassHierarchyCoral.DEAD_CORAL.value]}'
+                return (True, row['name'], row['model_file_path'], class_map_str_1, class_map_str_2, class_map_str_3, class_map_str_4, row['species'], (start_day, end_day,),)
+            except:
+                return (True, row['name'], row['model_file_path'], None, None, None, None, row['species'], (start_day, end_day,),)
         return edit_row_received     
 
     def _edit_row_confirmed(self): 

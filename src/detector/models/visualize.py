@@ -15,14 +15,14 @@ import numpy as np
 
 from detector.models import logger
 from detector.models.heatmap_tools import HeatmapHelper
-from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG
+from detector.model import DETECT_DAO, APP_FILE_MANAGER, CONFIG, ClassHierarchyCoral, ClassHierarchyPresentation
 
 class CoralObjectMapModelHelper():
     """ a collection of tools for the CoralObjectMapModel class
     """
     # constant class names for the two default classes - "all classes" and "coral objects"
     VISCLASS_ALL = {'label': 'all', 'value': '_all'}
-    VISCLASS_CORAL = {'label': 'coral objects', 'value': '_coral'}
+    VISCLASS_CORAL = {'label': 'alive coral', 'value': '_alive_coral'}
     CLASS_OPTIONS = None
     
     @staticmethod
@@ -57,7 +57,7 @@ class CoralObjectMapModelHelper():
         """
         if cls.CLASS_OPTIONS is None:
             cls.CLASS_OPTIONS = [cls.VISCLASS_CORAL, cls.VISCLASS_ALL,]
-            classname_list = DETECT_DAO.list_detected_classes()
+            classname_list = DETECT_DAO.list_coral_classes()
             for classname in classname_list:
                 cls.CLASS_OPTIONS.append({'label': classname, 'value': classname})
         return cls.CLASS_OPTIONS
@@ -159,11 +159,11 @@ class CoralObjectMapModel():
         if class_filter == None:
             class_filter = CoralObjectMapModelHelper.VISCLASS_ALL['value']
         if class_filter == CoralObjectMapModelHelper.VISCLASS_ALL['value']:
-            object_list = DETECT_DAO.query_detected_objects_as_coral_objects(tile_sample_id, object_classes=None)
+            object_list = DETECT_DAO.query_detected_objects_as_coral_objects(tile_sample_id, coral_classes=None)
         elif class_filter == CoralObjectMapModelHelper.VISCLASS_CORAL['value']:
-            object_list = DETECT_DAO.query_detected_objects_as_coral_objects(tile_sample_id, class_category=1)
+            object_list = DETECT_DAO.query_detected_objects_as_coral_objects(tile_sample_id, present_classes=ClassHierarchyPresentation.ALIVE_CORAL.name)
         else:
-            object_list = DETECT_DAO.query_detected_objects_as_coral_objects(tile_sample_id, object_classes=class_filter)
+            object_list = DETECT_DAO.query_detected_objects_as_coral_objects(tile_sample_id, coral_classes=class_filter)
         return object_list
 
 # ----------------------------------------------------------------------------------

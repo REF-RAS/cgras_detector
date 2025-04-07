@@ -148,7 +148,10 @@ class CountTileSelectTable():
             if not season_title:
                 raise PreventUpdate
             # update the selected season in the persistent storage
-            PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
+            try:
+                PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
+            except:
+                ...
             return (season_title,)
         return season_dropdown_changed
 
@@ -171,8 +174,11 @@ class CountTileSelectTable():
                     # this is a simplification of the front-end filtering logic,
                     # only works with complete fields in standard format
                     model = model.loc[model[col_name].str.startswith(filter_value)]
-            # update the selected season in the persistent storage
-            PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
+            try:
+                # update the selected season in the persistent storage
+                PERSISTENT_STORE_DAO.set_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, season_title)
+            except:
+                ...
             return (model.iloc[page_current * page_size:(page_current + 1) * page_size].to_dict('records'), [], )
         return update_datatable 
     

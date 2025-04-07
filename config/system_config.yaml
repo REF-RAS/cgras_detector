@@ -49,6 +49,8 @@ cgras_detector:
   cod_debug_blob_images: True
   cod_blob_overlap_pix: 128
   cod_use_cached_object_detection: True
+  cod_coral_child_min_overlap_ratio: 0.25         # the pverlap ratio of a polyp_single or polyp_keypart that is considered a child of a polyp_multi
+  cod_merge_mutli_models: True                # merge the detection result with duplication removal
   # the following config parameters are not used
   # cod_duplicate_max_displacement_images: 32
   # cod_duplicate_max_displacement_blobs: 32 

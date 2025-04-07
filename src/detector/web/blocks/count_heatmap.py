@@ -34,7 +34,7 @@ class CountHeatmapBlock():
         self.reversed_heatmaps = False
         self.default_count_range = (10, ) 
         # model variables
-        self.current_tile_id = None
+        # self.current_tile_id = None
         self.coral_trend_model = self.output_model = None
         self.heatmap_figures_list = None
         self.class_options = None
@@ -164,12 +164,13 @@ class CountHeatmapBlock():
             if tile_id is None:
                 raise PreventUpdate
             # the update is due to a new tile_id selected, or query again if the coral trend model has no data
-            if self.current_tile_id is None or tile_id != self.current_tile_id or self.coral_trend_model is None or len(self.coral_trend_model) == 0:
-                self.current_tile_id = tile_id
-                # update the coral_trend_model
-                self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
-                # reset the reverse heatmap display state
-                self.reversed_heatmaps = False
+            # if self.current_tile_id is None or tile_id != self.current_tile_id or self.coral_trend_model is None or len(self.coral_trend_model) == 0:
+            #     self.current_tile_id = tile_id
+            # update the coral_trend_model
+            self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)
+            # reset the reverse heatmap display state
+            self.reversed_heatmaps = False
+
                 
             if len(self.coral_trend_model) > 0:
                 return [{}, self.output_model.to_dict('records'), None, []]   

@@ -19,7 +19,7 @@ from cgras_datatools.logging_tools import logger
 import catkin_pkg.package
 
 from detector.database_file import DBFile
-from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ObjectClassCategories, TaskStatusNames, TaskTypes, SampleStatusNames
+from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ClassHierarchyCoral, ClassHierarchyPresentation, TaskStatusNames, TaskTypes, SampleStatusNames
 from detector.dao_persistent_storage import PERSISTENT_STORE_DDL, PersistentStoreDAO
 from detector.dao_tile_samples import TileSamplesDAO
 from detector.file_manager import ApplicationFileManager

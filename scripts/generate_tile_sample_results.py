@@ -11,7 +11,7 @@ __status__ = 'Development'
 
 import sys, random
 from detector.model import DETECT_DAO
-from detector.dao_detect import StatusNames, ObjectClassCategories
+from detector.dao_detect import StatusNames, ClassHierarchyPresentation, ClassHierarchyCoral
 
 def change_tile_sample_status(tile_sample_id:str, status:int):
     DETECT_DAO.update_tile_sample_status(tile_sample_id, status)
@@ -67,17 +67,17 @@ def add_fake_detected_objects():
     def generate_detected_objects(new_tile_sample_id, tile_sample_detect_stat_dict, reduction = 0.85):
         for index, row in detected_objects_df.iterrows():
             if random.random() <= reduction:
-                DETECT_DAO.add_detected_object(new_tile_sample_id, row['class_name'], row['class_category'], row['centre_x'], row['centre_y'], 
+                DETECT_DAO.add_detected_object(new_tile_sample_id, row['yolo_class'], row['coral_class'], row['present_class'], row['centre_x'], row['centre_y'], 
                                 row['corner_x1'], row['corner_y1'], row['size_x'], row['size_y'])
             else:
-                DETECT_DAO.add_detected_object(new_tile_sample_id, 'recruit_dead', ObjectClassCategories.DEAD_CORAL.value, row['centre_x'], row['centre_y'], 
+                DETECT_DAO.add_detected_object(new_tile_sample_id, 'dead', ClassHierarchyCoral.DEAD_CORAL.value, ClassHierarchyPresentation.DEAD_CORAL.value, row['centre_x'], row['centre_y'], 
                                 row['corner_x1'], row['corner_y1'], row['size_x'], row['size_y'])
         # add the detection stat for the new tile_sample_id
         new = tile_sample_detect_stat_dict
-        coral_count = int(new['coral_object_count'] * reduction)
-        other_count = int(new['other_object_count'] * random.normalvariate(1.0, 0.15) )
-        dead_coral_object_count = int(new['dead_coral_object_count'] + new['dead_coral_object_count'] * (1 - reduction))
-        DETECT_DAO.update_tile_sample_detect_stat(new_tile_sample_id, new['tile_pixel_x'], new['tile_pixel_y'], coral_count, dead_coral_object_count, other_count, 
+        coral_count = int(new['coral_alive_count'] * reduction)
+        other_count = int(new['other_count'] * random.normalvariate(1.0, 0.15) )
+        coral_dead_count = int(new['coral_dead_count'] + new['coral_dead_count'] * (1 - reduction))
+        DETECT_DAO.update_tile_sample_detect_stat(new_tile_sample_id, new['tile_pixel_x'], new['tile_pixel_y'], coral_count, coral_dead_count, other_count, 
                                                 new['duplicates_removed'], new['yaml_data'])
     
     # retrieve detected objects for the source tile_sample_id

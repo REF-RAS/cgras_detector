@@ -47,7 +47,7 @@ class TileSampleSearchBlock():
             {'label': 'Rejected', 'value': SampleStatusNames.REJECTED.value},
         ]
         status_dropdown = dcc.Dropdown(options=self.status_options, id=prefix+'status_dropdown', 
-                                       searchable=False, clearable=False, className='ms-2', style={'width': '200px', 'zIndex': 10})  
+                                       searchable=False, clearable=False, className='ms-2', style={'width': '240px', 'zIndex': 10})  
         # the page size filter
         self.pagesize_options = [
             {'label': 'Recent 10', 'value': 10},
@@ -116,7 +116,7 @@ class TileSampleSearchBlock():
             for season_title in season_titles_list:
                 period_options.append({'label': f'{season_title} Season', 'value': season_title})
             value = 0
-            return ('', '', period_options, value, 10, SampleStatusNames.REJECTED.value,)
+            return ('', '', period_options, value, 10, SampleStatusNames.UNKNOWN.value,)
         return reset_filter_button_clicked
     
     def _refresh_table_clicked(self):

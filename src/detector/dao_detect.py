@@ -94,12 +94,13 @@ DETECT_DDL = {
         species text,
         start_day integer DEFAULT 0,
         end_day integer DEFAULT -1,
-        coral_classes text,
-        dead_coral_classes text,
+        classes_map_yaml TEXT DEFAULT NULL,
         remarks text,
         UNIQUE (name)
     );
     """,
+    # coral_classes text,
+    # dead_coral_classes text,
 
     'tile_sample_detect_stat':
     """
@@ -107,16 +108,47 @@ DETECT_DDL = {
         tile_sample_id text PRIMARY KEY,
         tile_pixel_x integer,
         tile_pixel_y integer,
-        coral_object_count integer DEFAULT 0,
-        dead_coral_object_count integer DEFAULT 0,
-        other_object_count integer DEFAULT 0,
+        coral_alive_count integer DEFAULT 0,
+        coral_dead_count integer DEFAULT 0,
+        other_count integer DEFAULT 0,
         duplicates_removed integer DEFAULT 0,
-        yaml_data text DEFAULT NULL,
+        stat_yaml text DEFAULT NULL,
         CONSTRAINT fk_tile_sample_id
             FOREIGN KEY (tile_sample_id) REFERENCES tile_sample (id) ON DELETE CASCADE
     );
     """,
 
+    'detected_object':
+    """
+    CREATE TABLE IF NOT EXISTS detected_object (
+        id integer PRIMARY KEY AUTOINCREMENT,
+        tile_sample_id text,
+        yolo_class text,
+        coral_class text,
+        present_class text,
+        centre_x real,
+        centre_y real,
+        corner_x1 real,
+        corner_y1 real,
+        size_x real,
+        size_y real,
+        CONSTRAINT fk_tile_sample_id
+            FOREIGN KEY (tile_sample_id) REFERENCES tile_sample (id) ON DELETE CASCADE
+    );
+    """, 
+    
+    'error_flag':
+    """
+    CREATE TABLE IF NOT EXISTS error_flag (
+        id integer,
+        object text,
+        level integer DEFAULT 0,
+        update_time text,
+        remarks text,
+        PRIMARY KEY (id, object)
+    );
+    """,    
+    
     'health_model':
     """
     CREATE TABLE IF NOT EXISTS health_model (
@@ -148,36 +180,6 @@ DETECT_DDL = {
         count_yaml_data text DEFAULT NULL
     );
     """,
-
-    'detected_object':
-    """
-    CREATE TABLE IF NOT EXISTS detected_object (
-        id integer PRIMARY KEY AUTOINCREMENT,
-        tile_sample_id text,
-        class_name text,
-        class_category integer,
-        centre_x real,
-        centre_y real,
-        corner_x1 real,
-        corner_y1 real,
-        size_x real,
-        size_y real,
-        CONSTRAINT fk_tile_sample_id
-            FOREIGN KEY (tile_sample_id) REFERENCES tile_sample (id) ON DELETE CASCADE
-    );
-    """, 
-    
-    'error_flag':
-    """
-    CREATE TABLE IF NOT EXISTS error_flag (
-        id integer,
-        object text,
-        level integer DEFAULT 0,
-        update_time text,
-        remarks text,
-        PRIMARY KEY (id, object)
-    );
-    """,    
 }
 
 # the constants defined for storing task types in the task_record table
@@ -186,11 +188,21 @@ class TaskTypes(Enum):
     IMPORT_TILES = 1
     ASSESS_HEALTH = 2
 
-# the constants defined for storing coral class_category in the detected_object table
-class ObjectClassCategories(Enum):
-    NOT_CORAL = 0
-    CORAL = 1
-    DEAD_CORAL = 2
+# the constants defined for storing presentation class in the detected_object table
+class ClassHierarchyPresentation(Enum):
+    OTHER = 'OTHER'
+    ALIVE_CORAL = 'ALIVE_CORAL'
+    DEAD_CORAL = 'DEAD_CORAL'
+    MASKED = 'MASKED'
+
+# the constants defined for storing coral class in the detected_object table
+class ClassHierarchyCoral(Enum):
+    POLYP_SINGLE = 'POLYP_SINGLE'
+    POLYP_MULTI = 'POLYP_MULTI'
+    POLYP_KEYPART = 'POLYP_KEYPART'
+    DEAD_CORAL = 'DEAD_CORAL'
+    OTHER = 'OTHER'
+    UNDEFINED = 'UNDEFINED'
 
 # the constants defined for storing status in different tables
 class TaskStatusNames(Enum):
@@ -224,8 +236,9 @@ class CoralObject():
         self.image_row_index = kwargs.get('image_row_index', None)  # the row and column index of the image where this coral object was detected
         self.image_col_index = kwargs.get('image_col_index', None)
         self.cls_id =  kwargs.get('cls_id', None)                   # the class id of the coral object as specified in the detection model
-        self.cls_name = kwargs.get('cls_name', None)                # the class name of the coral object
-        self.class_category = kwargs.get('class_category', 0)       # the object is considered a coral 
+        self.yolo_class = kwargs.get('yolo_class', None)        # the detection model level class of the object
+        self.coral_class = kwargs.get('coral_class', None)          # the coral level class of the object
+        self.present_class = kwargs.get('present_class', None)      # the presentation level class of the object
         self.bbox_in_blob = kwargs.get('bbox_in_blob', None)        # the bounding box of the coral object in the image blob space (x1, y1, x2, y2)
         self.bbox_in_image = kwargs.get('bbox_in_image', None)      # the bounding box of the coral object in the image space
         self.bbox_in_tile = kwargs.get('bbox_in_tile', None)        # the bounding box of the coral object in the tile space
@@ -236,6 +249,7 @@ class CoralObject():
         self.centre_normalized = kwargs.get('centre_normalized', None) # the normalized centre of the coral object in the tile space    
         self.size_normalized = kwargs.get('size_normalized', None) # the normalized size of the coral object in the tile space              
         self.invalidated = False
+        self.inside_of = None                                      # the object is inside of the set object, only relevant during COD model building
         self.index_str = f'{self.image_col_index, self.image_row_index, self.blob_col_index, self.blob_row_index}'
         if not preserve_fraction:
             self._convert_to_int()
@@ -268,7 +282,7 @@ class CoralObject():
         centre_int = [int(x) for x in self.centre]
         centre_in_blob = (self.bbox_in_blob[0] + self.size[0] // 2, self.bbox_in_blob[1] + self.size[1] // 2)
         area = int(self.size[0] * self.size[1])
-        result = f'{inv_str} {self.image_col_index, self.image_row_index, self.blob_col_index, self.blob_row_index} ({self.cls_name}) bbox ({bbox_int}) centre ({centre_int})'
+        result = f'{inv_str} {self.image_col_index, self.image_row_index, self.blob_col_index, self.blob_row_index} ({self.yolo_class}) bbox ({bbox_int}) centre ({centre_int})'
         if self.centre_normalized is not None:
             result += f'({self.centre_normalized[0]:.5f}, {self.centre_normalized[0]:.5f}) blob ({centre_in_blob}) area ({area})'
         else:
@@ -701,7 +715,7 @@ class DetectorDAO():
     # - composite operation: obtain the coral count trend table
     @synchronized
     def get_coral_count_trend_as_df(self, tile_id:str) -> pd.DataFrame: 
-        sql = 'SELECT T.batch_time, T.age, S.coral_object_count, S.tile_sample_id \
+        sql = 'SELECT T.batch_time, T.age, S.coral_alive_count, S.tile_sample_id \
             FROM tile_sample_detect_stat S, tile_sample T WHERE T.tile_id = ?  \
             AND S.tile_sample_id = T.id ORDER BY T.batch_time ASC'
         return db_tools.query(self.db_file, sql, (tile_id,)) 
@@ -709,16 +723,19 @@ class DetectorDAO():
     # - table: yolo_model
     @synchronized
     def add_yolo_model(self, name:str, model_file_path:str, species:str, start_day:int, end_day:int, input_image_width:int, input_image_height:int, 
-                       coral_classes:list, dead_coral_classes:list, remarks:str) -> int:
-        coral_classes = [] if coral_classes is None or type(coral_classes) not in (list, tuple) else coral_classes
-        coral_classes = yaml.dump(coral_classes, Dumper=yaml.Dumper)
-        dead_coral_classes = [] if dead_coral_classes is None or type(dead_coral_classes) not in (list, tuple) else dead_coral_classes
-        dead_coral_classes = yaml.dump(dead_coral_classes, Dumper=yaml.Dumper)        
+                       classes_map:dict, remarks:str) -> int:
+        # coral_classes = [] if coral_classes is None or type(coral_classes) not in (list, tuple) else coral_classes
+        # coral_classes = yaml.dump(coral_classes, Dumper=yaml.Dumper)
+        # dead_coral_classes = [] if dead_coral_classes is None or type(dead_coral_classes) not in (list, tuple) else dead_coral_classes
+        # dead_coral_classes = yaml.dump(dead_coral_classes, Dumper=yaml.Dumper)   
+        classes_map = {} if classes_map is None else classes_map
+        classes_map_yaml = yaml.dump(classes_map, Dumper=yaml.Dumper)
+             
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO yolo_model (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, coral_classes, dead_coral_classes, remarks) '
-                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-                      (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, coral_classes, dead_coral_classes, remarks,))
+            c.execute('INSERT INTO yolo_model (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, classes_map_yaml, remarks) '
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                      (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, classes_map_yaml, remarks,))
             conn.commit()
             id = c.lastrowid
         return id
@@ -728,33 +745,37 @@ class DetectorDAO():
         sql = 'SELECT * FROM yolo_model ORDER BY species ASC, start_day ASC'
         return db_tools.query(self.db_file, sql)    
     
+    def populate_default_yolo_classes_map(classes_map:dict) -> None:
+        if classes_map is None:
+            classes_map = {}
+        valid_class_categories = ['polyp_single', 'polyp_multi', 'polyp_keypart', 'coral_dead']
+        for class_cat in valid_class_categories:
+            if class_cat not in classes_map:
+                classes_map[class_cat] = []
+                
+    
     @synchronized
     def query_yolo_model(self, species, days_since_settle) -> list:
         sql = 'SELECT * FROM yolo_model WHERE species = ? AND (? >= start_day) AND (end_day == -1 or ? <= end_day) ORDER BY start_day ASC'
         result_list = db_tools.query_for_list_of_dicts(self.db_file, sql, (species, days_since_settle, days_since_settle,))  
-        for result in result_list:
+        for result in result_list: 
             try:
-                result['coral_classes'] = yaml.load(result['coral_classes'], Loader=yaml.Loader)
-            except:
-                result['coral_classes'] = []
-            try:
-                result['dead_coral_classes'] = yaml.load(result['dead_coral_classes'], Loader=yaml.Loader)
-            except:
-                result['dead_coral_classes'] = []        
+                result['classes_map'] = yaml.load(result['classes_map_yaml'], Loader=yaml.Loader)
+            except:     
+                result['classes_map'] = {}
+            
         return result_list
     
     @synchronized
     def get_yolo_model(self, name) -> list:
         sql = 'SELECT * FROM yolo_model WHERE name = ?'
         result = db_tools.query_for_dict(self.db_file, sql, (name,))  
+        if result is None:
+            return None
         try:
-            result['coral_classes'] = yaml.load(result['coral_classes'], Loader=yaml.Loader)
-        except:
-            result['coral_classes'] = []
-        try:
-            result['dead_coral_classes'] = yaml.load(result['dead_coral_classes'], Loader=yaml.Loader)
-        except:
-            result['dead_coral_classes'] = []  
+            result['classes_map'] = yaml.load(result['classes_map_yaml'], Loader=yaml.Loader)
+        except:     
+            result['classes_map'] = {}        
         return result
     
     @synchronized
@@ -784,15 +805,15 @@ class DetectorDAO():
 
         input_image_width = yolo_spec_data.get('input_image_width', None)
         input_image_height = yolo_spec_data.get('input_image_height', None)
-        coral_classes = yolo_spec_data.get('coral_classes', [])  
-        dead_coral_classes = yolo_spec_data.get('dead_coral_classes', [])  
+        classes_map = yolo_spec_data.get('classes_map', {}) 
         remarks = yolo_spec_data.get('remarks', None)         
         # validate data
         if name is None or file is None or species is None:
             error_list.append(f'One of the mandatory fields (name, file, species) is missing in the yaml file')
         if input_image_width is None or input_image_height is None or not isinstance(input_image_width, numbers.Integral) or not isinstance(input_image_height, numbers.Integral):
             error_list.append(f'One of the mandatory fields (input_image_width, input_image_height) is missing or not a number in the yaml file')
-             
+        if self.get_yolo_model(name) is not None:
+            error_list.append(f'The yolo model name "{name}" is already defined in the system.  Change the name to a new one.')
         if error_list:
             model = pd.DataFrame(columns=('#', 'Errors'))
             for index, error in enumerate(error_list):
@@ -806,27 +827,24 @@ class DetectorDAO():
             model.loc[4] = ['valid period', self.get_period_str(valid_start_day, valid_end_day)]
             model.loc[5] = ['input image size', f'{input_image_width}(W) x {input_image_height}(H)']
             row_index = 6
-            if len(coral_classes) == 0:
-                model.loc[row_index] = ['coral classes', 'not set']
+            if len(classes_map) == 0:
+                model.loc[row_index] = ['classes map', 'not set']
             else:
-                for index, cls_name in enumerate(coral_classes):
-                    if index == 0:
-                        model.loc[row_index] = ['coral classes', f'{cls_name}']
-                    else:
-                        model.loc[row_index] = ['', f'{cls_name}'] 
+                model.loc[row_index] = ['classes map', '']
+                row_index += 1
+                # iterate through the classes_map
+                for index, class_map_key in enumerate(classes_map.keys()):
+                    try:
+                        ClassHierarchyCoral(class_map_key)
+                        class_map_values = classes_map[class_map_key]
+                        model.loc[row_index] = ['', f'{class_map_key} [{" ".join(class_map_values)}]']
+                    except:
+                        model.loc[row_index] = ['', f'{class_map_key} is an invalid coral class name']
                     row_index += 1
-                    
-            if len(dead_coral_classes) == 0:
-                model.loc[row_index] = ['dead coral classes', 'not set']
-            else:
-                for index, cls_name in enumerate(dead_coral_classes):
-                    if index == 0:
-                        model.loc[row_index] = ['dead coral classes', f'{cls_name}']
-                    else:
-                        model.loc[row_index] = ['', f'{cls_name}'] 
-                    row_index += 1            
+                            
             if remarks is not None:
                 model.loc[row_index] = ['remarks', remarks]   
+            
             return True, model
     
     @staticmethod
@@ -855,14 +873,19 @@ class DetectorDAO():
         valid_end_day = yolo_spec_data.get('valid_end_day', default_end_day)
         input_image_width = yolo_spec_data.get('input_image_width')
         input_image_height = yolo_spec_data.get('input_image_height')  
-        coral_classes = yolo_spec_data.get('coral_classes', []) 
-        dead_coral_classes = yolo_spec_data.get('dead_coral_classes', []) 
+        classes_map = yolo_spec_data.get('classes_map', {}) 
         remarks = yolo_spec_data.get('remarks', None)  
+        # populate the classes map with the default class names
+        for class_name in ClassHierarchyCoral:
+            if class_name == ClassHierarchyCoral.UNDEFINED:
+                continue
+            if class_name.name not in classes_map:
+                classes_map[class_name.name] = []
         try:
             with db_tools.create_connection(self.db_file) as conn: 
                 conn.isolation_level = None  # to turn off auto-commit (may be unnecessary, minor issue, to check)
                 if self.add_yolo_model(name, model_file_path, species, valid_start_day, valid_end_day, input_image_width, input_image_height, 
-                                       coral_classes, dead_coral_classes, remarks) > 0:
+                                       classes_map, remarks) > 0:
                     return True
             logger.warning(f'Failed to add yolo model to the database')
             return False
@@ -872,56 +895,96 @@ class DetectorDAO():
         
     # - table: detected_objet
     @synchronized
-    def add_detected_object(self, tile_sample_id:str, class_name:str, class_category:int, centre_x:float, centre_y:float, 
+    def add_detected_object(self, tile_sample_id:str, yolo_class:str, coral_class:str, present_class:str, centre_x:float, centre_y:float, 
                             corner_x1:float, corner_y1:float, size_x:float, size_y:float) -> int:
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO detected_object (tile_sample_id, class_name, class_category, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y) '
-                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-                      (tile_sample_id, class_name, class_category, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y,))
+            c.execute('INSERT INTO detected_object (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y) '
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                      (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y,))
             conn.commit()
             id = c.lastrowid
         return id
     
+        
     @synchronized
-    def add_detected_object_from_coral_object(self, tile_sample_id:str, coral_object:CoralObject):
+    def add_detected_object_from_coral_object_obs(self, tile_sample_id:str, coral_object:CoralObject):
         centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
         corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
         size_x, size_y = coral_object.size_normalized[0], coral_object.size_normalized[1] 
-        return self.add_detected_object(tile_sample_id, coral_object.cls_name, coral_object.class_category, 
+        return self.add_detected_object(tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class,
                                         centre_x, centre_y, corner_x1, corner_y1, size_x, size_y)        
-        
+
+    def add_detected_object_from_coral_object_list(self, tile_sample_id, coral_object_list, stat):
+        with db_tools.create_connection(self.db_file) as conn:
+            c = conn.cursor()        
+            coral_object:CoralObject
+            for coral_object in coral_object_list:
+                if coral_object.invalidated:
+                    continue
+                centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
+                corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
+                size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
+                if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
+                    stat['coral_alive_count'] += 1
+                elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:
+                    stat['coral_dead_count'] += 1
+                elif coral_object.present_class == ClassHierarchyPresentation.OTHER.value:
+                    stat['other_count'] += 1
+                elif coral_object.present_class == ClassHierarchyPresentation.MASKED.value:
+                    stat['masked'] += 1                    
+                c.execute('INSERT INTO detected_object (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y) '
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                      (tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y,))
+            conn.commit()
+        return stat
+
     @synchronized
     def delete_detected_objects_of_tile_sample(self, tile_sample_id:str) -> int:
         sql = 'DELETE FROM detected_object WHERE tile_sample_id = ?'
         return db_tools.update(self.db_file, sql, (tile_sample_id,))  
     
     @synchronized
-    def query_detected_objects(self, tile_sample_id:str, object_classes=None, class_category:int=None) -> pd.DataFrame:
+    def query_detected_objects(self, tile_sample_id:str, yolo_classes=None, coral_classes:list=None, present_classes:list=None) -> pd.DataFrame:
         param_list = [tile_sample_id]
         sql = 'SELECT * FROM detected_object WHERE tile_sample_id = ? '
-        if object_classes is not None:
-            if type(object_classes) in [list, tuple]:
-                classes_list = ','.join('?' * len(object_classes))
-                sql += f' AND class_name IN ({classes_list})'
-                param_list.extend(object_classes)            
+        if yolo_classes is not None:
+            if type(yolo_classes) in [list, tuple]:
+                yolo_classes_list = ','.join('?' * len(yolo_classes))
+                sql += f' AND yolo_class IN ({yolo_classes_list})'
+                param_list.extend(yolo_classes)            
             else:
-                sql += ' AND class_name = ?'
-                param_list.append(object_classes)
-        if class_category is not None and (type(class_category) == bool or isinstance(class_category, numbers.Number)):
-            sql += f' AND class_category = ?'
-            param_list.append(class_category)  
+                sql += ' AND yolo_class = ?'
+                param_list.append(yolo_classes)
+        if coral_classes is not None:
+            if type(coral_classes) in [list, tuple]:
+                coral_classes_list = ','.join('?' * len(coral_classes))
+                sql += f' AND coral_class IN ({coral_classes_list})'
+                param_list.extend(coral_classes)            
+            else:
+                sql += ' AND coral_class = ?'
+                param_list.append(coral_classes)
+        if present_classes is not None:
+            if type(present_classes) in [list, tuple]:
+                present_classes_list = ','.join('?' * len(present_classes))
+                sql += f' AND present_class IN ({present_classes_list})'
+                param_list.extend(present_classes)            
+            else:
+                sql += ' AND present_class = ?'
+                param_list.append(present_classes)                
+                
         return db_tools.query(self.db_file, sql, tuple(param_list))
     
     @synchronized
-    def query_detected_objects_as_coral_objects(self, tile_sample_id:str, object_classes=None, class_category:int=None) -> list:
-        detected_object_list = self.query_detected_objects(tile_sample_id, object_classes, class_category).to_dict('records')
+    def query_detected_objects_as_coral_objects(self, tile_sample_id:str, yolo_classes:list=None, coral_classes:list=None, present_classes:list=None) -> list:
+        detected_object_list = self.query_detected_objects(tile_sample_id, yolo_classes, coral_classes, present_classes).to_dict('records')
         coral_object_list = []
         for detected_object in detected_object_list:
             # create the object from db results
             coral_object = CoralObject(
-                cls_name = detected_object['class_name'],
-                class_category = detected_object['class_category'],
+                yolo_class = detected_object['yolo_class'],
+                coral_class = detected_object['coral_class'],
+                present_class = detected_object['present_class'],
                 centre = (detected_object['centre_x'], detected_object['centre_y'],),
                 bbox_normalized = (detected_object['corner_x1'], detected_object['corner_y1'], detected_object['corner_x1'] + detected_object['size_x'], detected_object['corner_y1'] + detected_object['size_y']),
                 centre_normalized = (detected_object['centre_x'], detected_object['centre_y'],),
@@ -931,23 +994,31 @@ class DetectorDAO():
         return coral_object_list
     
     @synchronized
-    def list_detected_classes(self, tile_sample_id:str=None) -> pd.DataFrame:
+    def list_coral_classes(self, tile_sample_id:str=None) -> pd.DataFrame:
         if tile_sample_id is None:
-            sql = 'SELECT DISTINCT(class_name) FROM detected_object'
+            sql = 'SELECT DISTINCT(coral_class) FROM detected_object'
             return db_tools.query_for_list(self.db_file, sql)          
         else:
-            sql = 'SELECT DISTINCT(class_name) FROM detected_object WHERE tile_sample_id = ?'
-            return db_tools.query_for_list(self.db_file, sql, (tile_sample_id,))         
-
+            sql = 'SELECT DISTINCT(coral_class) FROM detected_object WHERE tile_sample_id = ?'
+            return db_tools.query_for_list(self.db_file, sql, (tile_sample_id,))    
+             
+    @synchronized
+    def list_yolo_classes(self, tile_sample_id:str=None) -> pd.DataFrame:
+        if tile_sample_id is None:
+            sql = 'SELECT DISTINCT(yolo_class) FROM detected_object'
+            return db_tools.query_for_list(self.db_file, sql)          
+        else:
+            sql = 'SELECT DISTINCT(yolo_class) FROM detected_object WHERE tile_sample_id = ?'
+            return db_tools.query_for_list(self.db_file, sql, (tile_sample_id,))    
 
     # - table: tile sample stat
     @synchronized
-    def update_tile_sample_detect_stat(self, tile_sample_id:str, tile_pixel_x, tile_pixel_y, coral_object_count, dead_coral_object_count, 
-                                       other_object_count, duplicates_removed, yaml_data) -> int:
-        sql = 'REPLACE INTO tile_sample_detect_stat(tile_sample_id, tile_pixel_x, tile_pixel_y, coral_object_count, dead_coral_object_count, \
-            other_object_count, duplicates_removed, yaml_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_pixel_x, tile_pixel_y, coral_object_count, dead_coral_object_count, 
-                                                   other_object_count, duplicates_removed, yaml_data))
+    def update_tile_sample_detect_stat(self, tile_sample_id:str, tile_pixel_x, tile_pixel_y, coral_alive_count, coral_dead_count, 
+                                       other_count, duplicates_removed, stat_yaml) -> int:
+        sql = 'REPLACE INTO tile_sample_detect_stat(tile_sample_id, tile_pixel_x, tile_pixel_y, coral_alive_count, coral_dead_count, \
+            other_count, duplicates_removed, stat_yaml) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_pixel_x, tile_pixel_y, coral_alive_count, coral_dead_count, 
+                                                   other_count, duplicates_removed, stat_yaml))
 
     @synchronized
     def get_tile_sample_detect_stat(self, tile_sample_id:str) -> dict:
@@ -1144,10 +1215,10 @@ def manage_tables():
     DATABASE_FOLDER = os.path.join(CGRAS_HOME, 'database')
     DETECT_DBFM = DBFile(DATABASE_FOLDER, 'detector.db', DETECT_DDL)
     DETECT_DAO = DetectorDAO(DETECT_DBFM.db_file)
-    DETECT_DBFM.drop_tables(['error_flag'])
+    DETECT_DBFM.drop_tables(['yolo_model'])
     tables_name = DETECT_DBFM.list_tables_name()
     logger.info(f'tables: {tables_name}')
-    DETECT_DBFM.create_tables(['error_flag'])
+    DETECT_DBFM.create_tables(['yolo_model'])
     DETECT_DBFM.dump_all_tables()       
 
 # The main program for testing the clearing

@@ -57,14 +57,18 @@ def sample_cod_params():
         'logdata_folder': LOGDATA_FOLDER, 
         ModelsConfigNames.YOLO_MODEL_FILE.value: '/home/qcr/cgras_data/YoloModel/20240926_cgras_tiled_yolov8n_seg_640p.pt',
         'coral_classes': ['recruit_live_white', 'recruit_cluster_live_white', 'recruit_symbiotic', 
-                          'recruit_cluster_symbiotic', 'recruit_partial', 'recruit_cluster_partial'],
+                          'recruit_cluster_symbiotic', 'recruit_partial', 'recruit_cluster_partial'],  # to be replaced by classes_map
+        'classes_map': {'POLYP_KEYPART': ['alive'],
+                        'POLYP_MULTI': ['mask_live'],
+                        'DEAD_CORAL': ['dead', 'mask_dead'],
+                        },
         ModelsConfigNames.COD_MODEL_FILENAME.value: 'coral_object_detect_model.yaml', 
         ModelsConfigNames.COD_DEBUG_BLOB_IMAGES.value: True,
         ModelsConfigNames.COD_BLOB_SIZE.value: (640, 640),
         ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value: 32,
         ModelsConfigNames.COD_USE_CACHED_OBJECT_DETECTION.value: False,
-        ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES.value: 32,
-        ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS.value: 32,         
+        # ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES.value: 32,
+        # ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS.value: 32,         
     }
     return params
 
@@ -152,13 +156,15 @@ def test_build_coral_object_detect_model():
     logdata_folder = params['logdata_folder']
     # load a yolo model
     yolo_model_file = params[ModelsConfigNames.YOLO_MODEL_FILE.value]
-    yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file=yolo_model_file)
+    yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file=yolo_model_file, 
+                                                       blob_size=params[ModelsConfigNames.COD_BLOB_SIZE.value],
+                                                       classes_map=params['classes_map'])
 
     # build a CoralOjbectDetectModel for the images 
     # cod_model = CoralObjectDetectModel(image_map_as_list, reco_model, yolo_model, loctile_model, **params)
-    cod_model = CoralObjectDetectModel(images_2d_list=images_2d_list, yolo_model=yolo_model, map_bbox_image_fn=reco_model.map_bbox, 
+    cod_model = CoralObjectDetectModel(images_2d_list=images_2d_list, yolo_detect_model_list=[yolo_model], map_bbox_image_fn=reco_model.map_bbox, 
                                        map_normalize_bbox_tile_fn=loctile_model.map_and_normalize_bbox, 
-                                       tile_size=loctile_model.get_tile_size(), **params)
+                                       tile_size=loctile_model.get_tile_size_in_image_space(), **params)
     cod_model.build()
 
     cod_model_file = os.path.join(logdata_folder, params[ModelsConfigNames.COD_MODEL_FILENAME.value])

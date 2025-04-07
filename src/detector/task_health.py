@@ -77,20 +77,20 @@ class HealthEvaluateTaskModel():
             for index, stat in enumerate(stat_list):
                 # if this is the earliest (or the only) tile sample, extract the statistics about the start of the tile
                 if index == 0:
-                    coral_count_start, age_start = stat['coral_object_count'], stat['age']
+                    coral_count_start, age_start = stat['coral_alive_count'], stat['age']
                     species, season, settle_time = stat['species'], stat['season'], stat['settle_time']
-                count_data.append({ 'coral_object_count': stat['coral_object_count'],
-                                    'other_object_count': stat['other_object_count'],
-                                    'dead_coral_object_count': stat['dead_coral_object_count'],
+                count_data.append({ 'coral_alive_count': stat['coral_alive_count'],
+                                    'other_count': stat['other_count'],
+                                    'coral_dead_count': stat['coral_dead_count'],
                                     'age': stat['age'],
                                 })
                 # if this is the latest tile sample, extract the statistics about the end of the tile
                 if index == len(stat_list) - 1:
-                    coral_count_latest, other_object_count_latest, dead_coral_count_latest = stat['coral_object_count'], stat['other_object_count'], stat['dead_coral_object_count']
+                    coral_count_latest, other_object_count_latest, dead_coral_count_latest = stat['coral_alive_count'], stat['other_count'], stat['coral_dead_count']
                     age_latest, batch_time_latest = stat['age'], stat['batch_time']
                     # the trend parameters can only be computed if there are two or more tile samples in the history
                     if len(stat_list) > 1:
-                        loss_rate_recent = stat['coral_object_count'] - stat_list[index - 1]['coral_object_count']
+                        loss_rate_recent = stat['coral_alive_count'] - stat_list[index - 1]['coral_alive_count']
                         if age_latest - stat_list[index - 1]['age'] >= 1:
                             loss_rate_recent = loss_rate_recent / (age_latest - stat_list[index - 1]['age'])
                         else:
@@ -116,10 +116,10 @@ def eval_acropora_palmata(count_data):
         return 0   # neutral health index
     for index, data in enumerate(count_data):
         if index == 0:
-            coral_count_start = data['coral_object_count']
+            coral_count_start = data['coral_alive_count']
             age_start = data['age']
         elif index == len(count_data) - 1:
-            coral_count_end = data['coral_object_count']
+            coral_count_end = data['coral_alive_count']
             age_end = data['age']
     nominal_coral_count_end = coral_count_start - ((nominal_loss_rate_per_day * coral_count_start)  * (age_end - age_start))
     nominal_coral_count_end = max(0, nominal_coral_count_end)
@@ -141,10 +141,10 @@ def eval_acropora_palmata(count_data):
         return 0   # neutral health index
     for index, data in enumerate(count_data):
         if index == 0:
-            coral_count_start = data['coral_object_count']
+            coral_count_start = data['coral_alive_count']
             age_start = data['age']
         elif index == len(count_data) - 1:
-            coral_count_end = data['coral_object_count']
+            coral_count_end = data['coral_alive_count']
             age_end = data['age']
     nominal_coral_count_end = coral_count_start - ((nominal_loss_rate_per_day * coral_count_start)  * (age_end - age_start))
     nominal_coral_count_end = max(0, nominal_coral_count_end)
@@ -166,9 +166,9 @@ def test_health_model_func(func=None):
     age_start = 3
     age_end = 50
     for age in range(age_start, age_end, 7):
-        count_data.append({ 'coral_object_count': coral_count_start - (age - age_start) * actual_loss_per_day,
-                            'other_object_count': 0,
-                            'dead_coral_object_count': 0,
+        count_data.append({ 'coral_alive_count': coral_count_start - (age - age_start) * actual_loss_per_day,
+                            'other_count': 0,
+                            'coral_dead_count': 0,
                             'age': age
                             })
     if func is not None:

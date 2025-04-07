@@ -90,10 +90,28 @@ def run_update_tile_sample():
         sql = 'SELECT metadata FROM tile_sample'
         df = db_tools.query(DETECT_DBFILE, sql)
         print(df)
-
+        
+# function to change database table definitions based on release 0.1.0 to a new release
+def run_update_table_definitions_010():
+    sql = 'ALTER TABLE tile_sample_detect_stat RENAME COLUMN coral_object_count TO coral_alive_count'
+    db_tools.update(DETECT_DBFILE, sql)
+    sql = 'ALTER TABLE tile_sample_detect_stat RENAME COLUMN dead_coral_object_count TO coral_dead_count'
+    db_tools.update(DETECT_DBFILE, sql)
+    sql = 'ALTER TABLE tile_sample_detect_stat RENAME COLUMN other_object_count TO other_count'
+    db_tools.update(DETECT_DBFILE, sql)        
+    sql = 'ALTER TABLE tile_sample_detect_stat RENAME COLUMN yaml_data TO stat_yaml'
+    db_tools.update(DETECT_DBFILE, sql)     
+    sql = 'ALTER TABLE yolo_model DROP COLUMN coral_classes'
+    db_tools.update(DETECT_DBFILE, sql)     
+    sql = 'ALTER TABLE yolo_model DROP COLUMN dead_coral_classes'
+    db_tools.update(DETECT_DBFILE, sql)     
+    sql = 'ALTER TABLE yolo_model ADD COLUMN classes_map_yaml text DEFAULT NULL'
+    db_tools.update(DETECT_DBFILE, sql)     
+    
 # ------------------------------------------------
 # The main program for running a command line 
 # program for executing sql statements
 if __name__ == '__main__':
     run_db()
     # run_update_tile_sample()
+    # run_update_table_definitions_010()

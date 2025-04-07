@@ -69,7 +69,8 @@ class TileSampleTable():
                     html.Div([
                         html.B('', id=prefix+'view_modal_message'),
                         html.P(''),
-                        dbc.Button('Reconstructed Image', target='view_image', external_link=True, id=prefix+'view_reconstruct_link', color='primary'),
+                        dbc.Button('Reconstructed Tile', target='view_image', external_link=True, id=prefix+'view_reconstruct_tile_link', color='primary'),
+                        dbc.Button('Annotated Tile', target='view_image', external_link=True, id=prefix+'view_annotated_tile_link', color='primary'),
                         dbc.Button('Feature Matching Images', target='view_image', external_link=True, id=prefix+'view_feature_match_link', color='primary'),  
                         dbc.Button('Annotated Blobs', target='view_image', external_link=True, id=prefix+'view_annotated_blobs_link', color='primary'),                       
                         ]
@@ -80,7 +81,8 @@ class TileSampleTable():
         self._reprocess_mode_radio = dcc.RadioItems(id=prefix+'reprocess_mode', options={
                                                 '_whole': '  Redo the whole analysis (reconstruction, tile location, object detection and analysis)',
                                                 '_redo_detect': '  Redo from detection (object detection and analysis)',
-                                                '_redo_analysis': '  Redo analysis (only analysis)'}, value='_redo_analysis')  # style={'display': 'flex'}
+                                                '_redo_analysis': '  Redo analysis (only analysis)',
+                                                '_redo_finalize': '  Redo finalize (include annotate image)'}, value='_redo_finalize'   )  # style={'display': 'flex'}
         
         self._confirm_reprocess_modal = dbc.Modal(id=prefix+'confirm_reprocess_modal', children=[
                 dbc.ModalHeader(dbc.ModalTitle('Re-Process Tile Samples')),
@@ -139,8 +141,10 @@ class TileSampleTable():
         # define callback for selecting a scan and open the modal window
         self.app.callback([ Output(prefix+'view_modal', 'is_open'),
                             Output(prefix+'view_modal_message', 'children'), 
-                            Output(prefix+'view_reconstruct_link', 'href'),
-                            Output(prefix+'view_reconstruct_link', 'disabled'),
+                            Output(prefix+'view_reconstruct_tile_link', 'href'),
+                            Output(prefix+'view_reconstruct_tile_link', 'disabled'),
+                            Output(prefix+'view_annotated_tile_link', 'href'),
+                            Output(prefix+'view_annotated_tile_link', 'disabled'),                            
                             Output(prefix+'view_feature_match_link', 'href'),
                             Output(prefix+'view_feature_match_link', 'disabled'),
                             Output(prefix+'view_annotated_blobs_link', 'href'),
@@ -306,7 +310,7 @@ class TileSampleTable():
                     if action_data['action'] == 'reject':
                         DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.REJECTED.value)
                         DETECT_DAO.clear_tile_sample_data(tile_sample_id)
-                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_list=True, delete_object_detection_model=True)
                     elif action_data['action'] == 'delete':
                         DETECT_DAO.clear_tile_sample_data(tile_sample_id)
                         DetectionTaskModel.delete_cache_folder(tile_sample_id)
@@ -350,18 +354,24 @@ class TileSampleTable():
             button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
             if button_id.endswith('confirm_redo_button'):
                 message_info = []
+                tile_sample_id_list = []
                 for row_index in row_index_list:
                     tile_sample_id = self._model.iloc[row_index]['id']
+                    tile_sample_id_list.append(tile_sample_id)
+                
+                for tile_sample_id in tile_sample_id_list:
                     DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.QUEUED.value, '')
                     DETECT_DAO.clear_tile_sample_data(tile_sample_id)
                     message_info.append(tile_sample_id)
                     # remove the cache files
                     if mode == '_whole':
-                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_detection=True)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=True, delete_object_list=True, delete_object_detection_model=True)
                     elif mode == '_redo_detect':
-                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=False, delete_object_detection=True)
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=False, delete_object_list=True, delete_object_detection_model=True)
                     elif mode == '_redo_analysis':
-                        ...
+                        DetectionTaskModel.delete_cache_files(tile_sample_id, delete_reco=False, delete_object_list=False, delete_object_detection_model=True)
+                    elif mode == '_redo_finalize':
+                        ...                      
                         
                 message = f'The tile sample(s) {message_info} have been moved to the queue pending analysis'
                 return (True, message, False, store)
@@ -396,12 +406,17 @@ class TileSampleTable():
             modal_title = f'Tile Sample ID: {tile_sample_id}'
             # obtain the partial path to the cache folder
             partial_cache_folder = DetectionTaskModel.get_partial_cache_folder(tile_sample_id)
-            view_reconstruct_href = view_feature_match_href = view_annotated_blobs_href = None
+            view_reconstruct_href = view_annotated_href = view_feature_match_href = view_annotated_blobs_href = None
             if partial_cache_folder is not None:
                 # evalate if the file exists
                 view_reconstruct_path = os.path.join(logdata_folder, DetectionTaskModel.WHOLE_RECO_HTML_FILENAME)
                 if os.path.isfile(view_reconstruct_path):
                     view_reconstruct_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.WHOLE_RECO_HTML_FILENAME}' 
+                    
+                # evalate if the file exists
+                view_annotated_path = os.path.join(logdata_folder, DetectionTaskModel.ANNOTATED_WHOLE_RECO_HTML_FILENAME)
+                if os.path.isfile(view_annotated_path):
+                    view_annotated_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.ANNOTATED_WHOLE_RECO_HTML_FILENAME}'                     
 
                 # evaluate if the file exists
                 view_feature_match_path = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
@@ -413,7 +428,7 @@ class TileSampleTable():
                 if os.path.isfile(view_annotated_blobs_path):
                     view_annotated_blobs_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.ANNOTATED_BLOBS_INDEX_HTML_FILENAME}' 
                                 
-            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_feature_match_href, view_feature_match_href==None, 
+            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_annotated_href, view_annotated_href==None, view_feature_match_href, view_feature_match_href==None, 
                     view_annotated_blobs_href, view_annotated_blobs_href==None)
         return view_row_confirmed
     

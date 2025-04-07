@@ -1,0 +1,15 @@
+name: Amag early
+file: /home/qcr/cgras_data/NewYoloModel/runs/detect/train_early_ls1/weights/best.pt
+species: acropora 
+input_image_width: 640
+input_image_height: 640
+valid_start_day: 0
+valid_end_day: 6
+# coral_classes: ['alive', 'mask_live']
+# dead_coral_classes: ['dead', 'mask_dead']
+classes_map: 
+  POLYP_SINGLE: ['polyp_solo']
+  POLYP_MULTI: ['polyp_lump']
+  POLYP_KEYPART: []
+  DEAD_CORAL: []
+remarks: 

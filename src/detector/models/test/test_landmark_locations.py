@@ -259,7 +259,7 @@ def save_sample_objects_csv():
     detected_object:CoralObject
     samples_list = []
     for index, detected_object in enumerate(object_list):
-        the_class = detected_object.cls_name
+        the_class = detected_object.yolo_class
         if the_class in counter:
             counter[the_class] += 1
         else:

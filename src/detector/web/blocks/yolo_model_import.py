@@ -26,7 +26,7 @@ class YoloModelFileImportBlock():
         self.import_success_trigger_id = prefix + 'import_success'
         # define widgets
         self._toast = dbc.Toast(id=prefix+'toast', is_open=False, duration=5000, icon='danger', header='Message',
-                                style={'position': 'fixed', 'top': '15%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
+                                style={'position': 'fixed', 'top': '12%', 'left': '50%', 'width': 640, 'transform': 'translate(-50%, -50%)'})
         # define tile sample spec import panel
         self.file_upload_area = dcc.Upload(id=prefix+'file_import_area', children=html.Div([
             'Drag and Drop a Yolo model specification yaml file']), style={

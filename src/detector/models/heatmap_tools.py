@@ -52,7 +52,7 @@ class HeatmapHelper():
         for coral_object in object_list:
             if coral_object.invalidated and not include_invalidated:
                 continue
-            if class_filter is not None and coral_object.cls_name not in class_filter:
+            if class_filter is not None and coral_object.yolo_class not in class_filter:
                 continue
             # compute the cell index based on the object normalized location
             x, y = int(coral_object.centre_normalized[0] * map_size[0]), int(coral_object.centre_normalized[1] * map_size[1])

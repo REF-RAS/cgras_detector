@@ -49,13 +49,16 @@ class ModelsConfigNames(Enum):
     COD_DEBUG_BLOB_IMAGES = 'cod_debug_blob_images'
     COD_BLOB_OVERLAP_PIX = 'cod_blob_overlap_pix'
     COD_USE_CACHED_OBJECT_DETECTION = 'cod_use_cached_object_detection'
-    COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES = 'cod_duplicate_max_displacement_images'
-    COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS = 'cod_duplicate_max_displacement_blobs'
+    COD_CORAL_CHILD_MIN_OVERLAP_RATIO = 'cod_coral_child_min_overlap_ratio'
+    COD_MERGE_MULTI_MODELS = 'cod_merge_mutli_models'
+    # COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES = 'cod_duplicate_max_displacement_images'
+    # COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS = 'cod_duplicate_max_displacement_blobs'
     
     # the following are parameters generated dynamically during task execution
     LOGDATA_FOLDER = 'logdata_folder'
     COD_BLOB_SIZE = 'cod_blob_size'
     OBJECT_CLASSES_CORAL = 'coral_classes'
     OBJECT_CLASSES_DEAD_CORAL = 'dead_coral_classes'
+    OBJECT_CLASSES_MAP = 'classes_map'
     YOLO_MODEL_FILE = 'yolo_model_file'
     
