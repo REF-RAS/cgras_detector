@@ -19,7 +19,6 @@ from detector.models.reconstruct import ImageReconstructModel, ImageReconstructM
 
 from detector.models import logger
 from detector.models.models_config import ModelsConfigNames
-from detector.models.reconstruct import ImageReconstructModel
 from detector.models.detector_error import DetectorFailed, DetectorAborted, DetectorExceptionCodes
 
 class WhichCorner(Enum):

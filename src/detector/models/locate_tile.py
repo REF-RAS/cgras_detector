@@ -22,7 +22,6 @@ from detector.models.reconstruct import ImageReconstructModel, ImageReconstructM
 
 from detector.models import logger
 from detector.models.models_config import ModelsConfigNames
-from detector.models.reconstruct import ImageReconstructModel
 from detector.models.detector_error import DetectorFailed, DetectorAborted, DetectorExceptionCodes
 
 class WhichCorner(Enum):
@@ -35,9 +34,12 @@ class LocateTileModel():
     """ LocateTileModel uses computer vision means to detect the 4 corners of tile frames so to enable transformation from reconstructed image space to the tile space
     """
     # constants
-    WHOLE_RECO_IMAGE_FILENAME = 'whole_reco_image.jpg'
+    FILENAME_WHOLE_RECO_IMAGE = 'whole_reco_image.jpg'
+    FILENAME_WHOLE_RECO_FULL_SCALE_IMAGE = 'whole_reco_image_original_scale.jpg'
     LOCTILE_WHOLE_RECO_IMAGE_FILENAME = 'loctile_whole_reco_image.jpg'
     ROTATED_WHOLE_RECO_IMAGE_FILENAME = 'rotated_whole_reco_image.jpg'
+    ROTATED_WHOLE_RECO_FULL_SCALE_IMAGE_FILENAME = 'rotated_whole_reco_image_original_scale.jpg'
+
     
     def __init__(self, images_2d_list:list, map_location_fn, image_size_in_px:tuple, **kwargs):
         """ The constructor
@@ -75,9 +77,10 @@ class LocateTileModel():
         # other input parameters
         self.logdata_folder = kwargs.get('logdata_folder', None)
         self.write_debug_images = kwargs.get(ModelsConfigNames.LOCTILE_DEBUG_IMAGES.value, False)
+        self.write_debug_images_original_scale = kwargs.get(ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value, False)
         # self.blue_ratio_min = kwargs.get(ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value, 0.35)
         # self.red_ratio_max = kwargs.get(ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value, 0.15)
-        self.working_scale = kwargs.get(ModelsConfigNames.LOCTILE_WORKING_SCALE.value, 0.05)
+        self.working_scale = kwargs.get(ModelsConfigNames.LOCTILE_WORKING_SCALE.value, 0.1)
         self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 21)
         self.matching_score_min = kwargs.get(ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value, 0.5)
         # important model variables
@@ -111,8 +114,6 @@ class LocateTileModel():
 
         # write annotated whole image if found in the logfile folder
         self._write_annotate_whole_image()
-        # write rotated whole image if found in the logfile folder
-        self._write_rotated_whole_image() 
 
         # estimate the whole tile image size if not found in the input parameters
         detected_frame_size_x = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.TOP_RIGHT]))
@@ -132,29 +133,36 @@ class LocateTileModel():
         logger.info(f'AffineTransform matrix: {self.affine_transform_matrix} rotation origin offset {self.image_origin_offset}')  
 
         frame_offset = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT], adjust_offset=False) 
+        frame_topright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_RIGHT], adjust_offset=False) 
+        frame_bottomleft_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT], adjust_offset=False) 
         frame_bottomright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT], adjust_offset=False) 
         # update the detected frame_size in px
-        detected_frame_size_in_px = (frame_bottomright_corrected[0] - frame_offset[0], frame_bottomright_corrected[1] - frame_offset[1],)
+        detected_frame_size_in_px = (frame_topright_corrected[0] - frame_offset[0], frame_bottomleft_corrected[1] - frame_offset[1],)
         # compute the detected tile size in pixels from the tile size and frame size
         approx_pixel_per_mm_x = detected_frame_size_x / self.frame_size_in_mm[0]
         approx_pixel_per_mm_y = detected_frame_size_y / self.frame_size_in_mm[1]        
         approx_pixel_per_mm = (approx_pixel_per_mm_x + approx_pixel_per_mm_y) / 2
         
-        logger.info(f'LocateTile frame size in mm and detected in px: {self.frame_size_in_mm} {detected_frame_size_x}')
+        logger.info(f'LocateTile frame size in mm and detected in px: {self.frame_size_in_mm} {detected_frame_size_x, detected_frame_size_y}')
         logger.info(f'LocateTile approx_pixel_per_mm: {approx_pixel_per_mm_x:.2f} {approx_pixel_per_mm_y:.2f} (frame and tile size in mm: {self.frame_size_in_mm} {self.tile_size_in_mm})')
         logger.info(f'LocateTile frame_offset: {frame_offset}')
-        logger.info(f'LocateTile frame_size: {detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm:.2f})')
+        logger.info(f'LocateTile frame_size: {detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm_x:.2f} {approx_pixel_per_mm_y:.2f})')
         
         # compute tile offset, assuming that the frame holder width is the same on all sides
-        holder_width_in_pixel = ((self.frame_size_in_mm[0] - self.tile_size_in_mm[0]) / 2) * approx_pixel_per_mm
+        holder_width_in_pixel = ((self.frame_size_in_mm[0] - self.tile_size_in_mm[0]) / 2) * approx_pixel_per_mm_x, ((self.frame_size_in_mm[1] - self.tile_size_in_mm[1]) / 2) * approx_pixel_per_mm_y
         # NOTE: for testing - override by the param 'test_only_holder_width_in_px' 
         if 'test_only_holder_width_in_px' in self.params:
-            holder_width_in_pixel = self.params['test_only_holder_width_in_px']
+            holder_width_in_pixel = self.params['test_only_holder_width_in_px']  # (x, y)
         # compute the tile offset using the frame offset and the holder width
-        self.tile_offset_in_px = (frame_offset[0] + holder_width_in_pixel, frame_offset[1] + holder_width_in_pixel,)
-        self.tile_size_in_px = (int(detected_frame_size_in_px[0] - 2 * holder_width_in_pixel), int(detected_frame_size_in_px[1] - 2 * holder_width_in_pixel, ))
+        self.tile_offset_in_px = (frame_offset[0] + holder_width_in_pixel[0], frame_offset[1] + holder_width_in_pixel[1],)
+        self.tile_size_in_px = (int(detected_frame_size_in_px[0] - 2 * holder_width_in_pixel[0]), int(detected_frame_size_in_px[1] - 2 * holder_width_in_pixel[1], ))
         logger.info(f'LocateTile tile_offset: {self.tile_offset_in_px}')
-        logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (frame_width in pixels: {holder_width_in_pixel})')        
+        logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (holder_width in pixels: {holder_width_in_pixel})')   
+
+        # write rotated whole image if found in the logfile folder
+        self._write_rotated_whole_image() 
+        # write rotated whole image original scale if found in the logfile folder
+        self._write_rotated_whole_image_original_scale()
         
     def _locate_corner(self, original_image:np.ndarray, which_corner:WhichCorner, fine_search:bool=False):
         # image = self._apply_tile_filter(original_image)
@@ -191,7 +199,9 @@ class LocateTileModel():
             try:
                 debug_image_filepath = os.path.join(self.logdata_folder, f'locate_corner_{which_corner.name}.jpg')
                 image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-                image_bgr = cv2.rectangle(image_bgr, (corner[0] - self.template_size, corner[1] - self.template_size), (corner[0] + self.template_size, corner[1] + self.template_size), (0, 0, 255,), 10)
+                point_1 = (int(corner[0] - self.template_size / self.working_scale), int(corner[1] - self.template_size / self.working_scale))
+                point_2 = (int(corner[0] + self.template_size / self.working_scale), int(corner[1] + self.template_size / self.working_scale))
+                image_bgr = cv2.rectangle(image_bgr, point_1, point_2, (0, 0, 255,), 10)
                 cv2.imwrite(debug_image_filepath, image_bgr)
             except:
                 raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching output to {debug_image_filepath}')
@@ -253,7 +263,7 @@ class LocateTileModel():
             if reco_working_scale is None:
                 return
             # attempt to load the whole_reco_image
-            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.WHOLE_RECO_IMAGE_FILENAME)
+            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.FILENAME_WHOLE_RECO_IMAGE)
             reco_whole_image = cv2.imread(reco_whole_image_filepath)
             if reco_whole_image is None:
                 return
@@ -269,22 +279,54 @@ class LocateTileModel():
                     annotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.LOCTILE_WHOLE_RECO_IMAGE_FILENAME)
                     cv2.imwrite(annotated_reco_whole_image_filepath, annotated_reco_whole_image)
                 except:
-                    raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching output to {annotated_reco_whole_image_filepath}')            
+                    raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write whole reco image with tile bounds output to {annotated_reco_whole_image_filepath}')            
 
     def _write_rotated_whole_image(self):
         if self.write_debug_images is not None and self.logdata_folder is not None:
+            reco_working_scale = self.params.get(ModelsConfigNames.RECO_WORKING_SCALE.value, None)
             # attempt to load the whole_reco_image
-            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.WHOLE_RECO_IMAGE_FILENAME)
+            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.FILENAME_WHOLE_RECO_IMAGE)
             reco_whole_image = cv2.imread(reco_whole_image_filepath)
             if reco_whole_image is None:
                 return    
             # compute the affine tranform matrix based on the detected corners
             affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
             rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.05), int(reco_whole_image.shape[0] * 1.05)))
-            rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)
-            cv2.imwrite(rotated_reco_whole_image_filepath, rotated_whole_image)
+            # draw frame bounds
+            pts = np.array([self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT], adjust_offset=False),
+                            self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_RIGHT], adjust_offset=False),
+                            self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT], adjust_offset=False),
+                            self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT], adjust_offset=False),
+            ], np.float32)
+            pts = np.multiply(pts, reco_working_scale).astype(np.int32)
+            annotated_rotated_whole_image = cv2.polylines(rotated_whole_image, [pts], True, [0, 0, 255], 2) 
+            # draw tile bounds
+            tile_point_1 = (int(self.tile_offset_in_px[0] * reco_working_scale), int(self.tile_offset_in_px[1] * reco_working_scale))
+            tile_point_2 = (int(tile_point_1[0] + self.tile_size_in_px[0] * reco_working_scale), int(tile_point_1[1] + self.tile_size_in_px[1] * reco_working_scale))
+            cv2.rectangle(annotated_rotated_whole_image, tile_point_1, tile_point_2, 
+                          (32, 255, 32,), 1)
+            try:
+                rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)
+                cv2.imwrite(rotated_reco_whole_image_filepath, annotated_rotated_whole_image)
+            except:
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write rotated whole reco image with tile bounds  output to {rotated_reco_whole_image_filepath}')                     
             return rotated_reco_whole_image_filepath
         return None
+    
+    def _write_rotated_whole_image_original_scale(self):
+        if self.write_debug_images is not None and self.logdata_folder is not None and self.write_debug_images_original_scale:
+            # attempt to load the whole_reco_image
+            reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.FILENAME_WHOLE_RECO_FULL_SCALE_IMAGE)
+            reco_whole_image = cv2.imread(reco_whole_image_filepath)
+            if reco_whole_image is None:
+                return    
+            # compute the affine tranform matrix based on the detected corners
+            affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
+            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.05), int(reco_whole_image.shape[0] * 1.05)))
+            rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_FULL_SCALE_IMAGE_FILENAME)
+            cv2.imwrite(rotated_reco_whole_image_filepath, rotated_whole_image)
+            return rotated_reco_whole_image_filepath
+        return None    
 
     def _adjust_gamma(self, image, gamma=1.0):
         # build a lookup table mapping the pixel values [0, 255] to
@@ -296,7 +338,7 @@ class LocateTileModel():
         return cv2.LUT(image, table)
 
     @classmethod
-    def _generate_template(cls, type:int, width:WhichCorner, height:int):
+    def _generate_template(cls, type:WhichCorner, width:int, height:int):
         blank_image = np.full((height, width), 255, dtype=np.uint8)
         if type == WhichCorner.TOP_LEFT:
             blank_image[int(height // 2):, int(width // 2):] = 0
@@ -324,7 +366,7 @@ class LocateTileModel():
     #     return image
     
     def _apply_tile_filter_classifier(self, image:np.ndarray):
-        frame_detector = FrameDetector(os.path.join(os.path.dirname(__file__), 'training_data/train_set_1.model'))
+        frame_detector = FrameDetector(os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_1.model'))
         return frame_detector.classify_image(image)
     
     def map_and_normalize_bbox(self, bbox:tuple):

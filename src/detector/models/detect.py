@@ -25,6 +25,7 @@ from cgras_datatools.opencv_tools import CompareTools
 class CoralObjectDetectModel():
     # constant
     ANNOTATED_WHOLE_RECO_IMAGE_FILENAME = 'rotated_whole_reco_image_annotated.jpg'
+    ANNOTATED_WHOLE_RECO_ORIGINAL_SCALE_IMAGE_FILENAME = 'rotated_whole_reco_original_image_annotated.jpg'
     """ CoralDetectorModel uses an object detector to extract a list of objects detected in a 2d grid of images that represent a full coral aquaculture tile. The images which may overlap with one another are
         arranged in a 2d grid that implies the location with reference to the tile. The class uses an ImageReconstructionModel to map locations on individual images to  
     """
@@ -268,7 +269,8 @@ class CoralObjectDetectModel():
             # logger.warning(f'{type(self).__name__}: Failed to load object list cache file {cache_file}\n{e}')
             raise e
     
-    def annotate_whole_reco_image_with_objects(self, rotated_reco_image:np.ndarray, image_scale:float, tile_origin_in_px:tuple, tile_size_in_px:tuple, output_image_file:str) -> bool:
+    def annotate_whole_reco_image_with_objects(self, rotated_reco_image:np.ndarray, image_scale:float, tile_origin_in_px:tuple, tile_size_in_px:tuple, 
+                                               output_image_file:str, line_width:int=1, font_size:float=0.6, draw_coral_class:bool=False) -> bool:
         # define the colours for object annotation
         present_color_table = {
             ClassHierarchyPresentation.ALIVE_CORAL.value: (128, 256, 128,),
@@ -284,23 +286,23 @@ class CoralObjectDetectModel():
         # draw the color legend
         y, ystep = 20, 30
         for coral_class in present_color_table:
-            cv2.rectangle(rotated_reco_image, (10, y), (30, y + 20), present_color_table[coral_class], 1)
-            cv2.putText(rotated_reco_image, f'{coral_class}', (40, y + 10), cv2.FONT_HERSHEY_PLAIN, 0.6, present_color_table[coral_class], 1)
+            cv2.rectangle(rotated_reco_image, (10, y), (30, y + 20), present_color_table[coral_class], line_width)
+            cv2.putText(rotated_reco_image, f'{coral_class}', (40, y + 10), cv2.FONT_HERSHEY_PLAIN, font_size, present_color_table[coral_class], 1)
             y += ystep
 
         # draw the images grid lines
         n_cols, n_rows = 20, 20  # default for debug
-        grid_size_x, grid_size_y = int(tile_size_in_px[0] / n_cols), int(tile_size_in_px[1] / n_rows)
+        grid_size_x, grid_size_y = tile_size_in_px[0] / n_cols, tile_size_in_px[1] / n_rows
         for row in range(n_rows):
             for col in range(n_cols):
                 start_x, start_y = tile_origin_in_px[0] + col * grid_size_x, tile_origin_in_px[1] + row * grid_size_y, 
                 end_x, end_y = start_x + grid_size_x - 1, start_y + grid_size_y - 1
                 start_x, start_y = int(start_x * image_scale), int(start_y * image_scale)
-                end_x, end_y = int(end_x * image_scale), int(end_y * image_scale)
-
-                cv2.rectangle(rotated_reco_image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0, 0, 255), 1)
+                end_x, end_y = int(end_x * image_scale) + 1, int(end_y * image_scale) + 1
+                cv2.rectangle(rotated_reco_image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0, 0, 255), line_width)
+                centre_x, centre_y = int((start_x + end_x)/2), int((start_y + end_y)/2)
                 cv2.putText(rotated_reco_image, f'{col},{row}',
-                            (int(start_x + 15), int(start_y + 15)), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 255), 1)   
+                            (centre_x, centre_y), cv2.FONT_HERSHEY_PLAIN, font_size, (0, 0, 255), int(font_size + 0.5))   
         # iterate through the coral objects and annotate each on the rotated_reco_image
         coral_object:CoralObject 
         for coral_object in self.object_list:
@@ -313,15 +315,19 @@ class CoralObjectDetectModel():
                 bbox_in_tile[1] = int((bbox_in_tile[1] + tile_origin_in_px[1]) * image_scale)
                 bbox_in_tile[2] = int((bbox_in_tile[2] + tile_origin_in_px[0]) * image_scale)
                 bbox_in_tile[3] = int((bbox_in_tile[3] + tile_origin_in_px[1]) * image_scale)
-                cv2.rectangle(rotated_reco_image, (int(bbox_in_tile[0]), int(bbox_in_tile[1])), (int(bbox_in_tile[2]), int(bbox_in_tile[3])), bbox_color, 1)          
+                cv2.rectangle(rotated_reco_image, (int(bbox_in_tile[0]), int(bbox_in_tile[1])), (int(bbox_in_tile[2]), int(bbox_in_tile[3])), bbox_color, line_width)          
                 text_color = coral_color_table.get(coral_object.coral_class, None)
                 if bbox_color is None:
                     continue
+                text_pos = (int(bbox_in_tile[0]) + random.randint(-30, 30), int(bbox_in_tile[3]) + random.randint(15, 30))
                 text_to_draw = coral_object.index_str.replace(' ', '')
-                # text_to_draw = coral_object.present_class
-                cv2.putText(rotated_reco_image, f'{text_to_draw}',
-                            (int(bbox_in_tile[0]) + random.randint(-20, 20), int(bbox_in_tile[1]) - 10 + random.randint(-10, 20)),
-                            cv2.FONT_HERSHEY_PLAIN, 0.6, (0, 0, 0), 1)                     
+                # text_to_draw the text
+                cv2.putText(rotated_reco_image, f'{text_to_draw}', text_pos,
+                            cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.8, 0.6), (0, 0, 0), int(font_size + 0.5))   
+                if draw_coral_class:
+                    cv2.putText(rotated_reco_image, f'{coral_object.coral_class}', (text_pos[0], int(text_pos[1] + font_size * 15)),
+                                cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.6, 0.6), (0, 0, 0), int(font_size + 0.5))                           
+                            
         if not cv2.imwrite(output_image_file, rotated_reco_image):
             return False
             # raise DetectorExceptionCodes(DetectorExceptionCodes.OS_ERROR, f'Failed to save rotated annotated image to {output_image_file}')
@@ -631,7 +637,7 @@ class CoralObjectDetectImageModel():
         self.use_cached_object_detection = kwargs.get(ModelsConfigNames.COD_USE_CACHED_OBJECT_DETECTION.value, False)
         self.debug_blob_images = kwargs.get(ModelsConfigNames.COD_DEBUG_BLOB_IMAGES.value, True)
         # multiple yolo models
-        self.merge_mutli_yolo_models = kwargs.get(ModelsConfigNames.COD_MERGE_MULTI_MODELS, False)
+        self.merge_mutli_yolo_models = kwargs.get(ModelsConfigNames.COD_MERGE_MULTI_MODELS.value, False)
         # extract init model variables
         self.object_class_names:set = set()                   # list of class names of the detection model
         self.metadata_of_blobs = dict()                # metadata of the blobs including detection 
@@ -786,7 +792,6 @@ class CoralObjectDetectImageModel():
                     obj.invalidated = False
                 else:
                     obj.invalidated = True
-                    total_duplicates_removed += 1 
         # combine the valid objects into a list
         combined_object_list = [obj for obj in object_list_1 if not obj.invalidated]
         combined_object_list.extend([obj for obj in object_list_2 if not obj.invalidated])

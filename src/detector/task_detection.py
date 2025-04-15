@@ -22,7 +22,7 @@ from cgras_datatools.lock_tools import synchronized
 from detector.models import logger, ModelsConfigNames, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
 from detector.models.detect import CoralObjectDetectModel, CoralObjectDetectModelHelper, YoloObjectDetector, CoralObject, ClassHierarchyPresentation
 
-from detector.models.reconstruct_best import ImageReconstructModel, ImageReconstructModelHelper
+from detector.models.reconstruct import ImageReconstructModel, ImageReconstructModelHelper
 
 from detector.models.locate_tile import LocateTileModel, LocateTileModelHelper
 from detector.html.lightbox import LightboxHelper
@@ -148,7 +148,7 @@ class DetectionTaskModel():
         # self.params[ModelsConfigNames.YOLO_MODEL_FILE.value] = self.yolo_model_dict['model_file_path']
         # self.params[ModelsConfigNames.COD_BLOB_SIZE.value] = (self.yolo_model_dict['input_image_width'], self.yolo_model_dict['input_image_height'], )
         # self.params[ModelsConfigNames.OBJECT_CLASSES_MAP.value] = self.yolo_model_dict['classes_map']
-
+        self.debug_images_at_original_scale = self.params.get(ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value, False)
         self.params[ModelsConfigNames.TILE_SIZE_IN_MM.value] = self.tile_size
         self.params[ModelsConfigNames.FRAME_SIZE_IN_MM.value] = self.frame_size        
         # add other tile info to the params for metadata yaml file output
@@ -222,7 +222,7 @@ class DetectionTaskModel():
         except Exception as e:
             raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
         # load the cached ImageReconstructModel if exists, or build a new model from captured images
-        reco_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.RECO_MODEL_FILENAME, 'reco_model.yaml'))
+        reco_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.RECO_MODEL_FILENAME.value, 'reco_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached ImageReconstructModel')
             self.reco_model:ImageReconstructModel = ImageReconstructModelHelper.from_yaml_file(reco_model_file)
@@ -241,7 +241,7 @@ class DetectionTaskModel():
     def execute_task_loctile(self):
         self.progress_model.start_stage(ProgressStages.LOCTILE)
         # load the cached LocateTileModel if exists, or build a new model from captured images and the ImageReconstructModel
-        loctile_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.LOCTILE_MODEL_FILENAME, 'loctile_model.yaml'))
+        loctile_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.LOCTILE_MODEL_FILENAME.value, 'loctile_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached LocateTileModelHelper')
             self.loctile_model:LocateTileModel = LocateTileModelHelper.from_yaml_file(loctile_model_file)
@@ -261,7 +261,7 @@ class DetectionTaskModel():
         self.progress_model.start_stage(ProgressStages.OBJECT_DETECT)
         self.progress_model.update_stage_progress(ProgressStages.OBJECT_DETECT, 0, self.image_grid_dim[0] * self.image_grid_dim[1])
         # load the cached CoralObjectDetectionModel if exists, or build a new model from captured images, the ImageReconstructModel, and the yolo model
-        cod_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.COD_MODEL_FILENAME, 'coral_object_detect_model.yaml'))
+        cod_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.COD_MODEL_FILENAME.value, 'coral_object_detect_model.yaml'))
         try:
             logger.info(f'{type(self).__name__}: Attempting to load cached CoralObjectDetectModel')
             self.cod_model = CoralObjectDetectModelHelper.from_yaml_file(cod_model_file)
@@ -296,14 +296,26 @@ class DetectionTaskModel():
             except Exception as e:
                 raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write cod model to yaml file {cod_model_file}', e=e)
         # annotate an image of the reconstructed space with the objects for validation
-        rotated_reco_image_file = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)
-        if os.path.isfile(rotated_reco_image_file):
-            rotated_image = cv2.imread(rotated_reco_image_file)
-            if rotated_image is not None:
-                image_file_name = self.cod_model.ANNOTATED_WHOLE_RECO_IMAGE_FILENAME
-                target_image_file = os.path.join(self.logdata_folder, image_file_name)
-                self.cod_model.annotate_whole_reco_image_with_objects(rotated_image, self.working_scale, self.loctile_model.get_tile_origin_in_image_space(), 
-                                                                      self.loctile_model.get_tile_size_in_image_space(), target_image_file)
+        if self.logdata_folder:
+            rotated_reco_image_file = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)
+            if os.path.isfile(rotated_reco_image_file):
+                rotated_image = cv2.imread(rotated_reco_image_file)
+                if rotated_image is not None:
+                    image_file_name = self.cod_model.ANNOTATED_WHOLE_RECO_IMAGE_FILENAME
+                    target_image_file = os.path.join(self.logdata_folder, image_file_name)
+                    self.cod_model.annotate_whole_reco_image_with_objects(rotated_image, self.working_scale, self.loctile_model.get_tile_origin_in_image_space(), 
+                                                                        self.loctile_model.get_tile_size_in_image_space(), target_image_file)
+        # annotate full scale if the flag debug_images_at_original_scale is True
+        if self.logdata_folder and self.debug_images_at_original_scale:
+            rotated_reco_image_file = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_FULL_SCALE_IMAGE_FILENAME)
+            if os.path.isfile(rotated_reco_image_file):
+                rotated_image = cv2.imread(rotated_reco_image_file)
+                if rotated_image is not None:
+                    image_file_name = self.cod_model.ANNOTATED_WHOLE_RECO_ORIGINAL_SCALE_IMAGE_FILENAME
+                    target_image_file = os.path.join(self.logdata_folder, image_file_name)
+                    self.cod_model.annotate_whole_reco_image_with_objects(rotated_image, 1.0, self.loctile_model.get_tile_origin_in_image_space(), 
+                                                                        self.loctile_model.get_tile_size_in_image_space(), target_image_file,
+                                                                        line_width=4, font_size=5.0, draw_coral_class=True)
         # the end of the object detection task
         self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)        
 

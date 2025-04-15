@@ -124,7 +124,7 @@ class DashApplicationMain():
         # switch off the hot reload
         self.app.enable_dev_tools(dev_tools_hot_reload=CONFIG.get(SystemConfigNames.WEB_DEBUG_HOT_RELOAD, True))
         # start the server
-        self.app.run_server(host=self.DASH_HOST, port=self.DASH_PORT, debug=CONFIG.get(SystemConfigNames.WEB_DEBUG_MODE, True))
+        self.app.run(host=self.DASH_HOST, port=self.DASH_PORT, debug=CONFIG.get(SystemConfigNames.WEB_DEBUG_MODE, True))
 
     def stop(self, *args, **kwargs):
         rospy.loginfo(f'{type(self).__name__}: the dash flask server is being shutdown')

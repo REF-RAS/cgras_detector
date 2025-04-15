@@ -31,13 +31,6 @@ from stitching.blender import Blender
 from detector.models.imaging_tools import ImageMap, CameraTransformTools, test_get_cgras_sample_images_as_list
 from detector.models import ModelsConfigNames, get_logger, DetectorFailed, DetectorExceptionCodes, DetectorAborted, DetectorCancelled
 
-"""
-About the coral detection and visualization system.
-The reconstruction component is currently designed so that if no reliable parameters for image reconstruction are found (such as inadequate matching features), the tile sample is marked rejected. This design is based on the principle that accuracy is absolutely important.  it is better to report an error and give up. Clearly, sometimes if only 1 out of 24 images is problematic, then the whole tile sample would be given up.
-I suggest that we change the design principle to 'extract as much information as possible, even if it means some locations of objects will not be accurate'.
-Some changes will be made to the reconstruction components, including attempt to use different feature extraction schemes (brisk/sift) instead of just one.  Use the homography matrix of the nearby row
-"""
-
 class ImageReconstructModel():
     """ ImageReconstructModel is the wrapper class of the other image reconstruction classes in this module, that provides functions for mapping locations from the space of an individual input image to the 
         space of the reconstructed image. 
@@ -76,8 +69,7 @@ class ImageReconstructModel():
         self.logger.info(f'ImageReconstructModel working_scale: {self.working_scale} (scaling: {self.scaling_factor})')
         self.reco_2d_model = ImageReconstruct2DModel(self.images_2d_list, **self.params)  
         if self.to_cancel:  # stop processing if abort signal is recieved
-            raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')     
-        
+            raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')         
         self.reco_2d_model.build()  
         # retrieve major parameters from the model
         self.ncols, self.nrows = self.reco_2d_model.get_image_map_size()               # the number of rows and columns in the 2d grid of images
@@ -518,26 +510,11 @@ class ImageReconstruct2DModel():
             raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to create folder for log and cache files: {self.logdata_folder}')
 
         # step 1: construct a 1d reconstruction model for each row of images
-        failed_rows = []    # the row index of the rows that failed to build ImageReconstruct1DModel
-        succeeded_rows = []
-        model_build_error:Exception = None
         for row_index in range(self.nrows):
             if self.to_cancel:  # stop processing if abort signal is recieved
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
-            # if an exception occurs in the constructor of ImageReconstruct1DModel, mark the row as fail and continue with the next row
-            try:
-                images_in_row = self.image_map.get_row_images_at_working_scale(y = row_index)
-                reco_row_model = ImageReconstruct1DModel(images_in_row, row_index=row_index, **self.params)
-                succeeded_rows.append(row_index)
-            except Exception as e:
-                self.reco_row_model_list.append(None)       
-                self.confidence_matrix_list.append(None)     
-                self.camera_transforms_row_list.append(None)
-                self.row_reco_image_origin_offsets_list.append(None)
-                failed_rows.append(row_index)
-                model_build_error = e
-                continue
-            
+            images_in_row = self.image_map.get_row_images_at_working_scale(y = row_index)
+            reco_row_model = ImageReconstruct1DModel(images_in_row, row_index=row_index, **self.params)
             # extract the relevant model parameters
             self.reco_row_model_list.append(reco_row_model)       
             self.confidence_matrix_list.append(reco_row_model.get_confidence_matrix())     
@@ -553,21 +530,6 @@ class ImageReconstruct2DModel():
                     image_file = os.path.join(self.logdata_folder, image_file_name)
                     if not cv2.imwrite(image_file, image):
                         raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching output to {image_file}')
-        # step 1A: for each row in that reconsturction was failed, use the nearest row
-        if len(succeeded_rows) == 0:
-            # if no row was successfully reconstructed, throw the error
-            raise model_build_error
-        for failed_row in failed_rows:
-            nearest_row = None
-            for succeded_row in succeeded_rows:
-                if nearest_row is None or (abs(succeded_row - failed_row) < abs(nearest_row - failed_row)):
-                    nearest_row = succeded_row
-            if nearest_row is not None:
-                self.logger.warning(f'{type(self).__name__} Step 1A: Failed to reconstruct row {failed_row}, use the model for row {nearest_row} as the fallback')
-                self.reco_row_model_list[failed_row] = self.reco_row_model_list[nearest_row] 
-                self.confidence_matrix_list[failed_row] = self.confidence_matrix_list[nearest_row]
-                self.camera_transforms_row_list[failed_row] = self.camera_transforms_row_list[nearest_row]
-                self.row_reco_image_origin_offsets_list[failed_row] = self.row_reco_image_origin_offsets_list[nearest_row]
 
         # step 2: generate the reconstructed images row by row at the current scale
         self.logger.info(f'{type(self).__name__} Step 2: generating {self.nrows} reconstructed row images')
@@ -809,6 +771,10 @@ class ImageReconstruct2DModel():
         # generate the whole merged image from the rotated row reconstructed images
         whole_reco_image_original_scale, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(row_recoimages_list, camera_transforms_between_rows, 
                                                                                                                             images_list_scaling_factor)
+        # remove the row reconstruct original scale image to save space
+        for row_reco_image_original_scale in row_recoimages_list:
+            ...
+        # rotate the image back to the default orientation
         whole_reco_image_original_scale = cv2.rotate(whole_reco_image_original_scale, cv2.ROTATE_90_CLOCKWISE)
         if logdata_folder is not None:
             output_file = os.path.join(logdata_folder, ImageReconstructModel.FILENAME_WHOLE_RECO_FULL_SCALE_IMAGE)
@@ -857,142 +823,88 @@ class ImageReconstruct1DModel():
         self.logger = kwargs.get('logger', get_logger())
         logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
-        # input parameters and model variables  
-        self.num_images_in_list = len(images_1d_list)      
-        # feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTOR.value, 'sift')
+        # input parameters and model variables        
+        feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTOR.value, 'sift')
         feature_matching_confidence_threshold = kwargs.get(ModelsConfigNames.RECO_FEATURE_MATCHING_CONFIDENCE_THRESHOLD.value, 1.0)  # for matching features between two images
         if row_index is None:
             image_matching_min_confidence = kwargs.get(ModelsConfigNames.RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE.value, 1.0) 
         else:
             image_matching_min_confidence = kwargs.get(ModelsConfigNames.RECO_IMAGE_MATCHING_MIN_CONFIDENCE.value, 1.0) 
         # get image size
+        self.logger.info(f'{type(self).__name__}: Number of images: {len(images_1d_list)}')
         self.images_as_list = images_1d_list
         # step 1: extract the keyword parameters
         self.image_sizes, self.image_nchannels = ImageReconstruct1DModel.extract_image_sizes_nchannels(images_1d_list)
-        # self.image_size = self.image_sizes[0]
-        self.logger.info(f'{type(self).__name__}: Number of images: {len(images_1d_list)}')
-        # attempt to build model with different combinations of feature extractors
-        model_build_success:bool = False
-        model_build_error:Exception = None
-        # the desperate flag
-        tried_desperate = False
-        # the list of hyper-parameters for search
-        param_search_list = self._generate_parameter_search(image_matching_min_confidence)  
-        while True:
-            if len(param_search_list) == 0:
-                if not tried_desperate:
-                    self.logger.info(f'{type(self).__name__}: All parameter combinations tried but failed, go to desperate mode and use 0.5 of min threshold in the confidence matrix')
-                    param_search_list = self._generate_parameter_search(image_matching_min_confidence * 0.5)  # tried half of the threshold  
-                else:
-                    break
-            search_param = param_search_list.pop(0)
-            feature_detector, matcher_type, matrix_min_conf = search_param
-            self.logger.info(f'{type(self).__name__}: Attempt reconstruction of 1d image using parameters {feature_detector} {matcher_type} conf_matrix_min {matrix_min_conf}')
-            try: 
-                # step 2: extract features
-                self.features_finder = FeatureDetector(detector=feature_detector)  # orb, sift, brisk, akaze
-                self.features = [self.features_finder.detect_features(image) for image in images_1d_list]
-                # step 3: match features between all pairs of images
-                self.features_matcher = FeatureMatcher(matcher_type=matcher_type)  # 'affine' or 'homography', only affine works for tile reconstruction
-                self.matches_raw = self.features_matcher.match_features(self.features)
-                # NOTE: a hack into the stitching module to overcome the bug in working out the sequence by assuming the ordering the image list is true
-                self.matches = []
-                matchinfo:cv2.detail.MatchesInfo
-                for matchinfo in self.matches_raw:
-                    if matchinfo.dst_img_idx == matchinfo.src_img_idx + 1:
-                        self.matches.append(matchinfo)
-                    else:
-                        # fix the next matching image for each image
-                        replace_matchinfo = cv2.detail.MatchesInfo()
-                        replace_matchinfo.src_img_idx = matchinfo.src_img_idx
-                        replace_matchinfo.dst_img_idx = matchinfo.dst_img_idx
-                        replace_matchinfo.confidence = replace_matchinfo.num_inliers = 0
-                        replace_matchinfo.H = matchinfo.H
-                        replace_matchinfo.inliers_mask = matchinfo.inliers_mask
-                        self.matches.append(replace_matchinfo)
-                # evaluate the confidence matrix
-                self.confidence_matrix = self.features_matcher.get_confidence_matrix(self.matches)
-                self.logger.info(f'The confidence matrix:\n{self.confidence_matrix}')
-                min_value = None
-                for image_index in range(0, len(images_1d_list) - 1):
-                    if min_value is None or self.confidence_matrix[image_index, image_index + 1] < min_value:
-                        min_value = self.confidence_matrix[image_index, image_index + 1]
-                if min_value < matrix_min_conf:
-                    raise DetectorFailed(DetectorExceptionCodes.RECO_MATCH_FAILED, f'Cannot merge adjacent images: possibly error in image capturing')
-                # step 4: save the images annotated with matching results to a class variables 
-                self.debug_images_feature_matching = None
-                if debug_feature_matching_images:
-                    self.debug_images_feature_matching = self.features_matcher.draw_matches_matrix(images_1d_list, self.features, self.matches, conf_thresh=feature_matching_confidence_threshold, 
-                                                        inliers=True, matchColor=(0, 255, 0))
-                    # for image_index_1, image_index_2, image in self.debug_images_feature_matching:
-                    #     image_file = os.path.join(logdata_folder, f'feature_match_row_images_{image_index_1}_{row_index}_{image_index_2}_{row_index}.jpg')
-                    #     cv2.imwrite(image_file, image)
-                try:
-                    # step 5: split the features and matches group by the images
-                    subsetter = Subsetter(confidence_threshold=feature_matching_confidence_threshold)
-                    indices = subsetter.get_indices_to_keep(self.features, self.matches)
-                    
-                    subset_images_1d_list = subsetter.subset_list(images_1d_list, indices)
-                    self.features = subsetter.subset_list(self.features, indices)
-                    self.matches = subsetter.subset_matches(self.matches, indices)
-                    # step 6: estimate the camera intrinsics and rotation matrics based on the matched features and their locations
-                    camera_estimator = CameraEstimator()
-                    camera_adjuster = CameraAdjuster(adjuster='ray')  # use 'ray' ('reproj", 'affine', 'no' have been tested and all failed)
-                    wave_corrector = WaveCorrector()        
-                    camera_transforms_row = camera_estimator.estimate(self.features, self.matches)
-                    # self._print_camera_transforms_row(camera_transforms_row)
-                    camera_transforms_row = camera_adjuster.adjust(self.features, self.matches, camera_transforms_row)
-                    self.camera_transforms_row = wave_corrector.correct(camera_transforms_row)
-                    # step 7: compute roi for each image and normalize the locations 
-                    self.roi_corners, self.roi_sizes = ImageReconstruct1DModel._compute_warp_rois(self.image_sizes, self.camera_transforms_row, scale = 1)
-                    # step 8: check if the warp_rois were computed for all images in the row
-                    self.logger.info(f'ROI Corners: {self.roi_corners}')
-                    self.logger.info(f'ROI Sizes: {self.roi_sizes}')
-                    if len(self.roi_corners) != self.num_images_in_list:
-                        raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot find warp rois for all images in the row') 
-                    if not self._is_roi_sizes_reasonable(subset_images_1d_list, self.roi_sizes):
-                        raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'The sizes of rois are not regular') 
-                    self.reco_image_origin_offset = self._find_reco_image_origin_offset(self.roi_corners)
-                    self.logger.info(f'ImageID reco_iamge_origin_offset: {self.reco_image_origin_offset}')
-                    self.roi_corners = self._normalize_corners(self.roi_corners, self.reco_image_origin_offset)
-                    # step 9: estimate roi of the reconstructed image
-                    self.estimated_reco_image_size = self._estimate_model_outer_roi_size(self.roi_corners, self.roi_sizes)
-                    self.logger.info(f'Estimated reconstructed image size: {self.estimated_reco_image_size} and\ncorners: {self.roi_corners}')
-                    model_build_success = True
-                    break
-                except Exception as e:
-                    self.logger.info(e)
-                    raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot combine image as a grid: possibly wayward homography matrices')
-            except DetectorFailed as e:
-                model_build_error = e            
-            except Exception as e:
-                self.logger.error(traceback.format_exc())
-                model_build_error = e
-        # raise the Exception if the model build was not successful 
-        if not model_build_success and model_build_error is not None:
-            raise model_build_error
+        self.image_size = self.image_sizes[0]
+        # step 2: extract features
+        self.features_finder = FeatureDetector(detector=feature_detector)  # orb, sift, brisk, akaze
+        self.features = [self.features_finder.detect_features(image) for image in images_1d_list]
+        # step 3: match features between all pairs of images
+        self.features_matcher = FeatureMatcher(matcher_type='affine')  # 'affine' or 'homography', only affine works for tile reconstruction
+        self.matches_raw = self.features_matcher.match_features(self.features)
+        # NOTE: a hack into the stitching module to overcome the bug in working out the sequence by assuming the ordering the image list is true
+        self.matches = []
+        matchinfo:cv2.detail.MatchesInfo
+        for matchinfo in self.matches_raw:
+            if matchinfo.dst_img_idx == matchinfo.src_img_idx + 1:
+                self.matches.append(matchinfo)
+            else:
+                replace_matchinfo = cv2.detail.MatchesInfo()
+                replace_matchinfo.src_img_idx = matchinfo.src_img_idx
+                replace_matchinfo.dst_img_idx = matchinfo.dst_img_idx
+                replace_matchinfo.confidence = replace_matchinfo.num_inliers = 0
+                replace_matchinfo.H = matchinfo.H
+                replace_matchinfo.inliers_mask = matchinfo.inliers_mask
+                self.matches.append(replace_matchinfo)
+        # evaluate the confidence matrix
+        self.confidence_matrix = self.features_matcher.get_confidence_matrix(self.matches)
+        self.logger.info(f'The confidence matrix:\n{self.confidence_matrix}')
+        for image_index in range(0, len(images_1d_list) - 1):
+            if self.confidence_matrix[image_index, image_index + 1] < image_matching_min_confidence:
+                raise DetectorFailed(DetectorExceptionCodes.RECO_MATCH_FAILED, f'Cannot merge adjacent images: possibly error in image capturing')
+        # step 4: save the images annotated with matching results to a class variables 
+        self.debug_images_feature_matching = None
+        if debug_feature_matching_images:
+            self.debug_images_feature_matching = self.features_matcher.draw_matches_matrix(images_1d_list, self.features, self.matches, conf_thresh=feature_matching_confidence_threshold, 
+                                                   inliers=True, matchColor=(0, 255, 0))
+            # for image_index_1, image_index_2, image in self.debug_images_feature_matching:
+            #     image_file = os.path.join(logdata_folder, f'feature_match_row_images_{image_index_1}_{row_index}_{image_index_2}_{row_index}.jpg')
+            #     cv2.imwrite(image_file, image)
         
-    def _generate_parameter_search(self, conf_matrix_min_confidence):
-        # setup the list of parameters to search 
-        try_feature_detectors = ['brisk', 'sift']
-        try_matcher_types = ['affine']
-        try_min_confidence = [conf_matrix_min_confidence]
-        param_search_list = []
-        for fd in try_feature_detectors:
-            for mt in try_matcher_types:
-                for mc in try_min_confidence:
-                    param_search_list.append((fd, mt, mc,))
-        return param_search_list
+        try:
+            # step 5: split the features and matches group by the images
+            subsetter = Subsetter(confidence_threshold=feature_matching_confidence_threshold)
+            indices = subsetter.get_indices_to_keep(self.features, self.matches)
+            
+            images_1d_list = subsetter.subset_list(images_1d_list, indices)
+            self.features = subsetter.subset_list(self.features, indices)
+            self.matches = subsetter.subset_matches(self.matches, indices)
+            # step 6: estimate the camera intrinsics and rotation matrics based on the matched features and their locations
+            camera_estimator = CameraEstimator()
+            camera_adjuster = CameraAdjuster(adjuster='ray')  # use 'ray' ('reproj", 'affine', 'no' have been tested and all failed)
+            wave_corrector = WaveCorrector()        
+            camera_transforms_row = camera_estimator.estimate(self.features, self.matches)
+            # self._print_camera_transforms_row(camera_transforms_row)
+            camera_transforms_row = camera_adjuster.adjust(self.features, self.matches, camera_transforms_row)
+            # NOTE: Test setting R diagonal cells to 1.0
+            # if row_index is not None:
+            #     for camera_transform in camera_transforms_row:
+            #         camera_transform.R[0][0] = camera_transform.R[1][1] = camera_transform.R[2][2] = 1.0
 
-    def _is_roi_sizes_reasonable(self, images_1d_list:list, roi_sizes:list, tolerance_percent:float=0.1):
-        if len(images_1d_list) != len(roi_sizes):
-            self.logger.info(f'_is_roi_sizes_reasonable: input parameters are of different lengths')
-            return False
-        for image, roi in zip(images_1d_list, roi_sizes):
-            image_size = image.shape[:2][::-1]
-            if abs(image_size[0] - roi[0]) / image_size[0] > tolerance_percent or abs(image_size[1] - roi[1]) / image_size[1] > tolerance_percent:
-                return False
-        return True
+            self.camera_transforms_row = wave_corrector.correct(camera_transforms_row)
+            # step 7: compute roi for each image and normalize the locations 
+            self.roi_corners, self.roi_sizes = ImageReconstruct1DModel._compute_warp_rois(self.image_sizes, self.camera_transforms_row, scale = 1)
+            self.logger.info(f'ROI Corners: {self.roi_corners}')
+            self.logger.info(f'ROI Sizes: {self.roi_sizes}')
+            self.reco_image_origin_offset = self._find_reco_image_origin_offset(self.roi_corners)
+            self.logger.info(f'ImageID reco_iamge_origin_offset: {self.reco_image_origin_offset}')
+            self.roi_corners = self._normalize_corners(self.roi_corners, self.reco_image_origin_offset)
+            # step 8: estimate roi of the reconstructed image
+            self.estimated_reco_image_size = self._estimate_model_outer_roi_size(self.roi_corners, self.roi_sizes)
+            self.logger.info(f'Estimated reconstructed image size: {self.estimated_reco_image_size} and\ncorners: {self.roi_corners}')
+        except Exception as e:
+            self.logger.error(traceback.format_exc())
+            raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot combine image as a grid: possibly wayward homography matrices')
 
     @classmethod
     def _print_camera_transforms_row(cls, camera_transforms_row, logger):

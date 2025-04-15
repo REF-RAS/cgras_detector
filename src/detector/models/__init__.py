@@ -15,5 +15,6 @@ from enum import Enum
 from cgras_datatools.logging_tools import get_logger
 from .models_config import ModelsConfigNames
 from .detector_error import DetectorException, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
+from .reco_error_correct import RecoErrorCorrection
 
 logger = get_logger()
