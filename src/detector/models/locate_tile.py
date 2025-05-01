@@ -83,6 +83,7 @@ class LocateTileModel():
         self.working_scale = kwargs.get(ModelsConfigNames.LOCTILE_WORKING_SCALE.value, 0.1)
         self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 21)
         self.matching_score_min = kwargs.get(ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value, 0.5)
+        self.rotate_angle_max = kwargs.get(ModelsConfigNames.LOCTILE_ROTATE_ANGLE_MAX, 3.0)
         # important model variables
         self.corners_in_reco_space = {}
         self.tile_offset_in_px = self.tile_size_in_px = None
@@ -120,6 +121,7 @@ class LocateTileModel():
         detected_frame_size_y = int(math.dist(self.corners_in_reco_space[WhichCorner.TOP_LEFT], self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT]))
         self.detected_frame_size_in_px = (detected_frame_size_x, detected_frame_size_y,)
         logger.info(f'LocateTileModel estimated detected_frame_size: {self.detected_frame_size_in_px}')
+        
         # compute affine transformation (this is obsolete, only rotation is assumed)
         # self.affine_transform_matrix = cv2.getAffineTransform(input_pts, output_pts)
         # compute the origin (this is obsolete because the transformed/rotated corners do not give good estimation of the original)
@@ -129,24 +131,37 @@ class LocateTileModel():
         
         # the affirm transform matrix is defined in the space of the tile holder
         # the reconstructed image size is used as the reference of the origin, so if the affine transform matrix is used to operate in the frame/tile space, offset the result is required
-        self.affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, self.image_origin_offset)
-        logger.info(f'AffineTransform matrix: {self.affine_transform_matrix} rotation origin offset {self.image_origin_offset}')  
+        self.affine_transform_matrix, rotate_angle = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, self.image_origin_offset)
+        logger.info(f'AffineTransform matrix: {self.affine_transform_matrix} rotation origin offset {self.image_origin_offset} rotation angle {rotate_angle} (degrees)')
+        if abs(rotate_angle) > self.rotate_angle_max:
+            raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'Angle of rotation ({rotate_angle} degrees) outside of the valid range (+/- {self.rotate_angle_max} degrees)')
 
         frame_offset = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT], adjust_offset=False) 
         frame_topright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_RIGHT], adjust_offset=False) 
         frame_bottomleft_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT], adjust_offset=False) 
         frame_bottomright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT], adjust_offset=False) 
         # update the detected frame_size in px
-        detected_frame_size_in_px = (frame_topright_corrected[0] - frame_offset[0], frame_bottomleft_corrected[1] - frame_offset[1],)
+        # detected_frame_size_in_px = (frame_topright_corrected[0] - frame_offset[0], frame_bottomleft_corrected[1] - frame_offset[1],)
+        self.detected_frame_size_in_px = (frame_topright_corrected[0] - frame_offset[0], frame_bottomleft_corrected[1] - frame_offset[1],)        
+        # test if the ratio of the length and width is not similar to the given frame dimension
+        detected_frame_size_ratio = self.detected_frame_size_in_px[0] / self.detected_frame_size_in_px[1]
+        frame_size_in_mm_ratio = self.frame_size_in_mm[0] / self.frame_size_in_mm[1]  
+        rel_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_REL, 0.1)
+        abs_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_ABS, 0.1)
+        if not math.isclose(detected_frame_size_ratio, frame_size_in_mm_ratio, rel_tol=rel_tol, abs_tol=abs_tol):
+            raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'The aspect ratio of the detected frame ({self.detected_frame_size_in_px} {detected_frame_size_ratio}) does not match the given frame size in mm ({frame_size_in_mm_ratio})')
+
         # compute the detected tile size in pixels from the tile size and frame size
-        approx_pixel_per_mm_x = detected_frame_size_x / self.frame_size_in_mm[0]
-        approx_pixel_per_mm_y = detected_frame_size_y / self.frame_size_in_mm[1]        
+        # approx_pixel_per_mm_x = detected_frame_size_x / self.frame_size_in_mm[0]
+        # approx_pixel_per_mm_y = detected_frame_size_y / self.frame_size_in_mm[1]  
+        approx_pixel_per_mm_x = self.detected_frame_size_in_px[0] / self.frame_size_in_mm[0]
+        approx_pixel_per_mm_y = self.detected_frame_size_in_px[1] / self.frame_size_in_mm[1]                
         approx_pixel_per_mm = (approx_pixel_per_mm_x + approx_pixel_per_mm_y) / 2
         
         logger.info(f'LocateTile frame size in mm and detected in px: {self.frame_size_in_mm} {detected_frame_size_x, detected_frame_size_y}')
         logger.info(f'LocateTile approx_pixel_per_mm: {approx_pixel_per_mm_x:.2f} {approx_pixel_per_mm_y:.2f} (frame and tile size in mm: {self.frame_size_in_mm} {self.tile_size_in_mm})')
         logger.info(f'LocateTile frame_offset: {frame_offset}')
-        logger.info(f'LocateTile frame_size: {detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm_x:.2f} {approx_pixel_per_mm_y:.2f})')
+        logger.info(f'LocateTile frame_size: {self.detected_frame_size_in_px} (pixel per mm: {approx_pixel_per_mm_x:.2f} {approx_pixel_per_mm_y:.2f})')
         
         # compute tile offset, assuming that the frame holder width is the same on all sides
         holder_width_in_pixel = ((self.frame_size_in_mm[0] - self.tile_size_in_mm[0]) / 2) * approx_pixel_per_mm_x, ((self.frame_size_in_mm[1] - self.tile_size_in_mm[1]) / 2) * approx_pixel_per_mm_y
@@ -155,7 +170,7 @@ class LocateTileModel():
             holder_width_in_pixel = self.params['test_only_holder_width_in_px']  # (x, y)
         # compute the tile offset using the frame offset and the holder width
         self.tile_offset_in_px = (frame_offset[0] + holder_width_in_pixel[0], frame_offset[1] + holder_width_in_pixel[1],)
-        self.tile_size_in_px = (int(detected_frame_size_in_px[0] - 2 * holder_width_in_pixel[0]), int(detected_frame_size_in_px[1] - 2 * holder_width_in_pixel[1], ))
+        self.tile_size_in_px = (int(self.detected_frame_size_in_px[0] - 2 * holder_width_in_pixel[0]), int(self.detected_frame_size_in_px[1] - 2 * holder_width_in_pixel[1], ))
         logger.info(f'LocateTile tile_offset: {self.tile_offset_in_px}')
         logger.info(f'LocateTile tile_size in pixels: {self.tile_size_in_px} (holder_width in pixels: {holder_width_in_pixel})')   
 
@@ -225,7 +240,7 @@ class LocateTileModel():
         # test the affine transform matrix
         result:np.ndarray = np.matmul(affine_transform_matrix, np.float32([origin_offset[0], origin_offset[1], 1]).T).astype(np.int32)
         logger.info(f'_estimate_affine_transform test (origin {origin_offset}): {result}')
-        return affine_transform_matrix
+        return affine_transform_matrix, rotate_angle
 
     @classmethod
     def _compute_affine_transform(cls, corners:dict, origin_offset:tuple):    
@@ -290,8 +305,8 @@ class LocateTileModel():
             if reco_whole_image is None:
                 return    
             # compute the affine tranform matrix based on the detected corners
-            affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
-            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.05), int(reco_whole_image.shape[0] * 1.05)))
+            affine_transform_matrix, rotate_angle = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
+            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.1), int(reco_whole_image.shape[0] * 1.1)))
             # draw frame bounds
             pts = np.array([self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT], adjust_offset=False),
                             self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_RIGHT], adjust_offset=False),
@@ -321,8 +336,9 @@ class LocateTileModel():
             if reco_whole_image is None:
                 return    
             # compute the affine tranform matrix based on the detected corners
-            affine_transform_matrix = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
-            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.05), int(reco_whole_image.shape[0] * 1.05)))
+            affine_transform_matrix, rotate_angle = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, (reco_whole_image.shape[0] // 2, reco_whole_image.shape[1] // 2,))
+            
+            rotated_whole_image = cv2.warpAffine(reco_whole_image, affine_transform_matrix, (int(reco_whole_image.shape[1] * 1.1), int(reco_whole_image.shape[0] * 1.1)))
             rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_FULL_SCALE_IMAGE_FILENAME)
             cv2.imwrite(rotated_reco_whole_image_filepath, rotated_whole_image)
             return rotated_reco_whole_image_filepath
@@ -339,6 +355,7 @@ class LocateTileModel():
 
     @classmethod
     def _generate_template(cls, type:WhichCorner, width:int, height:int):
+        
         blank_image = np.full((height, width), 255, dtype=np.uint8)
         if type == WhichCorner.TOP_LEFT:
             blank_image[int(height // 2):, int(width // 2):] = 0

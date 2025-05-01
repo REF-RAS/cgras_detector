@@ -45,6 +45,9 @@ class ModelsConfigNames(Enum):
     LOCTILE_TEMPLATE_SIZE = 'loctile_template_size'
     LOCTILE_MATCHING_SCORE_MIN = 'loctile_matching_score_min'
     LOCTILE_DEBUG_IMAGES = 'loctile_debug_images'
+    LOCTILE_ROTATE_ANGLE_MAX = 'loctile_rotate_angle_max'
+    LOCTILE_ASPECT_RATIO_DIFF_MAX_REL = 'loctile_aspect_ratio_diff_max_rel'
+    LOCTILE_ASPECT_RATIO_DIFF_MAX_ABS = 'loctile_aspect_ratio_diff_max_abs'
     
     COD_MODEL_FILENAME = 'cod_model_filename'
     COD_DEBUG_BLOB_IMAGES = 'cod_debug_blob_images'

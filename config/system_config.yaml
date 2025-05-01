@@ -41,10 +41,13 @@ cgras_detector:
   reco_feature_detector: brisk               # sift, orb, brisk, akaze (this parameter is only used by reconstruct and not reconstruct_best)
   reco_feature_matching_confidence_threshold: 1.2
   reco_image_matching_min_confidence: 1.0   # between rows matching confidence
-  reco_image2d_matching_min_confidence: 1.0 # row matching confidence
+  reco_image2d_matching_min_confidence: 0.8 # row matching confidence
   reco_error_correction: False
   tile_size_in_mm: [294, 294]  # default value, only if not defined in the metadata of the tile_sample 
   frame_size_in_mm: [280, 280] # default value, only if not defined in the metadata of the tile_sample 
+  loctile_rotate_angle_max: 3.0   # degrees
+  loctile_aspect_ratio_diff_max_rel: 0.05   # 0.05 relative difference
+  loctile_aspect_ratio_diff_max_abs: 0.05   # 0.05 absolute difference
 
   cod_model_filename: coral_object_detect_model.yaml 
   cod_debug_blob_images: True

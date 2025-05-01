@@ -898,6 +898,7 @@ class ImageReconstruct1DModel():
                 if not tried_desperate:
                     self.logger.info(f'{type(self).__name__}: All parameter combinations tried but failed, go to desperate mode and use 0.5 of min threshold in the confidence matrix')
                     param_search_list = self._generate_parameter_search(image_matching_min_confidence * 0.5)  # tried half of the threshold  
+                    tried_desperate = True
                 else:
                     break
             search_param = param_search_list.pop(0)
@@ -989,7 +990,7 @@ class ImageReconstruct1DModel():
         
     def _generate_parameter_search(self, conf_matrix_min_confidence):
         # setup the list of parameters to search 
-        try_feature_detectors = ['brisk', 'sift']
+        try_feature_detectors = ['brisk', 'sift', 'orb']
         try_matcher_types = ['affine']
         try_min_confidence = [conf_matrix_min_confidence]
         param_search_list = []

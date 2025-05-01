@@ -1,0 +1,87 @@
+tile_id: 2024Oct-MIS5T09
+species: Montipora aequituberculata
+settle_time: 2024-10-30
+spawning_time: 2024-10-15
+season: 2024Oct
+num_tabs: [20, 20]
+tile_size: [280, 280]
+frame_size: [294, 294]
+batch_id: CG1-202412112300
+batch_time: 2024-12-11 23:00:00
+importer_id: YAML
+operator: luia2
+image_files_parent_folder: /home/qcr/cgras_data/Source/2024/MIS5_T09_241211
+images:
+  - x: 0
+    y: 0
+    file: CGRAS_Amag_241211_T09_00.jpg
+  - x: 1
+    y: 0
+    file: CGRAS_Amag_241211_T09_01.jpg
+  - x: 3
+    y: 0
+    file: CGRAS_Amag_241211_T09_02.jpg
+  - x: 0
+    y: 1
+    file: CGRAS_Amag_241211_T09_03.jpg
+  - x: 2
+    y: 0
+    file: CGRAS_Amag_241211_T09_04.jpg
+  - x: 1
+    y: 1
+    file: CGRAS_Amag_241211_T09_05.jpg
+  - x: 2
+    y: 1
+    file: CGRAS_Amag_241211_T09_06.jpg
+  - x: 3
+    y: 1
+    file: CGRAS_Amag_241211_T09_07.jpg
+  - x: 0
+    y: 2
+    file: CGRAS_Amag_241211_T09_08.jpg
+  - x: 1
+    y: 2
+    file: CGRAS_Amag_241211_T09_09.jpg
+  - x: 2
+    y: 2
+    file: CGRAS_Amag_241211_T09_10.jpg
+  - x: 3
+    y: 2
+    file: CGRAS_Amag_241211_T09_11.jpg
+  - x: 0
+    y: 3
+    file: CGRAS_Amag_241211_T09_12.jpg
+  - x: 1
+    y: 3
+    file: CGRAS_Amag_241211_T09_13.jpg
+  - x: 2
+    y: 3
+    file: CGRAS_Amag_241211_T09_14.jpg
+  - x: 3
+    y: 3
+    file: CGRAS_Amag_241211_T09_15.jpg
+  - x: 0
+    y: 4
+    file: CGRAS_Amag_241211_T09_16.jpg
+  - x: 1
+    y: 4
+    file: CGRAS_Amag_241211_T09_17.jpg
+  - x: 2
+    y: 4
+    file: CGRAS_Amag_241211_T09_18.jpg
+  - x: 3
+    y: 4
+    file: CGRAS_Amag_241211_T09_19.jpg
+  - x: 0
+    y: 5
+    file: CGRAS_Amag_241211_T09_20.jpg
+  - x: 1
+    y: 5
+    file: CGRAS_Amag_241211_T09_21.jpg
+  - x: 2
+    y: 5
+    file: CGRAS_Amag_241211_T09_22.jpg
+  - x: 3
+    y: 5
+    file: CGRAS_Amag_241211_T09_23.jpg
+
