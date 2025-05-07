@@ -72,7 +72,7 @@ class ImageReconstructModel():
         self.params['scaling_factor'] = self.scaling_factor
         # load the error correction model
         self.apply_error_correction = kwargs.get(ModelsConfigNames.RECO_ERROR_CORRECTION.value, False)
-        self.logger.warning(f'Apply Error Correction: {self.apply_error_correction}')
+        # self.logger.warning(f'Apply Error Correction: {self.apply_error_correction}')
         if self.apply_error_correction:
             self.error_correction_model = RecoErrorCorrection()
 
@@ -121,8 +121,8 @@ class ImageReconstructModel():
         # create warpers for location mapping
         self.warper = []
         for row_index in range(self.nrows):
-            self.warper.append(cv2.PyRotationWarper("spherical", self.get_row_median_focal(row_index)))
-        self.warper_between_rows = cv2.PyRotationWarper("spherical", self.get_between_rows_median_focal())  
+            self.warper.append(cv2.PyRotationWarper('spherical', self.get_row_median_focal(row_index)))
+        self.warper_between_rows = cv2.PyRotationWarper('spherical', self.get_between_rows_median_focal())  
 
     def cancel_build(self):
         """ abort the current reconstruction process """
@@ -593,7 +593,7 @@ class ImageReconstruct2DModel():
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             images_in_row = self.image_map.get_row_images_at_working_scale(y = row_index)
             output_file = os.path.join(self.logdata_folder, f'row_reco_image_{row_index}.jpg') if self.logdata_folder is not None else None
-            row_recoimage, warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(images_in_row, self.camera_transforms_row_list[row_index], 
+            row_recoimage, normalized_warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(images_in_row, self.camera_transforms_row_list[row_index], 
                                                                                                              images_list_scaling_factor=1.0, output_file=output_file)
             row_recoimages_list.append(row_recoimage)
             if output_file is not None:  # save the images only if output_folder is provided
@@ -601,18 +601,18 @@ class ImageReconstruct2DModel():
                 if not cv2.imwrite(output_file, row_recoimage):
                     raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write row reconstructed image to {output_file}')
 
-        # step 2A: if there is only one row, skip the rest
+        # step 3: if there is only one row, skip the rest
         if len(row_recoimages_list) == 1:
             whole_reco_image = row_recoimages_list[0]
             self.camera_transforms_between_rows = self.reco_row_model_list[0].get_camera_transforms_row()
             self.whole_reco_image_origin_offset = self.reco_row_model_list[0].get_reco_image_origin_offset()
         else:
-            # step 3: prepare between rows image stitching by rotating each row reco images counterclockwise 
-            self.logger.info(f'{type(self).__name__} Step 3: Rotate counter-clockwise the {self.nrows} reconstructed row images')
+            # step 4: prepare between rows image stitching by rotating each row reco images counterclockwise 
+            self.logger.info(f'{type(self).__name__} Step 4: Rotate counter-clockwise the {self.nrows} reconstructed row images')
             row_recoimages_rotated_list = self._rotate_cw90_images_list(row_recoimages_list, self.logdata_folder)
             
             # step 4: build the between rows reconstruction model
-            self.logger.info(f'{type(self).__name__} Step 4: Build the top-level 1d reconstruction model from the {self.nrows} rotated images')
+            self.logger.info(f'{type(self).__name__} Step 5: Build the top-level 1d reconstruction model from the {self.nrows} rotated images')
             reco_whole_model = ImageReconstruct1DModel(row_recoimages_rotated_list, row_index=None, **self.params)
             # save the debug matching images if the flag is on
             if self.debug_feature_matching_images:        
@@ -632,7 +632,7 @@ class ImageReconstruct2DModel():
             self.whole_reco_image_origin_offset = reco_whole_model.get_reco_image_origin_offset()
             if self.to_cancel:  # stop processing if abort signal is recieved
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
-            whole_reco_image, warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(row_recoimages_rotated_list, self.camera_transforms_between_rows, 
+            whole_reco_image, normalized_warped_roi_corners, warped_roi_sizes = self._generate_1d_recoimage_with_scaling(row_recoimages_rotated_list, self.camera_transforms_between_rows, 
                                                                                                                 images_list_scaling_factor=1.0)
             # write the whole reconstructed image (at working scale) to the logdata folder
             whole_reco_image = cv2.rotate(whole_reco_image, cv2.ROTATE_90_CLOCKWISE)
@@ -650,9 +650,8 @@ class ImageReconstruct2DModel():
         # step 5: generate the debug images in original scale
         if self.logdata_folder and self.debug_images_at_original_scale:
             images_list_scaling_factor = 1 / self.working_scale
-            whole_reco_image_original_scale = self._generate_whole_recoimage_with_scaling(self.images_2d_list, self.camera_transforms_row_list, self.camera_transforms_between_rows,
+            self._generate_whole_recoimage_with_scaling(self.images_2d_list, self.camera_transforms_row_list, self.camera_transforms_between_rows,
                                                                                           images_list_scaling_factor, logdata_folder=self.logdata_folder)
-            
     def cancel_build(self):
         """ abort the current reconstruction process """
         self.logger.warning(f'ImageReconstruct2DModel: received ABORT')
@@ -665,14 +664,6 @@ class ImageReconstruct2DModel():
         :rtype: tuple
         """
         return self.image_map.get_image_map_size()
-    
-    # def get_original_image_size(self) -> tuple:
-    #     """ This class assumes all images are of the same size
-
-    #     :return: The size (xdim, ydim) of the original images (before reduced to working scale)
-    #     :rtype: tuple
-    #     """
-    #     return self.image_map.get_image_size()
     
     def get_working_image_size(self) -> tuple:
         """ 
@@ -810,7 +801,7 @@ class ImageReconstruct2DModel():
             images_list, camera_tranforms_row = images_2d_list[row_index], camera_transforms_row_list[row_index]
             images_list = self._load_images(images_list)
             
-            row_reco_image_original_scale, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(images_list, camera_tranforms_row, 
+            row_reco_image_original_scale, normalized_warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(images_list, camera_tranforms_row, 
                                                                                                                                 images_list_scaling_factor)
             if logdata_folder is not None:
                 output_file = os.path.join(logdata_folder, f'row_reco_image_{row_index}_original_scale.jpg')
@@ -822,7 +813,7 @@ class ImageReconstruct2DModel():
             row_recoimages_list.append(row_reco_image_original_scale)
             
         # generate the whole merged image from the rotated row reconstructed images
-        whole_reco_image_original_scale, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(row_recoimages_list, camera_transforms_between_rows, 
+        whole_reco_image_original_scale, normalized_warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(row_recoimages_list, camera_transforms_between_rows, 
                                                                                                                             images_list_scaling_factor)
         whole_reco_image_original_scale = cv2.rotate(whole_reco_image_original_scale, cv2.ROTATE_90_CLOCKWISE)
         if logdata_folder is not None:
@@ -847,12 +838,12 @@ class ImageReconstruct2DModel():
         :return: a tuple of (the row reconstructed image, the list of corners of the transformed source images, the list of sizes of the transformed source images)  
         :rtype: tuple
         """
-        row_reco_image, warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(images_list, camera_tranforms_row, images_list_scaling_factor)
+        row_reco_image, normalized_warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel.generate_reco_image(images_list, camera_tranforms_row, images_list_scaling_factor)
         if output_file is not None:  # save the images only if output_folder is provided
             self.logger.info(f'{type(self).__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
             if not cv2.imwrite(output_file, row_reco_image):
                 raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write  row reconstructed image at scale to {output_file}')
-        return row_reco_image, warped_roi_corners, warped_roi_sizes 
+        return row_reco_image, normalized_warped_roi_corners, warped_roi_sizes 
  
             
 class ImageReconstruct1DModel():
@@ -874,12 +865,14 @@ class ImageReconstruct1DModel():
         debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
         # input parameters and model variables  
         self.num_images_in_list = len(images_1d_list)      
-        # feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTOR.value, 'sift')
         feature_matching_confidence_threshold = kwargs.get(ModelsConfigNames.RECO_FEATURE_MATCHING_CONFIDENCE_THRESHOLD.value, 1.0)  # for matching features between two images
         if row_index is None:
             image_matching_min_confidence = kwargs.get(ModelsConfigNames.RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE.value, 1.0) 
         else:
             image_matching_min_confidence = kwargs.get(ModelsConfigNames.RECO_IMAGE_MATCHING_MIN_CONFIDENCE.value, 1.0) 
+        # input parameters: reconstruction error checking
+        aspect_ratio_roi_error_rel = kwargs.get(ModelsConfigNames.RECO_ASPECT_RATIO_ROI_ERROR_REL, 0.1)
+        misplaced_roi_error_rel = kwargs.get(ModelsConfigNames.RECO_MISPLACED_ROI_ERROR_REL, 0.1)
         # get image size
         self.images_as_list = images_1d_list
         # step 1: extract the keyword parameters
@@ -959,15 +952,23 @@ class ImageReconstruct1DModel():
                     # self._print_camera_transforms_row(camera_transforms_row)
                     camera_transforms_row = camera_adjuster.adjust(self.features, self.matches, camera_transforms_row)
                     self.camera_transforms_row = wave_corrector.correct(camera_transforms_row)
+
                     # step 7: compute roi for each image and normalize the locations 
-                    self.roi_corners, self.roi_sizes = ImageReconstruct1DModel._compute_warp_rois(self.image_sizes, self.camera_transforms_row, scale = 1)
+                    self.roi_corners, self.normalized_roi_corners, self.roi_sizes = ImageReconstruct1DModel._compute_warp_rois(self.image_sizes, self.camera_transforms_row, scale = 1)
+
                     # step 8: check if the warp_rois were computed for all images in the row
                     self.logger.info(f'ROI Corners: {self.roi_corners}')
+                    self.logger.info(f'Normalized ROI Corners: {self.normalized_roi_corners}')
                     self.logger.info(f'ROI Sizes: {self.roi_sizes}')
+                    # error checking 1: warp rois cannot be found for one or more images
                     if len(self.roi_corners) != self.num_images_in_list:
                         raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot find warp rois for all images in the row') 
-                    if not self._is_roi_sizes_reasonable(subset_images_1d_list, self.roi_sizes):
-                        raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'The sizes of rois are not regular') 
+                    # error checking 2: roi size is not reasonable for one or more images
+                    if not self._is_aspect_ratio_roi_sizes_reasonable(subset_images_1d_list, self.roi_sizes, tol_rel=aspect_ratio_roi_error_rel):
+                        raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'The aspect ratio of one or more rois is different from the original image (max rel error: {aspect_ratio_roi_error_rel})') 
+                    # error checking 3:
+                    if not self._is_roi_corners_reasonable(self.roi_corners, self.roi_sizes):
+                        raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'_is_roi_corners_reasonable: roi corners not regularly placed') 
                     self.reco_image_origin_offset = self._find_reco_image_origin_offset(self.roi_corners)
                     self.logger.info(f'ImageID reco_iamge_origin_offset: {self.reco_image_origin_offset}')
                     self.roi_corners = self._normalize_corners(self.roi_corners, self.reco_image_origin_offset)
@@ -990,7 +991,7 @@ class ImageReconstruct1DModel():
         
     def _generate_parameter_search(self, conf_matrix_min_confidence):
         # setup the list of parameters to search 
-        try_feature_detectors = ['brisk', 'sift', 'orb']
+        try_feature_detectors = ['brisk', 'sift']
         try_matcher_types = ['affine']
         try_min_confidence = [conf_matrix_min_confidence]
         param_search_list = []
@@ -1000,13 +1001,30 @@ class ImageReconstruct1DModel():
                     param_search_list.append((fd, mt, mc,))
         return param_search_list
 
-    def _is_roi_sizes_reasonable(self, images_1d_list:list, roi_sizes:list, tolerance_percent:float=0.1):
+    def _is_aspect_ratio_roi_sizes_reasonable(self, images_1d_list:list, roi_sizes:list, tol_rel:float=0.1) -> bool:
         if len(images_1d_list) != len(roi_sizes):
             self.logger.info(f'_is_roi_sizes_reasonable: input parameters are of different lengths')
             return False
         for image, roi in zip(images_1d_list, roi_sizes):
             image_size = image.shape[:2][::-1]
-            if abs(image_size[0] - roi[0]) / image_size[0] > tolerance_percent or abs(image_size[1] - roi[1]) / image_size[1] > tolerance_percent:
+            if abs(image_size[0] - roi[0]) / image_size[0] > tol_rel or abs(image_size[1] - roi[1]) / image_size[1] > tol_rel:
+                return False
+        return True
+    
+    def _is_roi_corners_reasonable(self, roi_corners:list, roi_sizes:list, corner_tol_rel:float=0.1) -> bool:
+        # evaluate roi corners
+        x_diff_list = []
+        y_diff_list = []
+        # evaluate the median
+        for index in range(1, len(roi_corners)):
+            x_diff_list.append(roi_corners[index][0] - roi_corners[index - 1][0])
+            y_diff_list.append(roi_corners[index][1] - roi_corners[index - 1][1])
+        x_median, y_median = median(x_diff_list), median(y_diff_list)
+        # evaluate the difference
+        for index in range(1, len(roi_corners)):
+            x_diff = abs(roi_corners[index][0] - roi_corners[index - 1][0] - x_median) / roi_sizes[index][0]
+            y_diff = abs(roi_corners[index][1] - roi_corners[index - 1][1] - y_median) / roi_sizes[index][1]
+            if x_diff > corner_tol_rel or y_diff > corner_tol_rel:
                 return False
         return True
 
@@ -1049,15 +1067,23 @@ class ImageReconstruct1DModel():
             self.logger.info(f'Confidence matrix:\n{self.confidence_matrix}')
         return self.confidence_matrix
 
-    def get_reco_image_size(self, print=True):
-        if print:
-            self.logger.info(f'Reconstructed Image Size: {self.estimated_reco_image_size}')
-        return self.estimated_reco_image_size
+    def get_roi_corners_sizes(self) -> list:
+        """ Returns the roi corners, normalized roi corners, and roi sizes of the image list
+
+        :return: A 3-tuple
+        :rtype: 3-tuple of list
+        """
+        return self.roi_corners, self.normalized_roi_corners, self.roi_sizes
+
+    # def get_reco_image_size(self, print=True):
+    #     if print:
+    #         self.logger.info(f'Reconstructed Image Size: {self.estimated_reco_image_size}')
+    #     return self.estimated_reco_image_size
     
-    def get_roi_corners(self, print=True):
-        if print:
-            self.logger.info(f'ROI Corners of Original Images after Reconstruction: {self.roi_corners}')
-        return self.roi_corners
+    # def get_roi_corners(self, print=True):
+    #     if print:
+    #         self.logger.info(f'ROI Corners of Original Images after Reconstruction: {self.roi_corners}')
+    #     return self.roi_corners
     
     def get_reco_image_origin_offset(self, print=True):
         if print:
@@ -1113,7 +1139,10 @@ class ImageReconstruct1DModel():
             roi = ImageReconstruct1DModel._compute_warp_roi(image_size, camera_transform, median_focals, scale)            
             roi_corners.append(roi[0:2])
             roi_sizes.append(roi[2:4])
-        return roi_corners, roi_sizes
+        # compute normalized roi_corners
+        reco_image_origin_offset = ImageReconstruct1DModel._find_reco_image_origin_offset(roi_corners)
+        normalized_roi_corners = ImageReconstruct1DModel._normalize_corners(roi_corners, reco_image_origin_offset)
+        return roi_corners, normalized_roi_corners, roi_sizes
     
     @staticmethod
     def _find_reco_image_origin_offset(roi_corners:list):
@@ -1185,7 +1214,7 @@ class ImageReconstruct1DModel():
             image_sizes.append(image.shape[:2][::-1])
             image_nchannels.append(image.shape[2])
         return image_sizes, image_nchannels
-    
+       
     @staticmethod
     def generate_reco_image(images_as_list:list, camera_tranforms_row:list, scaling_factor_of_images:float=1.0):
         """ Generates and returns the reconstructed image of the input sequence of images of this object. It also returns the ROI corners and sizes of the transformed versions of the input iamges
@@ -1203,16 +1232,17 @@ class ImageReconstruct1DModel():
         warper.set_scale(camera_tranforms_row)
         # warp every image in the list at the scaling factor and the pre-computed camera transforms
         warped_images_list = list(warper.warp_images(images_as_list, camera_tranforms_row, scaling_factor_of_images))
-        warped_roi_corners, warped_roi_sizes = ImageReconstruct1DModel._compute_warp_rois(image_sizes, camera_tranforms_row, scaling_factor_of_images)
-        print(f'warped image size from calculation: {warped_roi_sizes}')
-        print(f'warped corners from calculation: {warped_roi_corners}')
+        warped_roi_corners, normalized_roi_corners, warped_roi_sizes = ImageReconstruct1DModel._compute_warp_rois(image_sizes, camera_tranforms_row, scaling_factor_of_images)
+        # logger = get_logger()
+        # logger.info(f'warped image size from calculation: {warped_roi_sizes}')
+        # logger.info(f'warped corners from calculation: {warped_roi_corners}')
         reco_image_origin_offset = ImageReconstruct1DModel._find_reco_image_origin_offset(warped_roi_corners)
-        print(f'reco image origin offset: {reco_image_origin_offset}')
-        warped_roi_corners = ImageReconstruct1DModel._normalize_corners(warped_roi_corners, reco_image_origin_offset)
-        print(f'normalized warped corners from calculation: {warped_roi_corners}')
+        # logger.info(f'reco image origin offset: {reco_image_origin_offset}')
+        normalized_warped_roi_corners = ImageReconstruct1DModel._normalize_corners(warped_roi_corners, reco_image_origin_offset)
+        # logger.info(f'normalized warped corners from calculation: {warped_roi_corners}')
         # going through the warped images list to estimate the buffer size for the reconstructed image
         br_max_x, br_max_y = None, None
-        for image, corner, image_size in zip(warped_images_list, warped_roi_corners, warped_roi_sizes):
+        for image, corner, image_size in zip(warped_images_list, normalized_warped_roi_corners, warped_roi_sizes):
             # compute the top left corner according to the scaling factor
             br_x, br_y = image_size[0] + corner[0], image_size[1] + corner[1]
             br_max_x = br_x if br_max_x is None else max(br_max_x, br_x)
@@ -1223,7 +1253,7 @@ class ImageReconstruct1DModel():
         image_buffer = None 
         index = 0
         # going through the warped images again and pasting them to the reconstructed image buffer
-        for image, warped_corner in zip(warped_images_list, warped_roi_corners):
+        for image, warped_corner in zip(warped_images_list, normalized_warped_roi_corners):
             image_size = image.shape[:2][::-1]
             if image_buffer is None:       
                 image_buffer = np.zeros(image_buffer_shape, dtype=np.uint8)
@@ -1233,4 +1263,4 @@ class ImageReconstruct1DModel():
                 image_buffer[warped_corner[1]:warped_corner[1]+image_size[1], warped_corner[0]:warped_corner[0]+image_size[0], :] = np.where((image_buffer_roi != [0, 0, 0]), image_buffer_roi, image)            
             # cv2.imwrite(f'/home/qcr/cgras_data/detector/row_step_{index}.jpg', image_buffer)
             index += 1
-        return image_buffer, warped_roi_corners, warped_roi_sizes    
+        return image_buffer, normalized_warped_roi_corners, warped_roi_sizes    

@@ -320,10 +320,11 @@ class CoralObjectDetectModel():
                 if bbox_color is None:
                     continue
                 text_pos = (int(bbox_in_tile[0]) + random.randint(-30, 30), int(bbox_in_tile[3]) + random.randint(15, 30))
-                text_to_draw = coral_object.index_str.replace(' ', '')
+                # text_to_draw = coral_object.index_str.replace(' ', '')
+                text_to_draw = coral_object.yolo_class
                 # text_to_draw the text
                 cv2.putText(rotated_reco_image, f'{text_to_draw}', text_pos,
-                            cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.8, 0.6), (0, 0, 0), int(font_size + 0.5))   
+                            cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.6, 0.6), (0, 0, 0), int(font_size + 0.5))   
                 if draw_coral_class:
                     cv2.putText(rotated_reco_image, f'{coral_object.coral_class}', (text_pos[0], int(text_pos[1] + font_size * 15)),
                                 cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.6, 0.6), (0, 0, 0), int(font_size + 0.5))                           
@@ -657,8 +658,9 @@ class CoralObjectDetectImageModel():
                 self.image = cv2.imread(self.image)
             except (Warning, Exception) as e:
                 raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID,f'Unable to read image file {self.image}', e=e)
-        if type(self.image) is not np.ndarray:
-            raise TypeError(f'Parameter image is neither an image file nor a numpy image') 
+        if self.image is None or type(self.image) is not np.ndarray:
+            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID,f'Unable to read image file {self.image}: file not exists or not an image')
+
         # step 2: traverse through the image coordinates to build a list of logical image blobs 
         image_size = self.image.shape[:2][::-1]
         step_x, step_y = self.blob_size[0] - self.blob_overlap_pix, self.blob_size[1] - self.blob_overlap_pix

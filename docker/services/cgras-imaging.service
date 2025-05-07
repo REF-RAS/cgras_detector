@@ -1,0 +1,14 @@
+[Unit]
+Description=Software stack for coordination of image capture sessions and data storage (CGRAS 2023)
+Requires=roscore.service
+After=roscore.service
+ 
+[Service]
+User=qcr
+Group=qcr
+# ExecStart=/bin/bash -c "source /etc/qcr/qcr-env.bash && export PYTHONPATH=/home/qcr/.local/lib/python3.8/site-packages:$PYTHONPATH && source /home/qcr/cgras_ws/devel/setup.bash && roslaunch cgras_imaging_agent default.launch"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=ros.service

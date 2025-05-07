@@ -214,7 +214,7 @@ class TaskStatusNames(Enum):
     REJECTED = 4
     
 class SampleStatusNames(Enum):
-    UNKNOWN = -1
+    ALL = -1
     QUEUED = 0
     DONE = 1
     FLAGGED = 2  # ABORTED may be due to interrupted by user or by a recoverable error (not from the data itself) such as no suitable YOLO model
@@ -503,9 +503,9 @@ class DetectorDAO():
                 sql = 'SELECT * FROM tile_sample WHERE status = ?'
                 param_list.append(status)
         else:
-            sql = 'SELECT * FROM tile_sample WHERE status NOT IN (?, ?)'
+            sql = 'SELECT * FROM tile_sample WHERE status <> ?'
             param_list.append(SampleStatusNames.QUEUED.value)
-            param_list.append(SampleStatusNames.DONE.value)
+            # param_list.append(SampleStatusNames.DONE.value)
         if season_title:
             sql += ' AND season = ?'
             param_list.append(season_title)            

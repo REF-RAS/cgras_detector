@@ -134,7 +134,7 @@ class LocateTileModel():
         self.affine_transform_matrix, rotate_angle = self._compute_affine_transform_only_rotation(self.corners_in_reco_space, self.image_origin_offset)
         logger.info(f'AffineTransform matrix: {self.affine_transform_matrix} rotation origin offset {self.image_origin_offset} rotation angle {rotate_angle} (degrees)')
         if abs(rotate_angle) > self.rotate_angle_max:
-            raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'Angle of rotation ({rotate_angle} degrees) outside of the valid range (+/- {self.rotate_angle_max} degrees)')
+            raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'Angle of rotation ({rotate_angle:.1f} degrees) outside of the valid range (+/- {self.rotate_angle_max} degrees)')
 
         frame_offset = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_LEFT], adjust_offset=False) 
         frame_topright_corrected = self._apply_affine_transform(self.corners_in_reco_space[WhichCorner.TOP_RIGHT], adjust_offset=False) 

@@ -54,7 +54,7 @@ class TileSampleTable():
                          {'name': 'Status', 'id': 'status', 'type': 'text', 'editable': False},    
                          {'name': 'Remarks', 'id': 'remarks', 'type': 'text', 'editable': False},                                                                         
                          ]
-        
+    
         self._style_cell_conditional=[
             {'if': {'column_id': 'remarks'},
             'fontSize': 14}
@@ -71,6 +71,7 @@ class TileSampleTable():
                         html.P(''),
                         dbc.Button('Reconstructed Tile', target='view_image', external_link=True, id=prefix+'view_reconstruct_tile_link', color='primary'),
                         dbc.Button('Annotated Tile', target='view_image', external_link=True, id=prefix+'view_annotated_tile_link', color='primary'),
+                        # dbc.Button('Annotated Tile (Original Size)', target='view_image', external_link=True, id=prefix+'view_annotated_original_tile_link', color='primary'),
                         dbc.Button('Feature Matching Images', target='view_image', external_link=True, id=prefix+'view_feature_match_link', color='primary'),  
                         dbc.Button('Annotated Blobs', target='view_image', external_link=True, id=prefix+'view_annotated_blobs_link', color='primary'),                       
                         ]
@@ -144,22 +145,14 @@ class TileSampleTable():
                             Output(prefix+'view_reconstruct_tile_link', 'href'),
                             Output(prefix+'view_reconstruct_tile_link', 'disabled'),
                             Output(prefix+'view_annotated_tile_link', 'href'),
-                            Output(prefix+'view_annotated_tile_link', 'disabled'),                            
+                            Output(prefix+'view_annotated_tile_link', 'disabled'),   
+                            # Output(prefix+'view_annotated_original_tile_link', 'href'),
+                            # Output(prefix+'view_annotated_original_tile_link', 'disabled'),                                                        
                             Output(prefix+'view_feature_match_link', 'href'),
                             Output(prefix+'view_feature_match_link', 'disabled'),
                             Output(prefix+'view_annotated_blobs_link', 'href'),
                             Output(prefix+'view_annotated_blobs_link', 'disabled'),],
-                        [Input(prefix+'row_view_store', 'data')], prevent_initial_call=True)(self._view_row_confirmed())
-        
-        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
-        #                     Output(prefix+'confirm_modal_title', 'children', allow_duplicate=True),
-        #                     Output(prefix+'confirm_modal_message', 'children', allow_duplicate=True),],
-        #     [Input(self.user_action_store_id, 'data')], prevent_initial_call=True)(self._reject_row_requested())  
-        
-        # self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
-        #                     Output(prefix+'confirm_modal_title', 'children', allow_duplicate=True),
-        #                     Output(prefix+'confirm_modal_message', 'children', allow_duplicate=True),],
-        #     [Input(prefix+'row_delete_store', 'data')], prevent_initial_call=True)(self._delete_row_requested())           
+                        [Input(prefix+'row_view_store', 'data')], prevent_initial_call=True)(self._view_row_confirmed())          
 
         self.app.callback([Output(prefix+'confirm_reprocess_modal', 'is_open', allow_duplicate=True)],
             [Input(prefix+'row_redo_store', 'data')], prevent_initial_call=True)(self._redo_row_requested())     
@@ -244,16 +237,6 @@ class TileSampleTable():
             return (self._model.to_dict('records'),)
         return update_datatable
     
-    # def _update_season_dropdown(self):
-    #     def update_season_dropdown(tile_id):
-    #         # get options for the dropdown
-    #         options = DETECT_DAO.list_seasons_in_tile_sample()
-    #         logger.warning(f'update season: {options}')
-    #         value = PERSISTENT_STORE_DAO.get_config_value(PERSISTENT_STORE_DAO.CONFIG_SELECTED_SEASON, None)
-    #         value = options[0] if value is None and options is not None and len(options) > 0 else None
-    #         return (options, value,)
-    #     return update_season_dropdown
-    
     def _table_button_pressed(self): 
         def table_button_pressed(selected_rows:list, *args):
             if selected_rows is None or len(selected_rows) == 0:
@@ -288,13 +271,6 @@ class TileSampleTable():
             return ([row], None, [],)
         return cb_cell_selected
 
-    # def _reject_row_requested(self): 
-    #     def reject_row_requested(row_index_list):
-    #         if row_index_list is None:
-    #             raise PreventUpdate        
-    #         return (True, 'Reject Tile Sample', 'The selected tile sample(s) will be rejected and their findings cleared! Are you sure?')  
-    #     return reject_row_requested 
-
     def _cb_confirm_modal_pressed(self): 
         def cb_confirm_modal_pressed(action_data, store, *args):
             button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
@@ -321,26 +297,6 @@ class TileSampleTable():
                 return (False, True, message, store)
             return (False, False, '', store)
         return cb_confirm_modal_pressed 
-
-    # def _delete_row_requested(self): 
-    #     def delete_row_requested(row_index_list):
-    #         if row_index_list is None:
-    #             raise PreventUpdate        
-    #         return (True, 'Delete Tile Sample', 'The selected tile sample(s) and their findings will be permanantly deleted! The tile samples may be imported again. Are you sure?')  
-    #     return delete_row_requested 
-
-    # def _delete_row_confirmed(self): 
-    #     def delete_row_confirmed(submit_n_clicks, row_index_list, store):
-    #         if submit_n_clicks:
-    #             for row_index in row_index_list:
-    #                 tile_sample_id = self._model.iloc[row_index]['id']
-    #                 DETECT_DAO.clear_tile_sample_data(tile_sample_id)
-    #                 DetectionTaskModel.delete_cache_folder(tile_sample_id)
-    #                 DETECT_DAO.delete_tile_sample(tile_sample_id)
-    #             message = f'The tile sample(s) {row_index_list} deleted'
-    #             return (False, True, message, store)
-    #         return (False, False, '', store)
-    #     return delete_row_confirmed 
 
     def _redo_row_requested(self): 
         def redo_row_requested(row_index_list):
@@ -418,6 +374,11 @@ class TileSampleTable():
                 if os.path.isfile(view_annotated_path):
                     view_annotated_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.ANNOTATED_WHOLE_RECO_HTML_FILENAME}'                     
 
+                # # evalate if the file exists
+                # view_annotated_original_path = os.path.join(logdata_folder, DetectionTaskModel.ROTATED_ANNOTATED_ORIGINAL_SCALE_HTML_FILENAME)
+                # if os.path.isfile(view_annotated_original_path):
+                #     view_annotated_original_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.ROTATED_ANNOTATED_ORIGINAL_SCALE_HTML_FILENAME}'   
+
                 # evaluate if the file exists
                 view_feature_match_path = os.path.join(logdata_folder, DetectionTaskModel.FEATURE_MATCH_HTML_FILENAME)
                 if os.path.isfile(view_feature_match_path):
@@ -428,7 +389,9 @@ class TileSampleTable():
                 if os.path.isfile(view_annotated_blobs_path):
                     view_annotated_blobs_href = f'{href}/{partial_cache_folder}/{DetectionTaskModel.ANNOTATED_BLOBS_INDEX_HTML_FILENAME}' 
                                 
-            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_annotated_href, view_annotated_href==None, view_feature_match_href, view_feature_match_href==None, 
+            return (True, modal_title, view_reconstruct_href, view_reconstruct_href==None, view_annotated_href, view_annotated_href==None, 
+                    # view_annotated_original_href, view_annotated_original_href==None,
+                    view_feature_match_href, view_feature_match_href==None, 
                     view_annotated_blobs_href, view_annotated_blobs_href==None)
         return view_row_confirmed
     
@@ -441,9 +404,13 @@ class TileSampleTable():
                 for i in row_index_list
             ]
             style_data_conditional.append({'if': {
-                    'filter_query': '{status} contains "FAILED"',
+                    'filter_query': '{status} contains "REJECTED"',
                     'column_id': 'status'
                 }, 'backgroundColor': '#ffffff', 'color': 'rgb(255, 0, 0)'} )
+            style_data_conditional.append({'if': {
+                    'filter_query': '{status} contains "FLAGGED"',
+                    'column_id': 'status'
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(255, 0, 0)'} )            
             return style_data_conditional
         return style_selected_rows
     

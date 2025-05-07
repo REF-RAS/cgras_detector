@@ -29,6 +29,7 @@ class MonitorTaskControlBlock():
         # mode dependent panels       
         self.button_panel = [
             html.P(' ', id=prefix+'button_panel_header', className='mt-2 mx-auto col-8 fw-bold'),
+            html.P(' ', id=prefix+'mode_message_1', className='mt-2 mx-auto col-12'),
             dbc.Row([
                 dbc.Button('Process the next Tile Sample', id={'type': prefix+'button', 'index': 'process_tile'}, color='primary', size='me', className='offset-1 col-4'), 
                 dbc.Label('Execute the next tile sample in the queue', className='col-7'),
@@ -48,7 +49,7 @@ class MonitorTaskControlBlock():
                 dcc.Store(id=prefix+'task_execute_mode_store'),
                 html.H4(dbc.Badge('TASK EXECUTION', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.P(' ', id=prefix+'mode_message_2', className='mt-2 mx-auto col-12'), 
-                html.P(' ', id=prefix+'mode_message_1', className='mt-2 mx-auto col-12'),
+
                 html.Div(self.button_panel, id=prefix+'button_panel', className='mx-auto col-10 border p-2', style={'visibility': 'hidden'}),
                 self._toast,
             ], id=prefix+'main_panel', className='mx-auto text-center pb-2')

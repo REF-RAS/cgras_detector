@@ -32,9 +32,9 @@ from detector.models.detector_error import DetectorException, DetectorFailed, De
 # from detector.tile_reconstruct.locate_tiles_main import TileBBoxLocator
 
 class ApplicationCoordinator(object):
-    NODE_NAME = 'cgras_detect_viewer'
+    NODE_NAME = 'cgras_detector'
     def __init__(self):
-        logger.info(f'The {ApplicationCoordinator.NODE_NAME} application (pid:{os.getpid()})')
+        logger.info(f'Starting the {ApplicationCoordinator.NODE_NAME} node (pid:{os.getpid()}) (python: {".".join(map(str, sys.version_info[:3]))})')
         # create lock for synchronization
         self.state_lock = threading.RLock()
         # create the stop signal handler
@@ -65,7 +65,6 @@ class ApplicationCoordinator(object):
 
         # create the dash application
         try:
-            logger.info(f'Starting Dash Server')
             self.dash_app_operator = DashApplicationMain()
             self.dash_app_operator.start()
         except (Exception, Warning) as e:
@@ -73,14 +72,14 @@ class ApplicationCoordinator(object):
             traceback.print_exc()
         
     def stop(self, *args, **kwargs):
-        logger.warning(f'The application (pid:{os.getpid()}) is being stopped')
+        logger.warning(f'The {ApplicationCoordinator.NODE_NAME} node (pid:{os.getpid()}) is being stopped')
         state = STATE.get_state()
         if state in [SystemStates.DETECT, SystemStates.WAIT_DETECT]:
             the_detection_task:DetectionTaskModel = STATE.get_var('the_detection_task')
             if the_detection_task:
                 the_detection_task.cancel_task()
             if self.work_thread is not None and self.work_thread.is_alive():
-                logger.warning(f'The application (pid:{os.getpid()}) is waiting for the detect task thread to abort')
+                logger.warning(f'The {ApplicationCoordinator.NODE_NAME}  node (pid:{os.getpid()}) is waiting for the detect task thread to abort')
                 self.work_thread.join()
         # time.sleep(2)
         sys.exit(0)

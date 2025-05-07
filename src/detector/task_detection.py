@@ -84,6 +84,7 @@ class ProgressModel():
 class DetectionTaskModel():
     WHOLE_RECO_HTML_FILENAME = 'whole_reco_image.html'
     ANNOTATED_WHOLE_RECO_HTML_FILENAME = 'annotated_whole_reco_image.html'
+    ROTATED_ANNOTATED_ORIGINAL_SCALE_HTML_FILENAME = 'rotated_annotated_original_image.html'
     FEATURE_MATCH_HTML_FILENAME = 'feature_match_images.html'
     ANNOTATED_BLOBS_HTML_FILENAME = 'annotated_blobs_at_{}_{}.html'
     ANNOTATED_BLOBS_INDEX_HTML_FILENAME = 'annotated_blobs_index.html'
@@ -394,7 +395,18 @@ class DetectionTaskModel():
         except Exception as e:
             logger.warning(f'Failed to generate HTML file for showing the annotated whole tile sample')
             traceback.print_exc()
-            raise        
+            raise   
+             
+        try:
+            # generate the html file for viewing the annotated whole reconstructed image of original scale
+            annotated_original_scale_filename = self.cod_model.ANNOTATED_WHOLE_RECO_ORIGINAL_SCALE_IMAGE_FILENAME
+            html_output_file = os.path.join(self.logdata_folder, DetectionTaskModel.ROTATED_ANNOTATED_ORIGINAL_SCALE_HTML_FILENAME)
+            LightboxHelper.generate_single_image_lightbox(html_output_file, annotated_original_scale_filename)
+            link_dict_list.append({'href': annotated_original_scale_filename, 'text': 'Annotated whole tile sample original scale'})
+        except Exception as e:
+            logger.warning(f'Failed to generate HTML file for showing the annotated whole tile sample at original scale')
+            traceback.print_exc()
+            raise   
         
         try:
             # generate the html file for viewing the feature matching images 

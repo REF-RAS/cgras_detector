@@ -51,6 +51,5 @@ if __name__ == '__main__':
             
     # Handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer((SERVER, PORT), Handler) as httpd:
-        logger.info(f'CGRAS Detector ImageWebServer: running at {SERVER}:{PORT}')
-        logger.info(f'CGRAS Detector ImageWebServer: serving images at {DIRECTORY}')
+        logger.info(f'Starting the image server at http://{SERVER}:{PORT} from {DIRECTORY}')
         httpd.serve_forever()

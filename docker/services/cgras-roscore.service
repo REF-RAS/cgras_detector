@@ -1,0 +1,14 @@
+[Unit]
+Description=CGRAS 2025 ROS Master
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+# ExecStart=/bin/bash -c "source /etc/qcr/qcr-env.bash && source $ROS_WORKSPACE && [ $QCR_IS_PRIMARY == true ] && roscore"
+ExecStart=/bin/bash -c "source /home/qcr/.config/cgras/setup.bash && roscore"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+

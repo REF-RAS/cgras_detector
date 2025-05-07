@@ -31,24 +31,29 @@ cgras_detector:
   # heatmap
   heatmap_colour_scale: viridis
   heatmap_show_label_slider_max: 30
-  # detection task parameters
+  # detection task parameters: reconstruction
   task_params_filename: params.yaml
   reco_model_filename: reco_model.yaml
   loctile_model_filename: loctile_model.yaml
   reco_working_scale: 0.1
-  reco_debug_images_at_original_scale: True
+  reco_debug_images_at_original_scale: False
   reco_debug_feature_matching_images: True
   reco_feature_detector: brisk               # sift, orb, brisk, akaze (this parameter is only used by reconstruct and not reconstruct_best)
   reco_feature_matching_confidence_threshold: 1.2
   reco_image_matching_min_confidence: 1.0   # between rows matching confidence
-  reco_image2d_matching_min_confidence: 0.8 # row matching confidence
+  reco_image2d_matching_min_confidence: 1.0 # row matching confidence
   reco_error_correction: False
+  aspect_ratio_roi_error_rel: 0.1           # the maximum relative error of aspect ratio of rois from that of the original image
+  misplaced_roi_erro_rel: 0.1               # the maximum relative error of roi corner placement with respect to the roi sizes
+
+  # detection task parameters: locate tile
   tile_size_in_mm: [294, 294]  # default value, only if not defined in the metadata of the tile_sample 
   frame_size_in_mm: [280, 280] # default value, only if not defined in the metadata of the tile_sample 
   loctile_rotate_angle_max: 3.0   # degrees
   loctile_aspect_ratio_diff_max_rel: 0.05   # 0.05 relative difference
   loctile_aspect_ratio_diff_max_abs: 0.05   # 0.05 absolute difference
 
+  # detection task parameters: object detection  
   cod_model_filename: coral_object_detect_model.yaml 
   cod_debug_blob_images: True
   cod_blob_overlap_pix: 128

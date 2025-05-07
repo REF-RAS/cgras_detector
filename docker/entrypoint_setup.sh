@@ -4,7 +4,7 @@
 # echo ${ROS_MASTER}
 echo "Setup ROS_MASTER_URI"
 
-
+alias python3=python3.11
 # echo ${CATKIN_WS}
 
 echo "> Setting up ROS"

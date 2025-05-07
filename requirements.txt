@@ -1,33 +1,40 @@
-# dash
-# dash_bootstrap_components
-# dash-auth
-dash==2.18.2
-dash_daq
-dash-bootstrap-components==1.6.0
-dash-auth==2.3.0
-dash-ag-grid==31.2.0
-flask_restx
-plotly
+dash==3.0.4
+dash-bootstrap-components==2.0.2
+dash_ag_grid==31.2.0
+dash_auth==2.3.0
+dash_daq==0.6.0
+flask-restx==1.3.0
+plotly==6.0.1
 json2html==1.3.0
 python-dateutil==2.8.2
 numpy==1.24.4
 pandas==2.0.3
 opencv_contrib_python==4.8.1.78
-# opencv_python==4.8.1.78
-scikit-image>=0.21.0
-scikit-learn>=1.3.2
+scikit-image==0.21.0
+scikit-learn==1.3.2
+
+notebook==6.5.5 
+ipykernel
+ipywidgets
 openpyxl==3.1.2
 pyyaml==6.0.1
 wrapt==1.16.0
 xlsxwriter==3.2.0
 ipywidgets
-ipykernel
-notebook==6.5.5 
 # project
 stitching==0.5.3
 kaleido==0.2.1
 # yolo
 networkx==2.8.8
+# access ports
+pyudev==0.24.1
+psutil==5.9.5
+defusedxml==0.7.1
+rospkg==1.5.0
+# to resolve the error of undefined symbol: ffi_type_pointer, version LIBFFI_BASE_7.0
+libffi==3.3
+
+
 # pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 # torch==2.4.1+cpu 
 # torchvision==0.19.1+cpu 

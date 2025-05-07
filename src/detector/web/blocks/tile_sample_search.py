@@ -41,10 +41,11 @@ class TileSampleSearchBlock():
                                        searchable=False, clearable=False, className='ms-2', style={'width': '240px', 'zIndex': 10})
         # the status filter
         self.status_options = [
-            {'label': 'Rejected or Flagged', 'value': SampleStatusNames.UNKNOWN.value},
+            {'label': 'All', 'value': SampleStatusNames.ALL.value},
+            {'label': 'Rejected or Flagged', 'value': SampleStatusNames.REJECTED.value},
             {'label': 'Done', 'value': SampleStatusNames.DONE.value},
-            {'label': 'Flagged', 'value': SampleStatusNames.FLAGGED.value},
-            {'label': 'Rejected', 'value': SampleStatusNames.REJECTED.value},
+            # {'label': 'Flagged', 'value': SampleStatusNames.FLAGGED.value},
+            # {'label': 'Rejected', 'value': SampleStatusNames.REJECTED.value},
         ]
         status_dropdown = dcc.Dropdown(options=self.status_options, id=prefix+'status_dropdown', 
                                        searchable=False, clearable=False, className='ms-2', style={'width': '240px', 'zIndex': 10})  
@@ -116,14 +117,17 @@ class TileSampleSearchBlock():
             for season_title in season_titles_list:
                 period_options.append({'label': f'{season_title} Season', 'value': season_title})
             value = 0
-            return ('', '', period_options, value, 10, SampleStatusNames.UNKNOWN.value,)
+            return ('', '', period_options, value, 10, SampleStatusNames.ALL.value,)
         return reset_filter_button_clicked
     
     def _refresh_table_clicked(self):
         def refresh_table_clicked(tile_id, batch_id, the_period, the_pagesize, the_status, store):
             button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
             # set default value at initialization
-            the_status = None if the_status == SampleStatusNames.UNKNOWN.value or the_status is None else the_status
+            if the_status == SampleStatusNames.REJECTED:
+                the_status = [SampleStatusNames.REJECTED, SampleStatusNames.FLAGGED]
+            else:
+                the_status = None if the_status == SampleStatusNames.ALL.value or the_status is None else the_status
             the_pagesize = 10 if the_pagesize is None else the_pagesize
             if isinstance(the_period, str):
                 season = the_period

@@ -3,12 +3,12 @@
 # the Queensland University of Technology
 
 services:
-    cgras_image:
+    cgras:
         build:
             context: .
             dockerfile: Dockerfile
-        image: cgras_image
-        container_name: cgras_image
+        image: cgras
+        container_name: cgras
         devices:
             - /dev/dri
         group_add:
@@ -30,15 +30,15 @@ services:
             - /etc/timezone:/etc/timezone:ro
             - /etc/localtime:/etc/localtime:ro
             - ~/.ssh:/home/qcr/.ssh  
-            # - ~/cgras_ws/src/cgras_messages:/home/qcr/cgras_ws/src/cgras_messages:rw     
+            - ~/cgras_ws/src/cgras_messages:/home/qcr/cgras_ws/src/cgras_messages:rw     
             - ~/cgras_ws/src/cgras_detector:/home/qcr/cgras_ws/src/cgras_detector:rw   
-            # - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
+            - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
             - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
             - ~/cgras_data:/home/qcr/cgras_data:rw
-   
         # networks:
         #     app_net:
         #         ipv4_address: 192.168.1.60 
         command:
             bash
+
          

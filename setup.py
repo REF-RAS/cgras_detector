@@ -9,7 +9,7 @@ req_packages = [
 
 # fetch values from package.xml
 setup_args = generate_distutils_setup(
-    packages=['detector', 'tools'],
+    packages=['detector'],
     package_dir={'': 'src'},
     python_requires='>=3.8',
     install_requires=req_packages

@@ -1,0 +1,15 @@
+[Unit]
+Description=CGRAS 2025 Detector (Coral Counting and Visualization System)
+Requires=cgras-roscore.service
+After=cgras-roscore.service
+ 
+[Service]
+User=qcr
+Group=qcr
+# ExecStart=/bin/bash -c "source /etc/qcr/qcr-env.bash && export PYTHONPATH=/home/qcr/.local/lib/python3.8/site-packages:$PYTHONPATH && source /home/qcr/cgras_ws/devel/setup.bash && roslaunch cgras_imaging_agent default.launch"
+ExecStart=/bin/bash -c "source /home/qcr/.config/cgras/setup.bash && source /home/qcr/miniconda3/bin/activate cgras && roslaunch cgras_detector default.launch"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -102,13 +102,14 @@ class ApplicationFileManager():
     def populate_system_assets_folder(self):
         try:
             system_folder_path = self.get_detector_folder(self.SYSTEM_SUBFOLDER)
+            logger.info(f'ApplicationFileManager: populating system folder at {system_folder_path}')
             shutil.rmtree(self.get_detector_folder(self.SYSTEM_SCRIPTS_SUBFOLDER), ignore_errors=True)
             shutil.rmtree(self.get_detector_folder(self.SYSTEM_IMAGES_SUBFOLDER), ignore_errors=True)
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system/scripts')
-            logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            # logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
             shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_SCRIPTS_SUBFOLDER), dirs_exist_ok=True)
             source_path = os.path.join(os.path.dirname(__file__), 'web/_system/images')
-            logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
+            # logger.info(f'ApplicationFileManager.populate_system_assets_folder: copy {source_path} to {system_folder_path}')
             shutil.copytree(source_path, self.get_detector_folder(self.SYSTEM_IMAGES_SUBFOLDER), dirs_exist_ok=True)            
             # self.generate_pattern_images()
             return True

@@ -79,10 +79,11 @@ class DashApplicationMain():
     def _define_app(self):
         # brand_div = html.Div([html.H3('CGRAS Coral Counting and Visualization'), html.H6('Robotics and Autonomous Systems Group, REF, RI, Queensland University of Technology')])    
         brand_div = dbc.Row([
-            html.Img(src='/assets/images/QUTLogo.png', height='60', className='col-2'),
+            html.Img(src='/assets/images/QUTLogo.png', width='75', height='75', className='col-2 mx-auto'),
+            html.Img(src='/assets/images/CGRASLogo.gif', height='75', className='col-2 mx-auto'),
             html.Div([html.H3('CGRAS Coral Counting and Visualization'), 
                       html.H6('Robotics and Autonomous Systems Group, REF')
-                      ], className='col-10')
+                      ], className='col-8')
         ])
         self._navbar_with_menu = dbc.NavbarSimple(
                     children=[
@@ -94,7 +95,7 @@ class DashApplicationMain():
                         dbc.NavItem(dbc.NavLink('System', href='/page_setup')),                                                 
                     ],
                     brand=brand_div,
-                    brand_href='/page_monitor', color='#ffcc99', className='fs-3 text')
+                    brand_href='/page_monitor', color='#ffcc99', dark=False, className='fs-3 text-primary text')  # #ffcc99
 
         # self._navbar_simple = dbc.NavbarSimple(
         #             brand=html.H3('CGRAS Coral Counting and Visualization'), color='#cccc99', className='fs-4 text')      
@@ -120,14 +121,14 @@ class DashApplicationMain():
               [State('url', 'pathname')])(self._dash_system_timer())
                
     def start(self):
-        rospy.loginfo(f'{type(self).__name__}: starting the dash flask server')
+        logger.info(f'{type(self).__name__}: starting the web application at http://{self.DASH_HOST}:{self.DASH_PORT}')
         # switch off the hot reload
         self.app.enable_dev_tools(dev_tools_hot_reload=CONFIG.get(SystemConfigNames.WEB_DEBUG_HOT_RELOAD, True))
         # start the server
         self.app.run(host=self.DASH_HOST, port=self.DASH_PORT, debug=CONFIG.get(SystemConfigNames.WEB_DEBUG_MODE, True))
 
     def stop(self, *args, **kwargs):
-        rospy.loginfo(f'{type(self).__name__}: the dash flask server is being shutdown')
+        logger.info(f'{type(self).__name__}: the web application is being shutdown')
         time.sleep(2)
         sys.exit(0)
 

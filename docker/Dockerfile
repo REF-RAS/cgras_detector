@@ -35,7 +35,7 @@ ca-certificates \
 net-tools \
 locales \
 figlet \
-curl \
+curl \catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 iputils-ping \
 vim
 
@@ -43,11 +43,17 @@ RUN git config --global core.editor "vim"
 
 RUN sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 wget \
+software-properties-common \
 dbus \
 htop \
 build-essential \
 cmake \
 gdb
+
+# install python
+RUN sudo add-apt-repository ppa:deadsnakes/ppa
+RUN sudo apt-get update
+RUN sudo apt-get install python3.11
 
 # install python
 RUN sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -67,7 +73,8 @@ RUN pip install -r ${CGRAS_WS}/src/requirements.txt
 RUN rm ${CGRAS_WS}/src/requirements.txt
 
 # install yolo and pytorch
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 RUN pip install ultralytics
 
 # complete rosdep installation
