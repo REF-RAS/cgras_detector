@@ -13,9 +13,11 @@ cgras_detector:
   task_automation: False  
    # suspend operation when executing capture image program
   suspend_when_capturing_image: False
-  # default ros topics
+  # default ros topics for the states of the coordinator and detector
   ros_coordinator_state_topic: '/cgras/coordinator/state' 
   ros_detector_state_topic: '/cgras/detector/state' 
+    # default ros topic for query tile sample
+  ros_query_tile_samples_topic: '/cgras/coordinator/query_tile_samples'
   # timers for driving the system and refresh the GUI
   system_timer: 0.5  # seconds
   dashboard_refresh_cycles: 2  # refresh rate of dashboard, the unit is system timer cycles

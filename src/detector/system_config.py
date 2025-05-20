@@ -36,6 +36,8 @@ class SystemConfigNames(Enum):
     # default ros topics
     ROS_COORDINATOR_STATE_TOPIC = 'ros_coordinator_state_topic' 
     ROS_DETECTOR_STATE_TOPIC = 'ros_detector_state_topic' 
+    # ros topic: query tile sample service server
+    ROS_QUERY_TILE_SAMPLES_TOPIC = 'ros_query_tile_samples_topic'  
     # timer for refresh the system and GUI
     SYSTEM_TIMER = 'system_timer'                                # the timer driving the state transition machine through the timer callback
     DASHBOARD_REFRESH_CYCLES = 'dashboard_refresh_cycles'        # the refresh rate of 'auto-refresh pages' in the dashboard the number of cycles of system timer

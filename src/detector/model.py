@@ -21,7 +21,6 @@ import catkin_pkg.package
 from detector.database_file import DBFile
 from detector.dao_detect import DETECT_DDL, DetectorDAO, CoralObject, ClassHierarchyCoral, ClassHierarchyPresentation, TaskStatusNames, TaskTypes, SampleStatusNames
 from detector.dao_persistent_storage import PERSISTENT_STORE_DDL, PersistentStoreDAO
-from detector.dao_tile_samples import TileSamplesDAO
 from detector.file_manager import ApplicationFileManager
 
 # --- System-wide definitions and variables 
@@ -83,7 +82,5 @@ AUTOMATED_TASK_EXECUTION = ValueHolder()
 DETECT_DBFM = DBFile(APP_FILE_MANAGER.database_folder, 'detector.db', [DETECT_DDL, PERSISTENT_STORE_DDL])
 DETECT_DAO:DetectorDAO = DetectorDAO(DETECT_DBFM.db_file)
 PERSISTENT_STORE_DAO:PersistentStoreDAO = PersistentStoreDAO(DETECT_DBFM.db_file)
-COORDINATOR_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'coordinator.db')
-IMPORT_SAMPLE_DAO:TileSamplesDAO = TileSamplesDAO(COORDINATOR_DBFILE)
 # the states of other components
 COORDINATOR_STATE = model_base.StateManager(CoordinatorStates.UNKNOWN)

@@ -32,45 +32,15 @@ class MonitorStateBlock():
         _left_datatable = dash_table.DataTable(id=prefix+'left_table', editable=False, row_selectable=False, cell_selectable=False, style_cell={'fontSize': 14})
         _right_datatable = dash_table.DataTable(id=prefix+'right_table', editable=False, row_selectable=False, cell_selectable=False, style_cell={'fontSize': 14})
         # define widgets 
-        # self._panel = dbc.Col([
-        #         html.H4(dbc.Badge('SYSTEM MONITOR', className='ms-2 mb-4', color='white', text_color='secondary')),
-        #         dcc.Store(id=self.update_store_id),
-        #         dbc.Row([html.Div('Counting and Visualization System:', className='fs-6 col-6 text-end'),
-        #                  dbc.Badge(id=prefix+'vis_state', className='fs-6 col-6 text-start', color='white', text_color='primary')
-        #             ], className='col-12 mb-2'),
-        #         dbc.Row([html.Div('Image Acquisition System:', className='fs-6 col-6 text-end'),
-        #                  dbc.Badge(id=prefix+'capturer_state', className='fs-6 col-6 text-start', color='white', text_color='primary')
-        #             ], className='col-12 mb-2'),                
-        #         dbc.Row([html.Div('Number of CPU(s):', className='fs-6 col-6 text-end'),
-        #                  dbc.Badge(f'{psutil.cpu_count()}', className='fs-6 col-6 text-start', color='white', text_color='secondary')
-        #             ], className='col-12 mb-2'),        
-        #         dbc.Row([html.Div('CPU Usage:', className='fs-6 col-6 text-end'),
-        #                  dbc.Progress(id=prefix+'cpu_percent', className='col-6 mt-1')
-        #             ], className='col-12 mb-2'),
-        #         dbc.Row([html.Div('RAM Usage:', className='fs-6 col-6 text-end'),
-        #                  dbc.Progress(id=prefix+'ram_percent', className='col-6 mt-1')
-        #             ], className='col-12 mb-2'),                
-                                      
-        #         html.P(' ', id=prefix+'state_message', className='mt-3 text-center'),
-        #     ], className='mx-auto text-center')
-        
+ 
         self._panel = dbc.Row([
-            html.H4(dbc.Badge('SYSTEM MONITOR', className='ms-2 mb-4', color='white', text_color='secondary')),
+            html.H4(dbc.Badge('SYSTEM STATUS', className='ms-2 mb-4', color='white', text_color='secondary')),
             dcc.Store(id=self.update_store_id),
-            dbc.Col([_left_datatable], className='col-6'),
-            dbc.Col([_right_datatable], className='col-6'),
+            dbc.Col([_left_datatable], className='col-5'),
+            dbc.Col([_right_datatable], className='col-7'),
             html.P(' ', id=prefix+'state_message', className='mt-3 text-center'),
         ], className='mx-auto text-center')
-    
-        # self.app.callback([Output(prefix+'vis_state', 'children'),
-        #                    Output(prefix+'capturer_state', 'children'),
-        #                    Output(prefix+'cpu_percent', 'value'),
-        #                    Output(prefix+'cpu_percent', 'label'),
-        #                    Output(prefix+'ram_percent', 'value'),
-        #                    Output(prefix+'ram_percent', 'label'),                           
-        #                     Output(self.prefix+'state_message', 'children')],
-        #                 [Input(self.update_store_id, 'data')])(self._update_content_bar())
-        
+
         self.app.callback([Output(self.prefix+'state_message', 'children')],
                         [Input(self.update_store_id, 'data')])(self._update_state_message())        
         
@@ -78,7 +48,6 @@ class MonitorStateBlock():
                            Output(self.prefix+'right_table', 'data'),],
                         [Input(self.update_store_id, 'data')])(self._update_table_content())          
 
-        
     def get_panel(self):
         return self._panel
     

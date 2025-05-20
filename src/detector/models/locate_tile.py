@@ -523,7 +523,7 @@ class LocateTileModelHelper():
         except:
             ...
         if object_file is None:
-            return yaml.dump(object_dict)
+            return yaml.dump(object_dict, Dumper=yaml.Dumper)
         else:
             with open(object_file, 'w') as outfile:
                 yamlstr = yaml.dump(object_dict, outfile, Dumper=yaml.Dumper)

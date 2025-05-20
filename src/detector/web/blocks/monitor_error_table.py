@@ -54,7 +54,7 @@ class MonitorErrorTableBlock():
                                                cell_selectable=False, row_selectable='single')
                 
         self.the_panel = html.Div([
-                html.H4(dbc.Badge('SYSTEM ISSUES', className='mx-auto col-10', color='white', text_color='secondary')), 
+                html.H4(dbc.Badge('PROCESSING AND SYSTEM ISSUES', className='mx-auto col-10', color='white', text_color='secondary')), 
                 # html.P('Click on the circle to dismiss an issue', style={'fontSize': 12}),
                 dbc.Row([ self._datatable], className='text-start p-2'),
                 dcc.Store(id=prefix+'row_remove_store'),            

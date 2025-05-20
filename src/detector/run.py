@@ -12,18 +12,20 @@ __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
 # import libraries
-import sys, os, signal, time, threading, random, subprocess, traceback
+import sys, os, signal, time, threading, random, yaml, traceback
 from datetime import datetime
 from time import strftime, localtime
 # ros modules
 import rospy, message_filters, actionlib, rospkg
 from std_msgs.msg import String, Header, Bool, Int8, Float32
+# project module: ros
+from cgras_messages.srv import QueryTileSamples, QueryTileSamplesRequest, QueryTileSamplesResponse
 # project modules: web and generic
 from cgras_datatools.logging_tools import logger
 import cgras_datatools.hash_tools as hash_tools
 from detector.web.dashapp_main import DashApplicationMain
 from detector.model import APP_FILE_MANAGER, STATE, CONFIG, SystemStates, DETECT_DAO, AUTOMATED_TASK_EXECUTION, SystemConfigNames, TaskStatusNames, TaskTypes, SampleStatusNames, CALLBACK_MANAGER, CallbackTypes
-from detector.model import COORDINATOR_STATE, CoordinatorStates, IMPORT_SAMPLE_DAO, PERSISTENT_STORE_DAO, PersistentStoreDAO
+from detector.model import COORDINATOR_STATE, CoordinatorStates
 from detector.task_detection import DetectionTaskModel
 from detector.models.detector_error import DetectorException, DetectorFailed, DetectorAborted, DetectorCancelled, DetectorExceptionCodes
 
@@ -48,6 +50,8 @@ class ApplicationCoordinator(object):
         # ros topic names
         self.state_pub_name = CONFIG.get(SystemConfigNames.ROS_DETECTOR_STATE_TOPIC, '/cgras/detector/state')
         self.coordinator_state_sub_name = CONFIG.get(SystemConfigNames.ROS_COORDINATOR_STATE_TOPIC, '/cgras/coordinator/state')  
+        # ros topic name for query tile samples
+        self.query_tile_samples_srv_topic = CONFIG.get(SystemConfigNames.ROS_QUERY_TILE_SAMPLES_TOPIC)         
         # define the ros topic subscriptions and services
         self.ias_state_sub = rospy.Subscriber(self.coordinator_state_sub_name, Int8, self.cb_coordinator)
         self.state_pub = rospy.Publisher(self.state_pub_name, Int8, queue_size=1, latch=True)
@@ -245,25 +249,40 @@ class ApplicationCoordinator(object):
                 elif state == SystemStates.CLICK_START:
                     ...
                     # nothing to do inside the event loop, only GUI event will change the state
-                    
+  
                 elif state == SystemStates.POLL_IMPORT_SAMPLE:
-                    # check if import tile sample is enabled
-                    enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
-                    if not enable_import_new_samples:
+                    # check if the ros service is present
+                    try:
+                        rospy.wait_for_service(self.query_tile_samples_srv_topic, 1.0)
+                        query_tile_samples_service = rospy.ServiceProxy(self.query_tile_samples_srv_topic, QueryTileSamples)
+                        tile_sample_yaml = query_tile_samples_service(the_query=QueryTileSamplesRequest.NEW_TILE_SAMPLE).data
+                        if tile_sample_yaml:
+                            tile_sample_data = yaml.load(tile_sample_yaml, Loader=yaml.Loader)
+                            is_valid, model = DETECT_DAO.validate_tile_sample_import(tile_sample_data)
+                            if is_valid:
+                                DETECT_DAO.import_tile_sample_yaml(tile_sample_data)
                         STATE.update_state(SystemStates.READY)
-                        return
-                    # query for new un-exported tile samples 
-                    exportable_tile_samples_list = IMPORT_SAMPLE_DAO.query_to_export_sample_as_list_tuples()
-                    if exportable_tile_samples_list is None or len(exportable_tile_samples_list) == 0:
+                    except Exception as e:
                         STATE.update_state(SystemStates.READY)
-                    else:
-                        STATE.set_var('exportable_tile_samples_list', exportable_tile_samples_list)
-                        STATE.update_state(SystemStates.IMPORT_SAMPLE)
+                    
+                # elif state == SystemStates.POLL_IMPORT_SAMPLE:
+                #     # check if import tile sample is enabled
+                #     enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
+                #     if not enable_import_new_samples:
+                #         STATE.update_state(SystemStates.READY)
+                #         return
+                #     # query for new un-exported tile samples 
+                #     exportable_tile_samples_list = IMPORT_SAMPLE_DAO.query_to_export_sample_as_list_tuples()
+                #     if exportable_tile_samples_list is None or len(exportable_tile_samples_list) == 0:
+                #         STATE.update_state(SystemStates.READY)
+                #     else:
+                #         STATE.set_var('exportable_tile_samples_list', exportable_tile_samples_list)
+                #         STATE.update_state(SystemStates.IMPORT_SAMPLE)
                         
-                elif state == SystemStates.IMPORT_SAMPLE:
-                    exportable_tile_samples_list = STATE.get_var('exportable_tile_samples_list')
-                    self.process_exportable_tile_samples(exportable_tile_samples_list)
-                    STATE.update_state(SystemStates.READY)
+                # elif state == SystemStates.IMPORT_SAMPLE:
+                #     exportable_tile_samples_list = STATE.get_var('exportable_tile_samples_list')
+                #     self.process_exportable_tile_samples(exportable_tile_samples_list)
+                #     STATE.update_state(SystemStates.READY)
                     
                 elif state == SystemStates.POLL_DETECT:
                     # query for a tile sample pending processig 
@@ -370,16 +389,16 @@ class ApplicationCoordinator(object):
                 # switch to READY
                 STATE.update_state(SystemStates.READY)
             
-    def process_exportable_tile_samples(self, exportable_tile_samples_list:list):
-        for exportable_tile_sample in exportable_tile_samples_list:
-            tile_id, batch_id = exportable_tile_sample
-            tile_sample_data = IMPORT_SAMPLE_DAO.export_tile_sample_as_dict(tile_id=tile_id, batch_id=batch_id, auto_update_export_time=True)
-            is_valid, model = DETECT_DAO.validate_tile_sample_import(tile_sample_data)
-            if not is_valid:
-                logger.warning(f'process_exportable_tile_samples: Invalid tile sample ({tile_id, batch_id}) and is skipped\n')
-                continue
-            if not DETECT_DAO.import_tile_sample_yaml(tile_sample_data):
-                logger.warning(f'process_exportable_tile_samples: Unable to import tile sample ({tile_id, batch_id})')
+    # def process_exportable_tile_samples(self, exportable_tile_samples_list:list):
+    #     for exportable_tile_sample in exportable_tile_samples_list:
+    #         tile_id, batch_id = exportable_tile_sample
+    #         tile_sample_data = IMPORT_SAMPLE_DAO.export_tile_sample_as_dict(tile_id=tile_id, batch_id=batch_id, auto_update_export_time=True)
+    #         is_valid, model = DETECT_DAO.validate_tile_sample_import(tile_sample_data)
+    #         if not is_valid:
+    #             logger.warning(f'process_exportable_tile_samples: Invalid tile sample ({tile_id, batch_id}) and is skipped\n')
+    #             continue
+    #         if not DETECT_DAO.import_tile_sample_yaml(tile_sample_data):
+    #             logger.warning(f'process_exportable_tile_samples: Unable to import tile sample ({tile_id, batch_id})')
         
 # ---------------------------------------------------------
 # The main program for running the detector

@@ -19,23 +19,26 @@ from dash.exceptions import PreventUpdate
 from detector.model import DETECT_DAO, TaskStatusNames, TaskTypes
 
 class MonitorRecentTaskTableBlock():
-    def __init__(self, app, prefix, page_size=10):
+    def __init__(self, app, prefix, max_records=100, page_size=10):
         self.app = app
         self.prefix = prefix = prefix + 'mlttb_'
-        self.num_rows = page_size
+        self.max_records = max_records
+        self.page_size = page_size
         # --- define widgets
-        self._columns = [{'name': 'Task Type', 'id': 'task_type', 'type': 'text', 'editable': False},
-                         {'name': 'Task Object', 'id': 'task_object', 'type': 'text', 'editable': False},
-                         {'name': 'Started', 'id': 'start_time', 'type': 'datetime', 'editable': False},
+        self._columns = [
+                        #{'name': 'Task Type', 'id': 'task_type', 'type': 'text', 'editable': False},
+                         {'name': 'Tile Sample ID', 'id': 'task_object', 'type': 'text', 'editable': False},
+                         {'name': 'Start Time', 'id': 'start_time', 'type': 'datetime', 'editable': False},
                          {'name': 'Duration (s)', 'id': 'used_time', 'type': 'text', 'editable': False},
                          {'name': 'Status', 'id': 'status', 'type': 'text', 'editable': False},  
                          {'name': 'Remarks', 'id': 'remarks', 'type': 'text', 'editable': False},                                                 
                          ]
        
-        _the_datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_cell={'fontSize': 14}, cell_selectable=False, row_selectable=False)
+        _the_datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_cell={'fontSize': 14}, cell_selectable=False, row_selectable=False,
+                                              page_current=0, page_size=self.page_size)
         
         self._the_panel = dbc.Col([
-                html.H4(dbc.Badge('STATUS OF RECENT EXECUTION OF TASKS', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('STATUS OF RECENT JOBS', className='ms-1 me-2', color='white', text_color='secondary')),
                 dbc.Row([_the_datatable], className='mx-auto col-12'),
             ], className='mx-auto text-center')
         
@@ -47,7 +50,7 @@ class MonitorRecentTaskTableBlock():
             [Input(trigger_id, 'data')], prevent_initial_call=False)(self._update_table())  
         
     def _update_model(self):   
-        model = DETECT_DAO.list_recent_task_records(self.num_rows)
+        model = DETECT_DAO.list_recent_task_records(self.max_records)
         return model
     
     def _refine_model(self, model):

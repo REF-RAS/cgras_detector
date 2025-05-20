@@ -22,6 +22,10 @@ from cgras_datatools.lock_tools import synchronized
 from cgras_datatools.logging_tools import logger
 from detector.database_file import DBFile
 
+class NoAliasDumper(yaml.SafeDumper):
+    def ignore_aliases(self, data):
+        return True
+
 # NOTE: The batch_time is an ISO 8601 date time string format '2025-05-29 14:16:00' and the batch_id is derived from the time and cgras_station_id or the importer_id
 # NOTE: The date/time is recorded in localtime instead of the usual GMT because the system is not an Internet application and the data is considered locally
 
@@ -674,7 +678,7 @@ class DetectorDAO():
                     filepath = tile_image.get('file', None)
                     # metadata in yaml string format
                     metadata = tile_image.get('metadata', {}) # dump an empty dictionary as default
-                    metadata_yaml = yaml.dump(metadata, Dumper=yaml.Dumper)
+                    metadata_yaml = yaml.dump(metadata, Dumper=NoAliasDumper)
                     if image_files_parent_folder is not None:
                         filepath = os.path.join(image_files_parent_folder, filepath)
                     capture_id = tile_image.get('capture_id', f'{tile_sample_id}-{x}-{y}')
@@ -684,8 +688,8 @@ class DetectorDAO():
                 conn.commit()
             return True
         except Exception as e:
-            traceback.print_exc()
-            logger.warning(e)
+            # traceback.print_exc()
+            # logger.warning(e)
             return False
         
     # - composite operation: obtain sample info for a tile id
@@ -723,13 +727,9 @@ class DetectorDAO():
     # - table: yolo_model
     @synchronized
     def add_yolo_model(self, name:str, model_file_path:str, species:str, start_day:int, end_day:int, input_image_width:int, input_image_height:int, 
-                       classes_map:dict, remarks:str) -> int:
-        # coral_classes = [] if coral_classes is None or type(coral_classes) not in (list, tuple) else coral_classes
-        # coral_classes = yaml.dump(coral_classes, Dumper=yaml.Dumper)
-        # dead_coral_classes = [] if dead_coral_classes is None or type(dead_coral_classes) not in (list, tuple) else dead_coral_classes
-        # dead_coral_classes = yaml.dump(dead_coral_classes, Dumper=yaml.Dumper)   
+                       classes_map:dict, remarks:str) -> int:  
         classes_map = {} if classes_map is None else classes_map
-        classes_map_yaml = yaml.dump(classes_map, Dumper=yaml.Dumper)
+        classes_map_yaml = yaml.dump(classes_map, Dumper=NoAliasDumper)
              
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
@@ -1041,7 +1041,7 @@ class DetectorDAO():
     @synchronized
     def update_cache_tile_health_stat(self, tile_id, season, species, settle_time, coral_count_start, age_start, coral_count_latest, dead_coral_count_latest,
                                             other_object_count_latest, age_latest, batch_time_latest, loss_rate_whole, loss_rate_recent, num_samples, health_index, count_data):
-        count_data = yaml.dump(count_data, Dumper=yaml.Dumper)
+        count_data = yaml.dump(count_data, Dumper=NoAliasDumper)
         sql = 'REPLACE INTO cache_tile_health_stat (tile_id, season, species, settle_time, coral_count_start, age_start, coral_count_latest, dead_coral_count_latest, other_object_count_latest, \
                 age_latest, batch_time_latest, loss_rate_whole, loss_rate_recent, num_samples, health_index, count_yaml_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         db_tools.update(self.db_file, sql, (tile_id, season, species, settle_time, coral_count_start, age_start, coral_count_latest, dead_coral_count_latest,
@@ -1146,7 +1146,7 @@ class DetectorDAO():
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
             if metadata is not None:
-                metadata = yaml.dump(metadata, Dumper=yaml.Dumper)
+                metadata = yaml.dump(metadata, Dumper=NoAliasDumper)
             c.execute('INSERT INTO task_record (task_type, task_object, start_time, used_time, status, remarks, metadata) '
                       'VALUES (?, ?, ?, ?, ?, ?, ?)', 
                       (task_type, task_object, start_time, used_time, status, remarks, metadata,))
@@ -1173,19 +1173,27 @@ class DetectorDAO():
     def get_task_records_stat_as_df(self) -> pd.DataFrame:
         model = pd.DataFrame(columns=('', 'Values'))
         row_index = 1
-        # number of tasks completed
-        sql = 'SELECT task_type, COUNT(*) as count FROM task_record GROUP BY task_type ORDER BY task_type'
-        num_task_stat_list = db_tools.query_for_list_of_dicts(self.db_file, sql)
-        for num_task_stat in num_task_stat_list:
-            task_name = TaskTypes(num_task_stat['task_type']).name
-            model.loc[row_index] = [f'{task_name} Task Count', num_task_stat['count']]
-            row_index += 1
-        # mean duration of DETECT_CORAL task
-        sql = 'SELECT AVG(used_time) as mean_duration FROM task_record WHERE task_type = ? AND status = ?'
-        mean_duration = db_tools.query_for_object(self.db_file, sql, (TaskTypes.DETECT_CORALS.value, TaskStatusNames.SUCCESS.value))
-        if mean_duration is not None:
-            model.loc[row_index] = ['DETECT_CORALS Mean Time', f'{mean_duration:.1f} s']
-            row_index += 1
+        # number of pending samples
+        with db_tools.create_connection(self.db_file) as conn:
+            # count pending samples
+            sql = 'SELECT COUNT(*) FROM tile_sample WHERE status = ?'
+            result = db_tools.query_for_object(self.db_file, sql, (SampleStatusNames.QUEUED.value,))
+            result = 0 if result is None else result
+            model.loc[row_index] = [f'# PENDING SAMPLES', result]
+            row_index += 1            
+            # number of tasks completed
+            sql = 'SELECT status, COUNT(*) as count FROM task_record WHERE task_type = ? GROUP BY status ORDER BY status'
+            results = conn.execute(sql, (TaskTypes.DETECT_CORALS.value,)).fetchall()
+            for num_status in results:
+                status_name = TaskStatusNames(num_status[0]).name
+                model.loc[row_index] = [f'# {status_name}', num_status[1]]
+                row_index += 1            
+            # mean duration of DETECT_CORAL task
+            sql = 'SELECT AVG(used_time) as mean_duration FROM task_record WHERE task_type = ? AND status = ?'
+            mean_duration = db_tools.query_for_object(self.db_file, sql, (TaskTypes.DETECT_CORALS.value, TaskStatusNames.SUCCESS.value))
+            if mean_duration is not None:
+                model.loc[row_index] = ['Mean Time (SUCCESS)', f'{mean_duration:.1f} s']
+                row_index += 1
         return model
     
     # - table: error flag

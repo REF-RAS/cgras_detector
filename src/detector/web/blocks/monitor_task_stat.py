@@ -22,11 +22,16 @@ class MonitorTaskStatBlock():
     def __init__(self, app, prefix):
         self.app = app
         self.prefix = prefix = prefix + 'mtsb_'
-        # --- define widgets
-        _datatable = dash_table.DataTable(id=prefix+'datatable', style_cell={'fontSize': 14})
+        # define style
+        style_data_conditional = [
+            {'if': {'row_index': 0},
+                'backgroundColor': '#FFFF99',
+                'font-weight': 'bold'},]
+        # define widgets
+        _datatable = dash_table.DataTable(id=prefix+'datatable', style_data_conditional=style_data_conditional, style_cell={'fontSize': 14})
 
         self.tile_stat_panel = dbc.Col([
-                html.H4(dbc.Badge('TASK EXECUTION STATISTICS', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('STATISTICS', className='ms-2 mb-4', color='white', text_color='secondary')),
                 dbc.Row([_datatable], className='mx-auto col-12'),
             ], className='mx-auto text-center')
         

@@ -326,7 +326,7 @@ class ImageReconstructModelHelper():
         """
         object_dict = ImageReconstructModelHelper._to_dict(reco_model)
         if object_file is None:
-            return yaml.dump(object_dict)
+            return yaml.dump(object_dict, Dumper=yaml.Dumper)
         else:
             try:
                 with open(object_file, 'w') as outfile:

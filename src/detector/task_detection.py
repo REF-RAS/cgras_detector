@@ -167,7 +167,7 @@ class DetectionTaskModel():
         try:
             param_yaml_file = os.path.join(self.logdata_folder, task_params_metadata_filename)
             with open(param_yaml_file, 'w') as outfile:
-                yaml.dump(self.params, outfile, Dumper=yaml.Dumper)
+                yaml.dump(self.params, outfile, Dumper=yaml.SafeDumper)
         except Exception as e:
             logger.warning(f'{type(self).__name__}: unable to save detect model parameter to the logdata folder {param_yaml_file}')
             raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to save detect model parameter to the logdata folder {param_yaml_file}', e=e)
@@ -470,7 +470,7 @@ class DetectionTaskModel():
     def _update_detection_stat(self, detection_stat:dict):
         # convert the dict into yaml format
         # coral_alive_count, coral_dead_count, other_count, duplicates_removed
-        yaml_data = yaml.dump(detection_stat)
+        yaml_data = yaml.dump(detection_stat, Dumper=yaml.SafeDumper)
         DETECT_DAO.update_tile_sample_detect_stat(self.tile_sample_id, detection_stat['tile_pixel_x'], detection_stat['tile_pixel_y'], 
                             detection_stat['coral_alive_count'], detection_stat['coral_dead_count'], detection_stat['other_count'], 
                             detection_stat['duplicates_removed'], yaml_data)
