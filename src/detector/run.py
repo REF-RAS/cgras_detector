@@ -211,7 +211,7 @@ class ApplicationCoordinator(object):
             # switch to manual operation to prevent trapped in an error loop
             AUTOMATED_TASK_EXECUTION.set_value(False)            
             # set error flag to notify the user
-            DETECT_DAO.set_error_flag(DetectorExceptionCodes.UNEXPECTED_ERROR.value, "System", '*** Unexpected Error Occurred ***: examine the error log file under the CGRAS Data Folder') 
+            DETECT_DAO.set_error_flag(DetectorExceptionCodes.UNEXPECTED_ERROR.value, 'System', '*** Unexpected Error Occurred ***: examine the error log file under the CGRAS Data Folder') 
             # cancel the current task, which will change to D_CANCELLED state
             self.cancel_current_task()
     
@@ -385,7 +385,7 @@ class ApplicationCoordinator(object):
                 # switch to manual operation to prevent trapped in an error loop
                 AUTOMATED_TASK_EXECUTION.set_value(False)            
                 # set error flag to notify the user
-                DETECT_DAO.set_error_flag(DetectorExceptionCodes.UNEXPECTED_ERROR.value, "System", '*** Unexpected Error Occurred ***: examine the error log file under the CGRAS Data Folder') 
+                DETECT_DAO.set_error_flag(DetectorExceptionCodes.UNEXPECTED_ERROR.value, 'System', '*** Unexpected Error Occurred ***: examine the error log file under the CGRAS Data Folder') 
                 # switch to READY
                 STATE.update_state(SystemStates.READY)
             

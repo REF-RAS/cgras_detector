@@ -33,9 +33,14 @@ class MonitorRecentTaskTableBlock():
                          {'name': 'Status', 'id': 'status', 'type': 'text', 'editable': False},  
                          {'name': 'Remarks', 'id': 'remarks', 'type': 'text', 'editable': False},                                                 
                          ]
+
+        style_data_conditional = [{'if': {
+                    'filter_query': '{status} contains "FAIL"',
+                    'column_id': 'status'
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(255, 0, 0)'} ]
        
         _the_datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, style_cell={'fontSize': 14}, cell_selectable=False, row_selectable=False,
-                                              page_current=0, page_size=self.page_size)
+                                              page_current=0, page_size=self.page_size, style_data_conditional=style_data_conditional)
         
         self._the_panel = dbc.Col([
                 html.H4(dbc.Badge('STATUS OF RECENT JOBS', className='ms-1 me-2', color='white', text_color='secondary')),

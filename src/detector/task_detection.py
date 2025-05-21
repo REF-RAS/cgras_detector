@@ -233,7 +233,7 @@ class DetectionTaskModel():
         if self.reco_model is None:
             self.reco_model = ImageReconstructModel(self.image_map_as_list, **self.params) 
             if self.to_cancel:
-                self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
+                self.progress_model.end_stage(ProgressStages.RECO)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             self.reco_model.build()
             ImageReconstructModelHelper.to_yaml(self.reco_model, reco_model_file)
@@ -252,7 +252,7 @@ class DetectionTaskModel():
         if self.loctile_model is None:
             self.loctile_model = LocateTileModel(self.image_map_as_list, map_location_fn=self.reco_model.map_locations, image_size_in_px=self.reco_model.get_whole_reco_image_size(), **self.params)
             if self.to_cancel:
-                self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
+                self.progress_model.end_stage(ProgressStages.LOCTILE)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
             self.loctile_model.build()
             LocateTileModelHelper.to_yaml(self.loctile_model, loctile_model_file)
@@ -296,6 +296,7 @@ class DetectionTaskModel():
                 CoralObjectDetectModelHelper.to_yaml_file(self.cod_model, cod_model_file)  
             except Exception as e:
                 raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write cod model to yaml file {cod_model_file}', e=e)
+            
         # annotate an image of the reconstructed space with the objects for validation
         if self.logdata_folder:
             rotated_reco_image_file = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)

@@ -36,15 +36,15 @@ class MonitorErrorTableBlock():
                 {'if': {
                     'filter_query': '{level} = 0',
                     'column_id': 'remarks'
-                }, 'backgroundColor': '#ffffff', 'color': 'red'},
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(128, 0, 0)'},
                 {'if': {
                     'filter_query': '{level} > 0',
                     'column_id': 'remarks'
-                }, 'backgroundColor': '#ffffff', 'color': 'rgb(128, 0, 0)'},  
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(64, 0, 0)'},  
                 {'if': {
                     'filter_query': '{remarks} contains "file"',
                     'column_id': 'remarks'
-                }, 'backgroundColor': '#ffffff', 'color': 'rgb(128, 0, 0)'},                                       
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(96, 0, 0)'},                                       
                 ]
         
         self._datatable = dash_table.DataTable(columns=self._columns,

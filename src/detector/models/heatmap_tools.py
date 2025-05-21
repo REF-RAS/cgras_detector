@@ -54,6 +54,9 @@ class HeatmapHelper():
                 continue
             if class_filter is not None and coral_object.yolo_class not in class_filter:
                 continue
+            # filter out the out of bound objects
+            if coral_object.centre_normalized[0] < 0 or coral_object.centre_normalized[1] < 0 or coral_object.centre_normalized[0] >= 1.0 or coral_object.centre_normalized[1] >= 1.0:
+                continue
             # compute the cell index based on the object normalized location
             x, y = int(coral_object.centre_normalized[0] * map_size[0]), int(coral_object.centre_normalized[1] * map_size[1])
             x, y = min(x, map_size[0] - 1), min(y, map_size[1] - 1)

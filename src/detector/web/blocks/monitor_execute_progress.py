@@ -115,7 +115,7 @@ class MonitorExecuteProgressBlock():
                             progress = (5, 5, int(sub_progress[0] / sub_progress[1] * 80), 0)
                         else:
                             progress = (5, 5, 0, 0)
-                        progress_message = f'Counting coral babies in images ({sub_progress[0]} of {sub_progress[1]})'
+                        progress_message = f'Counting coral babies in the images ({sub_progress[0]} of {sub_progress[1]})'
                     elif current_stage == ProgressStages.COLLECT_STAT:
                         progress_message = f'Saving data for bittersweet reminiscence when the corals are populating the reef'
                         progress = (5, 5, 80, 2)

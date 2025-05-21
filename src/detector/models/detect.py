@@ -109,7 +109,9 @@ class CoralObjectDetectModel():
                 self.annotated_blob_filename_dict_lists[index]  = self.cod_model.get_annotated_blob_filename_dict_list()
                 # increase the counter
                 self.count_images_completed += 1 
-                
+        # make the last progress callback
+        if hasattr(self, 'progress_cb') and self.progress_cb is not None:
+            self.progress_cb((self.count_images_completed, self.num_images))
         # step 3: resolve duplicate objects in the overlapping regions between images
         logger.info(f'DUPLICATE OBJECT REMOVAL between images of the tile') 
         self.num_invalidated_objects = self._invalidate_duplicate_objects(self.object_list_of_images, self.image_grid_size)
@@ -322,6 +324,7 @@ class CoralObjectDetectModel():
                 text_pos = (int(bbox_in_tile[0]) + random.randint(-30, 30), int(bbox_in_tile[3]) + random.randint(15, 30))
                 # text_to_draw = coral_object.index_str.replace(' ', '')
                 text_to_draw = coral_object.yolo_class
+                text_to_draw = f'{coral_object.centre_normalized[0]:.3f},{coral_object.centre_normalized[1]:.3f}'
                 # text_to_draw the text
                 cv2.putText(rotated_reco_image, f'{text_to_draw}', text_pos,
                             cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.6, 0.6), (0, 0, 0), int(font_size + 0.5))   

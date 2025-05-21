@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import shutil
+import time
 import pandas as pd
 # dash modules
 import dash
@@ -62,7 +62,8 @@ class CountHeatmapBlock():
             ], className='text-center')
         
         # define callbacks
-        self.app.callback([Output(prefix+'chart_panel', 'children', allow_duplicate=True),],
+        self.app.callback([Output(prefix+'chart_panel', 'children', allow_duplicate=True),
+                           Output(prefix+'reverse_button', 'n_clicks'),],
                         [Input(prefix+'reverse_button', 'n_clicks'),
                          State(prefix+'chart_panel', 'children'),], 
             prevent_initial_call=True)(self._reverse_button_pressed()) 
@@ -202,12 +203,13 @@ class CountHeatmapBlock():
     # callback for the reverse button
     def _reverse_button_pressed(self):
         def reverse_button_pressed(n_clicks, graph_list):
-            if n_clicks is None or graph_list is None:
-                raise PreventUpdate
-            # update the state variable
-            self.reversed_heatmaps = not self.reversed_heatmaps
-            # reverse the current figures in the list to update the display
-            graph_list.reverse()
-            self.heatmap_figures_list.reverse()
-            return (graph_list,)
+            if n_clicks == 1 and graph_list is not None:
+                # update the state variable
+                self.reversed_heatmaps = not self.reversed_heatmaps
+                # reverse the current figures in the list to update the display
+                graph_list.reverse()
+                self.heatmap_figures_list.reverse()
+                return (graph_list, 0,)
+            time.sleep(1.0)
+            return (dash.no_update, 0,)
         return reverse_button_pressed

@@ -22,7 +22,7 @@ from detector.task_detection import DetectionTaskModel
 from cgras_datatools.logging_tools import logger
 
 class TileSampleTable():
-    def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_delete=False, allow_view=False):
+    def __init__(self, app, prefix, allow_priority=True, allow_reprocess=False, allow_delete=False, allow_view=False, paginagate:int=None):
         self.app = app 
         self.prefix = prefix = prefix + 'tst_'
         self.allow_priority = allow_priority
@@ -59,8 +59,12 @@ class TileSampleTable():
             {'if': {'column_id': 'remarks'},
             'fontSize': 14}
         ]
-                
-        self._datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, fill_width=True, row_selectable='multi',
+        if paginagate is not None and isinstance(paginagate, int):
+            self._datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, fill_width=True, row_selectable='multi',
+                                               style_cell_conditional=self._style_cell_conditional, 
+                                               cell_selectable=allow_view, row_deletable=False, page_current=0, page_size=paginagate)
+        else:
+            self._datatable = dash_table.DataTable(id=prefix+'datatable', columns=self._columns, fill_width=True, row_selectable='multi',
                                                style_cell_conditional=self._style_cell_conditional, 
                                                cell_selectable=allow_view, row_deletable=False)
 
@@ -76,7 +80,7 @@ class TileSampleTable():
                         dbc.Button('Annotated Blobs', target='view_image', external_link=True, id=prefix+'view_annotated_blobs_link', color='primary'),                       
                         ]
                         , className='d-grid gap-2 col-8 mx-auto p-2 pb-3')
-                        ], id=prefix+'view_modal', is_open=False)
+                    ], id=prefix+'view_modal', is_open=False)
         
         # define confirm panel in a modal
         self._reprocess_mode_radio = dcc.RadioItems(id=prefix+'reprocess_mode', options={
@@ -244,7 +248,7 @@ class TileSampleTable():
             row_index_list = list(selected_rows)
             button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
             button_index = button_id.get('index', None)
-
+            # handle each button pressed
             if button_index.endswith('redo'):
                 return (False, None, None, row_index_list, None, None, [])
             elif button_index.endswith('priority'):

@@ -154,13 +154,20 @@ class CountResultDownloadBlock():
                 # go through each tile sample id and retrieve the coral detection
                 for index, row in coral_count_trend_df.iterrows():
                     tile_sample_id = row['tile_sample_id']
+                    # generate detected_object worksheet for the tile_sample_id
                     detected_objects_df = DETECT_DAO.query_detected_objects(tile_sample_id)
                     detected_objects_df.to_excel(writer, sheet_name=f'Detect-{row["batch_time"][:11]}', index=False)
-                latest_tile_sample_id = coral_count_trend_df.iloc[-1]['tile_sample_id']
-                vt_model = CoralObjectMapModel(latest_tile_sample_id)
-                count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
-                count_map_df = pd.DataFrame(data=count_map)
-                count_map_df.to_excel(writer, sheet_name=f'CountMap-{coral_count_trend_df.iloc[-1]["batch_time"][:11]}', index=False)
+                    # generate count map for the tile sample id
+                    vt_model = CoralObjectMapModel(tile_sample_id)
+                    count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
+                    count_map_df = pd.DataFrame(data=count_map)
+                    count_map_df.to_excel(writer, sheet_name=f'CountMap-{row["batch_time"][:11]}', index=False)
+
+                # latest_tile_sample_id = coral_count_trend_df.iloc[-1]['tile_sample_id']
+                # vt_model = CoralObjectMapModel(latest_tile_sample_id)
+                # count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
+                # count_map_df = pd.DataFrame(data=count_map)
+                # count_map_df.to_excel(writer, sheet_name=f'CountMap-{coral_count_trend_df.iloc[-1]["batch_time"][:11]}', index=False)
                 writer.close()
                 output.seek(0)
                 # wrap up the excel file and send for download

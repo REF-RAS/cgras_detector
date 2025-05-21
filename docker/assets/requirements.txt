@@ -1,10 +1,12 @@
 dash==3.0.4
-dash-bootstrap-components==2.0.2
+# dash-bootstrap-components==2.0.2
+dash-bootstrap-components
 dash_ag_grid==31.2.0
 dash_auth==2.3.0
 dash_daq==0.6.0
 flask-restx==1.3.0
 plotly==6.0.1
+seaborn
 json2html==1.3.0
 python-dateutil==2.8.2
 numpy==1.24.4
@@ -12,6 +14,8 @@ pandas==2.0.3
 opencv_contrib_python==4.8.1.78
 scikit-image==0.21.0
 scikit-learn==1.3.2
+# pytorch
+# networtx==2.8.8
 
 notebook==6.5.5 
 ipykernel
@@ -24,12 +28,11 @@ ipywidgets
 # project
 stitching==0.5.3
 kaleido==0.2.1
-# yolo
-networkx==2.8.8
 # access ports
 pyudev==0.24.1
 psutil==5.9.5
 defusedxml==0.7.1
 rospkg==1.5.0
 # to resolve the error of undefined symbol: ffi_type_pointer, version LIBFFI_BASE_7.0
-libffi==3.3
+# python 3.9 is not supported by noetic
+# libffi==3.3

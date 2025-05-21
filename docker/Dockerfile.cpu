@@ -27,7 +27,7 @@ RUN mkdir -p ${CGRAS_WS}/src
 # git clone git@github.com:Coral-Imaging/cgras_imaging_agent.git
 
 # install base packages
-RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo apt-get install -y \
+RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 lsb-release \
 git \
 openssh-server \
@@ -35,13 +35,13 @@ ca-certificates \
 net-tools \
 locales \
 figlet \
-curl \catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
+curl \
 iputils-ping \
 vim
 
 RUN git config --global core.editor "vim"
 
-RUN sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 wget \
 software-properties-common \
 dbus \
@@ -52,11 +52,11 @@ gdb
 
 # install python
 RUN sudo add-apt-repository ppa:deadsnakes/ppa
-RUN sudo apt-get update
-RUN sudo apt-get install python3.11
+
+# RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo apt-get upgrade -y python3.9 
 
 # install python
-RUN sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 python3-pip \
 python3-rosdep \
 python3-setuptools \
@@ -73,9 +73,8 @@ RUN pip install -r ${CGRAS_WS}/src/requirements.txt
 RUN rm ${CGRAS_WS}/src/requirements.txt
 
 # install yolo and pytorch
-# RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-RUN pip install ultralytics
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+RUN pip install networkx ultralytics
 
 # complete rosdep installation
 RUN rosdep update

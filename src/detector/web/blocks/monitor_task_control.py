@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-
+import time
 # dash modules
 import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
@@ -47,7 +47,7 @@ class MonitorTaskControlBlock():
                 dcc.Store(id=prefix+'task_execute_mode_store'),
                 html.H4(dbc.Badge('JOB CONTROL', className='ms-2 mb-4', color='white', text_color='secondary')),
                 html.Div([
-                   dbc.Button(id=prefix+'mode_button', className='me-4', style={'width': '320px'}),
+                   dbc.Button(' ', id=prefix+'mode_button', className='me-4', color='light', style={'width': '320px'}),
                 ], className='mb-4 mx-auto col-12'), 
                 html.P(' ', id=prefix+'mode_message', className='mt-2 mx-auto col-12'),
                 self.button_panel,
@@ -90,23 +90,24 @@ class MonitorTaskControlBlock():
     def _button_pressed(self):
         def button_pressed(*args):
             button_id = ctx.triggered_id if ctx.triggered_id is not None else {}
-            logger.warning(f'_button_pressed: {args}')
             button_index = button_id.get('index', None)
             return_n_click_list = args[0]
+            default_n_click_list = (None, None,)
             if button_index is None:
                 raise PreventUpdate
             elif button_index.endswith('process_tile'):
                 if return_n_click_list[0] != None and return_n_click_list[0] > 1:
-                    raise PreventUpdate
+                    time.sleep(1.0)
+                    return (dash.no_update, dash.no_update, dash.no_update, default_n_click_list)
                 CALLBACK_MANAGER.fire_event(CallbackTypes.PROCESS_TILE_CLICKED)
-                return_n_click_list[0] = None
-                return (True, 'Attempt to process the next pending tile sample if it exists', 'Process Tile', return_n_click_list)
+                return (True, 'Attempt to process the next pending tile sample if it exists', 'Process Tile', default_n_click_list)
             elif button_index.endswith('import_sample'):
                 if return_n_click_list[1] != None and return_n_click_list[1] > 1:
-                    raise PreventUpdate
+                    time.sleep(1.0)
+                    return (dash.no_update, dash.no_update, dash.no_update, default_n_click_list)
                 CALLBACK_MANAGER.fire_event(CallbackTypes.IMPORT_SAMPLE_CLICKED)
                 return_n_click_list[1] = None
-                return (True, 'Attempt to import new tile samples found in the image acquisition system', 'Import New Tile Samples', return_n_click_list)            
+                return (True, 'Attempt to import new tile samples found in the image acquisition system', 'Import New Tile Samples', default_n_click_list)            
             else:               
                 raise PreventUpdate
         return button_pressed
@@ -114,10 +115,11 @@ class MonitorTaskControlBlock():
     def _mode_button_pressed(self):
         def mode_button_pressed(n_clicks):
             if n_clicks != None and n_clicks > 1:
-                raise PreventUpdate
+                time.sleep(1.0)
+                return (0, )
             new_mode = not AUTOMATED_TASK_EXECUTION.value
             CALLBACK_MANAGER.fire_event(CallbackTypes.TASK_EXECUTE_MODE_CHANGED, new_mode)
-            return (0,)        
+            return (0, )        
         return mode_button_pressed
 
     def _update_panel(self):
