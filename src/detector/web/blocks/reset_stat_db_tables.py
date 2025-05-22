@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-
+import time
 # dash modules
 import dash
 from dash import html, dcc, Input, Output, State, dash_table, ctx, ALL
@@ -48,7 +48,8 @@ class ResetStatDBTableBlock():
             ], className='text-center')
 
         self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
-                           Output(self.button_pressed_store_id, 'data',)],
+                           Output(self.button_pressed_store_id, 'data',),
+                           Output(prefix+'clear_task_records_button', 'n_clicks')],
                             [Input(prefix+'clear_task_records_button', 'n_clicks')], 
             prevent_initial_call=True)(self._button_pressed())
         
@@ -62,11 +63,13 @@ class ResetStatDBTableBlock():
         return self.reset_db_panel
         
     def _button_pressed(self):
-        def button_pressed(button_id):
-            button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
-            if button_id.endswith('clear_task_records_button'):
-                return (True, button_id)
-            return (False, None)
+        def button_pressed(n_clicks):
+            if n_clicks == 1:
+                button_id = ctx.triggered_id if ctx.triggered_id is not None else 'No clicks yet'
+                if button_id.endswith('clear_task_records_button'):
+                    return (True, button_id, 0)
+            time.sleep(1.0)
+            return (False, dash.no_update, 0)
         return button_pressed
     
     def _cb_confirm_modal_pressed(self):

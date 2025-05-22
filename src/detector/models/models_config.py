@@ -34,14 +34,9 @@ class ModelsConfigNames(Enum):
     RECO_ASPECT_RATIO_ROI_ERROR_REL = 'aspect_ratio_roi_error_rel'
     RECO_MISPLACED_ROI_ERROR_REL = 'misplaced_roi_erro_rel'
     
-    # WHOLE_TILE_IAMGE_SIZE = 'whole_tile_image_size'     # the size of the tile (including tile holder) in pixels (for correction of rotated image and default value if the corner is not found)
-    # TILE_HOLDER_WIDTH = 'tile_holder_width'             # the width of the tile holder in pixels
-    
     TILE_SIZE_IN_MM = 'tile_size_in_mm'     # the size of the tile in mm (width, height)
     FRAME_SIZE_IN_MM = 'frame_size_in_mm'   # the size of the frame in mm (width, height)
     
-    # LOCTILE_BLUE_RATIO_MIN = 'loctile_blue_ratio_min'     # NOTE: not used because the background classifier is a machine learning model
-    # LOCTILE_RED_RATIO_MAX = 'loctile_red_ratio_max'       # NOTE: not used because the background classifier is a machine learning model
     
     LOCTILE_WORKING_SCALE = 'loctile_working_scale'
     LOCTILE_TEMPLATE_SIZE = 'loctile_template_size'
@@ -57,8 +52,7 @@ class ModelsConfigNames(Enum):
     COD_USE_CACHED_OBJECT_DETECTION = 'cod_use_cached_object_detection'
     COD_CORAL_CHILD_MIN_OVERLAP_RATIO = 'cod_coral_child_min_overlap_ratio'
     COD_MERGE_MULTI_MODELS = 'cod_merge_mutli_models'
-    # COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES = 'cod_duplicate_max_displacement_images'
-    # COD_DUPLICATE_MAX_DISPLACEMENT_BLOBS = 'cod_duplicate_max_displacement_blobs'
+    COD_MASK_POLYP_KEYPART = 'cod_mask_polyp_keypart'
     
     # the following are parameters generated dynamically during task execution
     LOGDATA_FOLDER = 'logdata_folder'

@@ -915,16 +915,27 @@ class DetectorDAO():
         return self.add_detected_object(tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class,
                                         centre_x, centre_y, corner_x1, corner_y1, size_x, size_y)        
 
-    def add_detected_object_from_coral_object_list(self, tile_sample_id, coral_object_list, stat):
+    def add_detected_object_from_coral_object_list(self, tile_sample_id, coral_object_list, stat:dict=None, exclude_outside_of_tile:bool=True):
+        if stat is None:
+            stat = {
+                'coral_alive_count': 0,
+                'coral_dead_count': 0,
+                'other_count': 0,
+                'masked': 0,
+            } 
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()        
             coral_object:CoralObject
             for coral_object in coral_object_list:
                 if coral_object.invalidated:
                     continue
+                # exclude the objects that are outside of the tile area, which is between (0, 0) and (1, 1)
                 centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
+                if exclude_outside_of_tile and (centre_x < 0 or centre_x >= 1 or centre_y < 0 or centre_y >= 1):
+                    continue
                 corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
                 size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
+                # tally the coral types
                 if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
                     stat['coral_alive_count'] += 1
                 elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:

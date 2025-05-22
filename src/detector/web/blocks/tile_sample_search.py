@@ -9,7 +9,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import shutil
+import time
 from collections import OrderedDict
 import pandas as pd
 # dash modules
@@ -80,7 +80,7 @@ class TileSampleSearchBlock():
                            Output(prefix+'period_dropdown', 'value', allow_duplicate=True),
                            Output(prefix+'pagesize_dropdown', 'value', allow_duplicate=True),
                            Output(prefix+'status_dropdown', 'value', allow_duplicate=True),
-                           # Output(prefix+'refresh_button', 'n_clicks', allow_duplicate=True),
+                           Output(prefix+'reset_filter_button', 'n_clicks'),
                            ],
                             [
                             Input(prefix+'reset_filter_button', 'n_clicks'),
@@ -89,7 +89,6 @@ class TileSampleSearchBlock():
 
         self.app.callback([Output(prefix+'search_query_store', 'data')],
                             [
-                            # Input(prefix+'refresh_button', 'n_clicks'),
                             Input(prefix+'tile_id_input', 'value'),
                             Input(prefix+'batch_id_input', 'value'),
                             Input(prefix+'period_dropdown', 'value'),
@@ -112,12 +111,15 @@ class TileSampleSearchBlock():
 
     def _reset_filter_button_clicked(self):
         def reset_filter_button_clicked(n_clicks, _):
-            period_options = self.period_options
-            season_titles_list = DETECT_DAO.list_seasons_in_tile_sample()
-            for season_title in season_titles_list:
-                period_options.append({'label': f'{season_title} Season', 'value': season_title})
-            value = 0
-            return ('', '', period_options, value, 10, SampleStatusNames.ALL.value,)
+            if n_clicks == 1:
+                period_options = self.period_options
+                season_titles_list = DETECT_DAO.list_seasons_in_tile_sample()
+                for season_title in season_titles_list:
+                    period_options.append({'label': f'{season_title} Season', 'value': season_title})
+                value = 0
+                return ('', '', period_options, value, 10, SampleStatusNames.ALL.value, 0)
+            time.sleep(1.0)
+            return (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, 0)
         return reset_filter_button_clicked
     
     def _refresh_table_clicked(self):

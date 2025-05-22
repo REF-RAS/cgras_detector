@@ -3,6 +3,7 @@
 # the Queensland University of Technology
 
 services:
+    # the service based on the container installed with cuda/gpu version of pytorch
     cgras:
         build:
             context: .
@@ -39,10 +40,79 @@ services:
             - ~/cgras_data:/home/qcr/cgras_data:rw
         command:
             bash
+    # the service based on the container installed with cpu version of pytorch
+    cgras-cpu:
+        build:
+            context: .
+            dockerfile: Dockerfile.cpu
+        image: cgras-cpu
+        container_name: cgras-cpu
+        devices:
+            - /dev/dri
+        group_add:
+            - video
+        stdin_open: true
+        tty: true
+        privileged: true
+        environment:
+            - DISPLAY
+            - QT_X11_NO_MITSHM=1
+            - ROS_MASTER=false
+            - ROS_MASTER_URI=http://localhost:11311
+            # - ROS_MASTER_URI=http://192.168.1.50:11311
+            # - ROS_IP=192.168.1.50
+        network_mode:  host
+        ipc: host
+        user: qcr
+        working_dir: /home/qcr
+        volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix:rw
+            - /etc/timezone:/etc/timezone:ro
+            - /etc/localtime:/etc/localtime:ro
+            - ~/.ssh:/home/qcr/.ssh  
+            - ~/cgras_ws/src/cgras_messages:/home/qcr/cgras_ws/src/cgras_messages:rw     
+            - ~/cgras_ws/src/cgras_detector:/home/qcr/cgras_ws/src/cgras_detector:rw   
+            - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
+            - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
+            - ~/cgras_data:/home/qcr/cgras_data:rw
+        command:
+            bash
+    # the service that runs the cgras systems using the cuda/gpu enabled container
     cgras-system:
         extends: 
             service: cgras
         container_name: cgras-system
+        stdin_open: true
+        tty: true
+        privileged: true
+        environment:
+            - DISPLAY
+            - QT_X11_NO_MITSHM=1
+            - ROS_MASTER=false
+            - ROS_MASTER_URI=http://localhost:11311
+            # - ROS_MASTER_URI=http://192.168.1.50:11311
+            # - ROS_IP=192.168.1.50
+        network_mode: host
+        ipc: host
+        user: qcr
+        working_dir: /home/qcr
+        volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix:rw
+            - /etc/timezone:/etc/timezone:ro
+            - /etc/localtime:/etc/localtime:ro
+            - ~/.ssh:/home/qcr/.ssh  
+            - ~/cgras_ws/src/cgras_messages:/home/qcr/cgras_ws/src/cgras_messages:rw     
+            - ~/cgras_ws/src/cgras_detector:/home/qcr/cgras_ws/src/cgras_detector:rw   
+            - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
+            - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
+            - ~/cgras_data:/home/qcr/cgras_data:rw
+        command:
+            ['/bin/bash', '-c', 'cd /home/qcr/cgras_ws && catkin_make && source /home/qcr/cgras_ws/devel/setup.bash && roslaunch cgras_detector default.launch']
+    # the service that runs the cgras systems using the cpu enabled container
+    cgras-system-cpu:
+        extends: 
+            service: cgras-cpu
+        container_name: cgras-system-cpu
         stdin_open: true
         tty: true
         privileged: true

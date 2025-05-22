@@ -340,16 +340,14 @@ class DetectionTaskModel():
             self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
             raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
         try:
-            stat = {
-                'coral_alive_count': 0,
-                'coral_dead_count': 0,
-                'other_count': 0,
-                'masked': 0,
-                'duplicates_removed': self.cod_model.get_num_invalidated_objects(),
-                'total_object_count': self.cod_model.get_num_objects(),
-            }            
             # stat = self._process_detected_objects(self.cod_model)    # DB operation
-            stat = DETECT_DAO.add_detected_object_from_coral_object_list(self.tile_sample_id, self.cod_model.get_object_list(), stat) # DB operation
+            stat = DETECT_DAO.add_detected_object_from_coral_object_list(self.tile_sample_id, self.cod_model.get_object_list(), exclude_outside_of_tile=True) # DB operation
+            stat.update(
+                {
+                    'duplicates_removed': self.cod_model.get_num_invalidated_objects(),
+                    'total_object_count': self.cod_model.get_num_objects(),
+                }
+            )
             logger.info(f'{type(self).__name__}: Statistics {stat}')
             self.detection_stat.update(stat)
             # save the statistics to the database
@@ -475,31 +473,32 @@ class DetectionTaskModel():
         DETECT_DAO.update_tile_sample_detect_stat(self.tile_sample_id, detection_stat['tile_pixel_x'], detection_stat['tile_pixel_y'], 
                             detection_stat['coral_alive_count'], detection_stat['coral_dead_count'], detection_stat['other_count'], 
                             detection_stat['duplicates_removed'], yaml_data)
-         
-    def _process_detected_objects(self, cod_model:CoralObjectDetectModel) -> dict:
-        stat = {
-            'coral_alive_count': 0,
-            'coral_dead_count': 0,
-            'other_count': 0,
-            'duplicates_removed': cod_model.get_num_invalidated_objects(),
-            'total_object_count': cod_model.get_num_objects(),
-        }
-        coral_object_list:list = cod_model.get_object_list()
-        coral_object:CoralObject
-        for coral_object in coral_object_list:
-            if coral_object.invalidated:
-                continue
-            centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
-            corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
-            size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
-            if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
-                stat['coral_alive_count'] += 1
-            elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:
-                stat['coral_dead_count'] += 1
-            elif coral_object.present_class == ClassHierarchyPresentation.OTHER.value:
-                stat['other_count'] += 1
-            DETECT_DAO.add_detected_object_from_coral_object(self.tile_sample_id, coral_object)
-        return stat
+
+    # NOTE: not used in execute_task_record     
+    # def _process_detected_objects(self, cod_model:CoralObjectDetectModel) -> dict:
+    #     stat = {
+    #         'coral_alive_count': 0,
+    #         'coral_dead_count': 0,
+    #         'other_count': 0,
+    #         'duplicates_removed': cod_model.get_num_invalidated_objects(),
+    #         'total_object_count': cod_model.get_num_objects(),
+    #     }
+    #     coral_object_list:list = cod_model.get_object_list()
+    #     coral_object:CoralObject
+    #     for coral_object in coral_object_list:
+    #         if coral_object.invalidated:
+    #             continue
+    #         centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
+    #         corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
+    #         size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
+    #         if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
+    #             stat['coral_alive_count'] += 1
+    #         elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:
+    #             stat['coral_dead_count'] += 1
+    #         elif coral_object.present_class == ClassHierarchyPresentation.OTHER.value:
+    #             stat['other_count'] += 1
+    #         DETECT_DAO.add_detected_object_from_coral_object(self.tile_sample_id, coral_object)
+    #     return stat
 
     @staticmethod
     def delete_cache_files(tile_sample_id:str, delete_reco=False, delete_object_list=False, delete_object_detection_model=False):
@@ -512,13 +511,12 @@ class DetectionTaskModel():
             if delete_object_list:
                 delete_object_detection_model = True
                 for file in glob.glob(os.path.join(logdata_folder, 'object_list_*.yaml')):
+                    logger.warning(f'delete_cache_files: {file}')
                     os.remove(file)
             
             if delete_object_detection_model:            
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.COD_MODEL_FILENAME.value, 'coral_object_detect_model.yaml')))
                 
-
-                    
     @staticmethod
     def delete_cache_folder(tile_sample_id:str):
         with contextlib.suppress(FileNotFoundError, Exception):
