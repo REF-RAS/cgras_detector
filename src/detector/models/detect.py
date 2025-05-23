@@ -22,6 +22,7 @@ from detector.dao_detect import CoralObject, ClassHierarchyPresentation, ClassHi
 
 from cgras_datatools.opencv_tools import CompareTools
 
+
 class CoralObjectDetectModel():
     # constant
     ANNOTATED_WHOLE_RECO_IMAGE_FILENAME = 'rotated_whole_reco_image_annotated.jpg'
@@ -504,7 +505,10 @@ class CoralObjectDetectModel():
                             parent_object.present_class = ClassHierarchyPresentation.OTHER.value
                 # parent is ALIVE_CORAL if its coral class is POLYP_KEYPART and not mask_polyp_keypart, which is a system config
                 elif parent_object.coral_class == ClassHierarchyCoral.POLYP_KEYPART.value:
-                    parent_object.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value 
+                    if not self.mask_polyp_keypart:
+                        parent_object.present_class = None
+                    else:
+                        parent_object.present_class = ClassHierarchyPresentation.MASKED.value 
                 # parent is ALIVE_CORAL if its coral class is POLYP_SINGLE
                 elif parent_object.coral_class == ClassHierarchyCoral.POLYP_SINGLE.value:
                     parent_object.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value 
@@ -530,9 +534,9 @@ class CoralObjectDetectModel():
                     # to determine if it is considered ALIVE because sometimes the parent POLYP_MULTI is not detected
                     elif obj.coral_class == ClassHierarchyCoral.POLYP_KEYPART.value:
                         if not self.mask_polyp_keypart:
-                            parent_object.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value 
+                            obj.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value 
                         else:
-                            parent_object.present_class = ClassHierarchyPresentation.MASKED.value 
+                            obj.present_class = ClassHierarchyPresentation.MASKED.value 
                     # DEAD_CORAL is mapped to DEAD_CORAL
                     elif obj.coral_class == ClassHierarchyCoral.DEAD_CORAL.value:
                         obj.present_class = ClassHierarchyPresentation.DEAD_CORAL.value   
@@ -724,6 +728,7 @@ class CoralObjectDetectImageModel():
                             # extract the detected objects from the output of the yolo model of this blob
                             object_list = self._extract_objects_from_result(yolo_result, classes_map, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, 
                                                                             self.map_bbox_image_fn, self.map_normalize_bbox_tile_fn)  
+                            # combine the object lists from the yolo detect models
                             if object_list_of_blob is None:
                                 object_list_of_blob = object_list
                             elif self.merge_mutli_yolo_models:

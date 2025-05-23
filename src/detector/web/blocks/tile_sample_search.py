@@ -111,7 +111,7 @@ class TileSampleSearchBlock():
 
     def _reset_filter_button_clicked(self):
         def reset_filter_button_clicked(n_clicks, _):
-            if n_clicks == 1:
+            if n_clicks <= 1:   # n_clicks is 0 if the callback is triggered by page loading
                 period_options = self.period_options
                 season_titles_list = DETECT_DAO.list_seasons_in_tile_sample()
                 for season_title in season_titles_list:

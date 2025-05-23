@@ -2,9 +2,11 @@
 
 The **Coral Counting and Visualization System (CCVS)** is part of the CGRAS 2025 platform. It is designed to monitor the coral recruitment process in tanks with acquaculture tiles. It achieves the objective based on visual analytics on images captured of the tiles, which involves the application of deep-learning based object detection models, the post-processing of identified objects, and the presentation of the findings. CCVS provides a web interface for users to monitor and control the visual analytics process, to manage the image samples, and to visualize the trend and distribution of corals of a tile. 
 
+At the upstream of the CGRAS 2025 finds the **Image Acquisition Coorindation System (IACS)**, which is designed to autonomously capture images of acquaculture tiles in a operation zone called the **CGRAS Arena**. 
+
 ## Basic Operation
 
-The CCVS can operate in tendem with the **Image Acquisition Coorindation System (IACS)**, from which the input images of tile samples are retrieved through the ROS middleware. It can operate also in a stand-alone manner, in which case the input images can be imported through the user interface or a RESTful API.
+The CCVS can operate in tendem with the IACS, from which the input images of tile samples are retrieved through the ROS middleware. It can operate also in a stand-alone manner, in which case the input images can be imported through the user interface or a RESTful API.
 
 The input images are organized as tile samples. A tile sample is a set of images captured of a tile. Depending on the image capturing device, multiple images may be required to capture all areas of a tile at a required resolution. The images are expected to arrange in a grid-like manner. A tile sample is associated with a particular tile, identified by the __tile_id__, and the capture time, identified by the __batch_id__.
 
@@ -18,7 +20,7 @@ The following shows the main screen - the Monitor, which is structured into four
 
 ![Dashboard Screen](docs/images/DashboardScreen.png)
 
-The top-left corner is the __job control__ panel. CCVS has defined two job types: (1) coral detection of a tile sample and (2) retrieval of a tile sample from the IACS. 
+The top-left corner is the __job control__ panel. CCVS has defined two job types: (1) coral detection of a tile sample and (2) retrieval of a tile sample from the IACS. In the __Automated Execution Mode__, the system autonomously polls the tile sample manager for samples pending for coral detection and polls the IACS for new tile samples. 
 
 
 
@@ -28,7 +30,7 @@ CCVS operates as an autonomous system that streamlines fetching of newly acquire
 
 
 
-![Chart Screen](docs/ChartScreen.png)
+
 
 ## Running the Node
 

@@ -1220,8 +1220,12 @@ class DetectorDAO():
     
     @synchronized
     def unset_error_flag(self, id:int, obj:str) -> int:
-        sql = 'DELETE FROM error_flag WHERE id = ? AND object = ?'
-        return db_tools.update(self.db_file, sql, (id, obj))       
+        if obj is None or obj == '':
+            sql = 'DELETE FROM error_flag WHERE id = ? AND object IS NULL'
+            return db_tools.update(self.db_file, sql, (id,)) 
+        else:
+            sql = 'DELETE FROM error_flag WHERE id = ? AND object = ?'
+            return db_tools.update(self.db_file, sql, (id, obj))       
 
     @synchronized
     def clear_error_flags(self) -> int:

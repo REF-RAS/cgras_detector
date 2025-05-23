@@ -286,6 +286,8 @@ class TileSampleTable():
                 row_index_list = action_data['selected_list']
                 message_info = []
                 for row_index in row_index_list:
+                    if row_index >= len(self._model):
+                        continue
                     tile_sample_id = self._model.iloc[row_index]['id']
                     if action_data['action'] == 'reject':
                         DETECT_DAO.update_tile_sample_status(tile_sample_id, SampleStatusNames.REJECTED.value)

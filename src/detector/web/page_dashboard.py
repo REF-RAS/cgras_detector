@@ -56,7 +56,7 @@ class DashboardPage():
         # putting the GUI components together 
         self._panel = html.Div(id='scan-body',children = [
             dcc.Store(id=self.update_store_id),
-            dbc.Row(html.H3(children = 'The Monitor', className='mt-3 mb-3')),
+            dbc.Row(html.H3(children = 'Application Monitor', className='mt-3 mb-3')),
             dbc.Row([
                 dbc.Col(self.process_task_control_panel.get_panel(), className='col-5 border'),
                 dbc.Col(self.monitor_task_stat_panel.get_panel(), className='col-2 border'),                

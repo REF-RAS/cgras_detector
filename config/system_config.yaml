@@ -73,4 +73,4 @@ cgras_detector:
   cod_coral_child_min_overlap_ratio: 0.25         # the pverlap ratio of a polyp_single or polyp_keypart that is considered a child of a polyp_multi
   cod_merge_mutli_models: True                # merge the detection result with duplication removal
   # detection task parameters: object detection classification
-  cod_mask_polyp_keypart: True
+  cod_mask_polyp_keypart: False
