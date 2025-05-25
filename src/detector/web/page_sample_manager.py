@@ -47,7 +47,7 @@ class SampleManagerPage():
 
         # putting the components together 
         rows = html.Div(id='scan-body', children =[
-            dbc.Row(html.H3(children = 'Sample Processing Manager', className='mt-3 mb-3')),
+            dbc.Row(html.H3(children = 'Tile Sample Manager', className='mt-3 mb-3')),
             dbc.Row(html.H4(children = 'Import of Tile Samples', className='text-center mt-5 mb-3')),
             dbc.Row([dbc.Col(self.tile_sample_retrieve_panel.get_panel(), className='col-6 border'), 
                      dbc.Col(self.tile_sample_import_panel.get_panel(), className='col-6 border')

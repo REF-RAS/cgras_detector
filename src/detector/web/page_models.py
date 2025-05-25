@@ -46,7 +46,7 @@ class ModelsPage():
 
         # putting the components together 
         rows = html.Div(id='scan-body', children =[
-            dbc.Row(html.H3(children = 'Models Management', className='mt-3 mb-3')),
+            dbc.Row(html.H3(children = 'Detection Model Manager', className='mt-3 mb-3')),
             dbc.Row(html.H4(children = 'Import Yolo Model', className='text-center mt-5 mb-3')),
             dbc.Row([dbc.Col(self.yolo_model_file_import_panel.get_panel(), className='col-12 border'), 
                      ], className='mx-auto'),

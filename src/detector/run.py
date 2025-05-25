@@ -131,6 +131,8 @@ class ApplicationCoordinator(object):
             if event == CallbackTypes.PROCESS_TILE_TO_CANCEL:
                 logger.warning(f'_console_callback: received CANCEL callback')
                 self.cancel_current_task()
+                logger.info(f'_console_callback: change execution mode to MANUEL')
+                AUTOMATED_TASK_EXECUTION.set_value(False)
                 
     def cancel_current_task(self) -> bool:
         with self.state_lock:
