@@ -90,7 +90,35 @@ The top pane is the drop area for the import of a detection model specification 
 
 ## System Installation
 
-The CCVS is written in Python and it is designed to run in a ROS1 (noetic) environment. It will run significantly more efficient with the support of CUDA/GPU but it can also run on a pure CPU host.
+The CCVS is written in Python and it is designed to run in a ROS1 (noetic) environment. It will run significantly more efficient with the support of CUDA/GPU but it can also run on a pure CPU host. 
+
+#### Create a workspace for CGRAS packages
+
+Assume that the path to the CGRAS packages is in the environment variable `CGRAS_WS` and it has the value `/home/qcr/cgras_ws`.  Create the workspace folders as follows.
+
+```bash
+mkdir -p $CGRAS_WS/src
+```
+In addition to this repository, the repositories of `cgras_datatools`, `cgras_messages`, and optionally `cgras_coordinator` are to be downloaded and saved to the `src` folder.
+
+```bash
+cd $CGRAS_WS/src
+git clone git@github.com:REF-RAS/cgras_detector.git
+
+git clone git@github.com:REF-RAS/cgras_datatools.git
+git clone git@github.com:REF-RAS/cgras_messages.git
+git clone git@github.com:REF-RAS/cgras_coordinator.git
+```
+
+
+
+
+
+
+
+
+
+
 
 ### 
 
