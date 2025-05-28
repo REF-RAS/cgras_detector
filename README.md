@@ -94,15 +94,20 @@ The CCVS is written in Python and it is designed to run in a ROS1 (noetic) envir
 
 #### Create a workspace for CGRAS packages
 
-Assume that the path to the CGRAS packages is in the environment variable `CGRAS_WS` and it has the value `/home/qcr/cgras_ws`.  Create the workspace folders as follows.
+Assume that the path to the CGRAS packages is in the environment variable `CGRAS_WS` and it has the value `/home/qcr/cgras_ws`.  
+```bash
+CGRAS_WS=/home/qcr/cgras_ws
+export CGRAS_WS
+```
+Create the workspace folders as follows.
 
 ```bash
-mkdir -p $CGRAS_WS/src
+mkdir -p ${CGRAS_WS}/src
 ```
 In addition to this repository, the repositories of `cgras_datatools`, `cgras_messages`, and optionally `cgras_coordinator` are to be downloaded and saved to the `src` folder.
 
 ```bash
-cd $CGRAS_WS/src
+cd ${CGRAS_WS}/src
 git clone git@github.com:REF-RAS/cgras_detector.git
 
 git clone git@github.com:REF-RAS/cgras_datatools.git
@@ -112,7 +117,7 @@ git clone git@github.com:REF-RAS/cgras_coordinator.git
 The resulting folder structure under the CGRAS workspace is shown below.
 
 ```bash
-$(CGRAS_WS)                 # the root of the CGRAS workspace
+${CGRAS_WS}                 # the root of the CGRAS workspace
 ├── src                  
 ├──├── cgras_detector           # the package of CCVS
 ├──├── cgras_coordinator        # the package of IACS (optional)
@@ -121,6 +126,7 @@ $(CGRAS_WS)                 # the root of the CGRAS workspace
 ├── devel                       # system generated (by catkin_make)
 ├── build                       # system generated (by catkin_make)
 ```
+
 #### The folder structure of this repository
 
 The repository contains various kinds of files that are relevant to the setup of the system. This section shows the locations of these critical files.
@@ -132,6 +138,7 @@ src
 ├──├──├── system_config.yaml    # defines system configuration        
 ├──├── docker                   # contains files relevant to deployment of this system based on docker
 ├──├──├── assets                # a folder containing misc files used for building docker images
+├──├──├── docker-compose.yaml   # a folder containing misc files used for building docker images
 ├──├──├── services              # a folder containing files for running the system as a systemd service and files for loading the system in a browser
 ├──├── docs                     # contains files relevant to deployment of this system based on docker
 ├──├──├── images                # a folder containing the images used in this README.md file 
@@ -151,19 +158,120 @@ src
 ├──├──├──├── html                  # contains html snippets for image display functions of the system
 ├──├──├──├── test                  # contains unit tests for the rest of the system
 ├──├──├──├── web                   # program components for the web interface
+├── READNE.md                   # this README.md file
+├── requirements.txt            # python module dependencies 
 ```
 
+#### Set up the file space
+
+The two CGRAS systems, the CCVS and the IACS, shared a folder for file data storage. The default location is `cgras_data` under the home folder of the user.  The location may be updated as the value of the parameter `cgras_data_folder` in the `system_config.yaml` file.
+
+Create the folder as follows.
+
+```bash
+mkdir -p ~/cgras_data
+```
+
+#### Set up the execution environment
+
+The CCVS is a complex software built on many third-party modules and middleware. Some of them are listed below.
+- ROS Noetic (ROS 1).
+- Python 3.8 (Python 3.9 if pytorch 2.0 or above)
+- Dash 3.0 or above
+- Plotly 6.0 or above
+- Numpy 1.24, Pandas 2.0, OpenCV 4.8.1, SkLearn
+- Stitching 0.5.3
+- Pytorch (CPU or GPU)
+- CUDA/GPU Driver (optional)
+
+It is recommended that the execution environment is to be set up by one of the following approaches: docker and virtual environment.  Docker is highly recommended for ease of setup. These two approaches are explained in the next sections.
+
+Note that this instruction does not cover the installation of GPU driver (for Nvidia) and CUDA and the NVidia container toolkit.  Follow this page for a [easy-to-follow instruction](https://dev.to/thenjdevopsguy/using-nvidia-gpus-with-docker-in-5-minutes-386g) to enable GPU computation for CCVS.
+
+### Docker Installation
+
+Running from docker containers is the quickest way to set up the system if the [docker engine](https://docs.docker.com/engine/install/) is already installed.  Templates of docker images and docker compose services are provided in the repository under the `docker` folder.
+
+The following docker compose services are defined in file `docker/docker-compose.yaml` file that carry out the setup the environment and the execution of the CCVS system through a single command.
+
+| Docker Compose Services | Remarks                                | Execution Scripts | 
+| :----------------       | :------:                               | :------:          |
+| `cgras`                     | Start a container suitable for the running of the system with CUDA 10.1 enabled | `docker compose up cgras` |
+| `cgras-cpu`                 | Start a container suitable for the running of the system with CPU only | `docker compose up cgras-cpu` |
+| `cgras-system`             | Execute the CCVS system in the `cgras` container | `docker compose up cgras-system` |
+| `cgras-system-cpu`         | Execute the CCVS system in the `cgras-cpu` container  | `docker compose up cgras-system-cpu` |
+
+
+1. Change directory to the `docker` folder of this respository
+```bash
+cd ${CGRAS_WS}/cgras_detector/docker
+```
+2. The CGRAS docker containers will share the network with the host computer, including being the ROS Master if the host computer is already running `roscore`. The environment variable `ROS_MASTER` may be passed to the containers to determine if the `roscore` should be started by the container. The variable may be updated in the `environment` section of the services in `docker-compose.yaml`.
+
+If the host computer is already running as the ROS Master, ensure that `ROS_MASTER` is set to `False`.
+```yaml
+        environment:
+            - DISPLAY
+            - QT_X11_NO_MITSHM=1
+            - ROS_MASTER=false
+            ...
+```
+If the container should be the ROS Master, set `ROS_MASTER` to `True` and `ROS_MASTER_URI` to the IP of the container. The default `localhost:11311` should work unless the network configuration requires something different.
+```yaml
+        environment:
+            - DISPLAY
+            - QT_X11_NO_MITSHM=1
+            - ROS_MASTER=true
+            - ROS_MASTER_URI=http://localhost:11311
+            # - ROS_MASTER_URI=http://192.168.1.50:11311
+```
+
+3. Execute below to allow applications in the container to display a GUI on the host.
+```
+xhost +
+```
+
+4. To start the CCVS, execute one of the following in the `docker` folder (depending on whether CUDA/GPU is available). At the first time of execution, the image does not exist and so it has to be built from scratch and the building may take a while.  If the image is already available, the command starts a container based on the `cgras` (or `cgras-cpu`) image and launch the CCVS ros node. 
+
+If CUDA/GPU is available, use this script.
+```bash
+docker compose up cgras-system
+```
+If CUDA/GPU is not available, use this script.
+```bash
+docker compose up cgras-system-cpu
+```
+If the image building is successful and the node is launched, the command line window will last print lines similar to the following.
+```bash
+[INFO] [1748390642.515012]: Starting the cgras_detector node (pid:950) (python: 3.8.10)
+[INFO] [1748390642.555908]: DashApplicationMain: starting the web application at http://0.0.0.0:8023
+```
+
+5. To access the web interface, point a browser to the URL `http://localhost:8023`.  The host ip and port may be specified in the system configuration file.  The Application Monitor page will be loaded.
+
+6. The docker service can be terminated by CTRL-C in the command line window running the docker compose command.
+
+
+### Virtual Environment Installation
+
+Non-docker system installation is more challenging for novices. Its success can depend on the host computer current settings.
+
+1. Assume that if GPU computation is desired, the Nvidia drivers and CUDA are already installed.  Use `nvidia-smi` to find out the status.
+
+2. If the computer has no virtual environment manager such as conda, install one such as miniconda as follows. 
+```bash
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
+bash ~/Miniconda3-latest-Linux-x86_64.sh 
+``` 
+
+3. Create a new environment (replace the name `cgras` with your preference). 
+```bash
+conda create -n "cgras" python=3.8 ipython ipykernel 
+conda activate cgras 
 
 
 
 
-
-### 
-
-
-It is designed for monitoring the well being of the growing coral babies on aquacultural tiles by analysing tile images and counting the number of corals and other objects. 
-
-CCVS operates as an autonomous system that streamlines fetching of newly acquired tile images (from the other systems of CGRAS 2025), applying of deep learning object detection models on the images, analyzing and recording of data, and presenting of useful findings.  CCVS provides a web-based user interface for interactive visualization of trends of coral growth on tiles. It also offers control for the users to override the autonomous operations and to enhance the analysis with import of new models.  
 
 
 

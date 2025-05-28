@@ -58,6 +58,7 @@ RUN sudo add-apt-repository ppa:deadsnakes/ppa
 # install python
 RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 python3-pip \
+python3-rospkg \
 python3-rosdep \
 python3-setuptools \
 python3-tk

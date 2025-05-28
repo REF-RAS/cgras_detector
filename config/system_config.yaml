@@ -9,7 +9,7 @@ cgras_detector:
   # auxillary web server
   aux_web_host: 0.0.0.0
   aux_web_port: 8024
-  aux_web_directory: /home/qcr/cgras_data/detector/data
+  aux_web_directory: ~/cgras_data/detector/data
 
   # automation mode (whether the task execution is automated)
   task_automation: False  
@@ -29,7 +29,7 @@ cgras_detector:
   dashboard_refresh_cycles: 2  # refresh rate of dashboard, the unit is system timer cycles
 
   # the data folder
-  cgras_data_folder: /home/qcr/cgras_data
+  cgras_data_folder: ~/cgras_data
   # the import image folder
   # cgras_captured_images_folder: /home/qcr/cgras_data/images/{tile_id}_{batch_id}/Export
 

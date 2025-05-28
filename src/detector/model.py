@@ -68,7 +68,7 @@ class ValueHolder:
 
 # global variable for accessing the system configuration
 CONFIG:SystemConfig = SystemConfig(os.path.join(os.path.dirname(__file__), '../../config/system_config.yaml'))
-CGRAS_DATA_FOLDER = CONFIG.get(SystemConfigNames.CGRAS_DATA_FOLDER, '/home/qcr/cgras_data')
+CGRAS_DATA_FOLDER = os.path.expanduser(CONFIG.get(SystemConfigNames.CGRAS_DATA_FOLDER, '/home/qcr/cgras_data'))
 # global variables for import by other modules
 STATE = model_base.StateManager(SystemStates.READY)                              # the state of the detection and visualization processor
 CALLBACK_MANAGER:model_base.CallbackManager = model_base.CallbackManager()      # the callback manager for linking the GUI and the processor
