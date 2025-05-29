@@ -450,8 +450,8 @@ cgras_detector:
 ##### Geometry related
 | Config variables     | Remarks                                                          | Default value (type) | 
 | :----------------    | :------:                                                         | :------:      |
-| `tile_size_in_mm` | The width and the height of the tiles | [294, 294] (a list of two lenghts in mm)    |
-| `frame_size_in_mm` | The width and the height of the frames | [280, 280] (a list of two lenghts in mm)    |
+| `tile_size_in_mm` | The width and the height of the tiles (the default values) | [294, 294] (a list of two lenghts in mm)    |
+| `frame_size_in_mm` | The width and the height of the frames (the default values) | [280, 280] (a list of two lenghts in mm)    |
 
 ##### Reconstruction related
 | Config variables     | Remarks                                                          | Default value (type) | 
@@ -483,6 +483,115 @@ cgras_detector:
 | `cod_merge_mutli_models` | Use multiple applicable coral detection models | True (bool)   |
 | `cod_mask_polyp_keypart` | Mask the class polyp_keypart class when determining the presentation class | False (bool)   |
 
+## System Setup
+
+The operation of CCVS requires a coral detection model based on YOLO and a source of tile samples to be processed. 
+
+### Import of a Coral Detection Model
+
+The following shows a template of a coral detection model specification yaml file, which contains critical information such as the file location of a trained YOLO model, the class names of the detection results, and other metadata.
+
+```yaml
+name: Maeq 20250320
+file: /home/qcr/cgras_data/YoloModel/cgras_20250320_yolov8nseg_640p_first30.pt
+species: montipora aequituberculata 
+input_image_width: 640
+input_image_height: 640
+valid_start_day: 0
+valid_end_day: null
+classes_map: 
+  POLYP_SINGLE: []
+  POLYP_MULTI: ['mask_live']
+  POLYP_KEYPART: ['alive']
+  DEAD_CORAL: ['dead', 'mask_dead']
+remarks: 
+
+```
+| Parameter     | Remarks         |  |
+| :----------------    | :------: | :------: | 
+| `name` | The name of the coral detection model | Mandatory |
+| `file` | The full path to the trained YOLOv8 model file (.pt) | Mandatory |
+| `species` | The species that this model is applicable |  Mandatory |
+| `input_image_width` | The image width expected by the YOLOv8 model | Mandatory |
+| `input_image_height` | The image height expected by the YOLOv8 model |  Mandatory |
+| `valid_start_day` | The start of the age range that this model is applicable | Optional |
+| `valid_end_day` | The end of the age range that this model is applicable  | Optional | 
+| `classes_map` | The node that maps the output classes of YOLOv8 model to the internal classes | Mandatory | 
+| `remarks` | Additional description | Optional | 
+
+The significance of `classes_map` is to map the classes of the YOLOv8 model, which depends on the modelling of coral objects and the choice of class names, to the internal coral classes of the CCVS, which comprises of the following.
+
+| CCVS Coral Classes     | Remarks         |  
+| :----------------    | :------: | 
+| `POLYP_SINGLE` | Represents a singleton coral polyp (not in a cluster/colony)  | 
+| `POLYP_MULTI` | Represents a cluster or colony of coral polyps | 
+| `POLYP_KEYPART` | Represents a keypart that distinguishes a cluster or colony |
+| `DEAD_CORAL` | Represents a dead coral whether it is a part or as a whole |
+
+The CCVS internal coral classes are part of the CGRAS hierarchical coral class framework, which is described in more details in another page.
+
+### Import of a Tile Sample Specification
+
+The following shows a template of a tile sample specification yaml file, which specifies the locations and the indices of the images that all together capture the visual appearance of a tile, additionally, other metadata of the tile such as the species and the age and the sampling time.
+
+```yaml
+tile_id: 2024Oct-MIS5T14
+species: Acropora
+settle_time: 2024-10-30
+spawning_time: 2024-10-15
+season: 2024Oct
+num_tabs: [20, 20]
+tile_size: [280, 280]
+frame_size: [294, 294]
+batch_id: CG1-202410312300
+batch_time: 2024-10-31 23:00:00
+importer_id: YAML
+operator: luia2
+image_files_parent_folder: /home/qcr/cgras_data/Source/2024/MIS5_T14_241031
+images:
+  - x: 0
+    y: 0
+    file: CGRAS_Amag_241031_T14_00.jpg
+  ...
+```
+| Parameter     | Remarks         |  |
+| :----------------    | :------: | :------: | 
+| `tile_id` | The ID of the tile, which is made up of the season and the PIT tag ID (connected by a hyphen) | Mandatory |
+| `species` | The species of the coral that is growing on the tile | Mandatory |
+| `settle_time` | The date that the coral larvae was allowed to settle on the tile | Mandatory |
+| `spawning_time` | The date that the coral spores spawned | Mandatory |
+| `season` | The spawning season | Mandatory |
+| `num_tabs` | The number of tabs of the tile| Mandatory |
+| `tile_size` | The width and the height of this tile (in mm)  | Option |
+| `frame_size` | The width and the height of the frame of this tile (in mm)  | Option |
+| `batch_id` | The batch ID, which comprises of the CGRAS station ID and the sampling time (connected by a hyphen) | Mandatory |
+| `batch_time` | The date and time of the sample  | Mandatory |
+| `importer_id` | Denotes how the tile sample is imported | Optional |
+| `operator` | Denotes the operator of the import action | Optional |
+| `image_files_parent_folder` | The path if all the images are in the same folder | Optional |
+| `images` | A list of records each of which describes the location of the image file and the index in the capture grid | Mandatory |
+
+Each record under the `images` node has the following fields.
+
+| Image Parameters     | Remarks         |  
+| :----------------    | :------: | 
+| `x` | The column index of the image in the capture grid  |
+| `y` | The row index of the image in the capture grid  |
+| `file` | The path to the image if the string starts with `/` or image filename if otherwise  |
+
+### Experimental Feature: RESTful API
+
+The system provides several endpoints as a part of an experimental RESTful API. 
+
+| Endpoints     | Remarks         |  Return Values | 
+| :----------------    | :------: | :------:  |
+| `/api/tile_samples/list/<string:season_title>` | Query for all the tile samples of a season | A list of tile samples (json) |
+| `/api/detected_objects/query/<string:tile_sample_id>` | Query for the detected objects of a tile sample | A list of detected objects (json) |
+| `/api/tile_samples/import` | Import a new tile sample in yaml format | N/A |
+
+
+
+
 ## Developer
 
 Dr Andrew Lui, Senior Research Engineer <br />
@@ -490,4 +599,4 @@ Robotics and Autonomous Systems, Research Engineering Facility <br />
 Research Infrastructure <br />
 Queensland University of Technology <br />
 
-Latest update: Apr 2025
+Latest update: May 2025
