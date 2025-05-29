@@ -25,14 +25,14 @@ class ModelsConfigNames(Enum):
     LOCTILE_MODEL_FILENAME = 'loctile_model_filename'
     RECO_DEGUG_IMAGE_ORIGINAL_SCALE = 'reco_debug_images_at_original_scale'
     RECO_DEBUG_FEATURE_MATCH_IMAGES = 'reco_debug_feature_matching_images'
-    RECO_FEATURE_DETECTOR = 'reco_feature_detector'
+    RECO_FEATURE_DETECTORS = 'reco_feature_detectors'
     RECO_FEATURE_MATCHING_CONFIDENCE_THRESHOLD = 'reco_feature_matching_confidence_threshold'
     RECO_IMAGE_MATCHING_MIN_CONFIDENCE = 'reco_image_matching_min_confidence'
     RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE = 'reco_image2d_matching_min_confidence'
     RECO_WORKING_SCALE = 'reco_working_scale'
     RECO_ERROR_CORRECTION = 'reco_error_correction'
-    RECO_ASPECT_RATIO_ROI_ERROR_REL = 'aspect_ratio_roi_error_rel'
-    RECO_MISPLACED_ROI_ERROR_REL = 'misplaced_roi_erro_rel'
+    RECO_ASPECT_RATIO_ROI_ERROR_REL = 'reco_aspect_ratio_roi_error_rel'
+    RECO_MISPLACED_ROI_ERROR_REL = 'reco_misplaced_roi_erro_rel'
     
     TILE_SIZE_IN_MM = 'tile_size_in_mm'     # the size of the tile in mm (width, height)
     FRAME_SIZE_IN_MM = 'frame_size_in_mm'   # the size of the frame in mm (width, height)

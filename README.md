@@ -256,80 +256,232 @@ If the image building is successful and the node is launched, the command line w
 
 Non-docker system installation is more challenging for novices. Its success can depend on the host computer current settings.
 
-1. Assume that if GPU computation is desired, the Nvidia drivers and CUDA are already installed.  Use `nvidia-smi` to find out the status.
+1. A host computer with Ubuntu 20.04 is available. 
 
-2. If the computer has no virtual environment manager such as conda, install one such as miniconda as follows. 
+2. Ensure that, if GPU computation is desired, the Nvidia drivers and CUDA are already installed.  Use `nvidia-smi` to find out the status.    
+
+3. Ensure that ROS Noetic is already installed. Follow [the instruction on this page](https://wiki.ros.org/Installation/Ubuntu) to install ROS Noetic on the host computer. 
+
+4. If the computer has no virtual environment manager such as conda, install one such as miniconda as follows. 
 ```bash
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
 bash ~/Miniconda3-latest-Linux-x86_64.sh 
 ``` 
 
-3. Create a new environment (replace the name `cgras` with your preference). 
+5. Create a new environment (replace the name `cgras` with your preference). 
 ```bash
 conda create -n "cgras" python=3.8 ipython ipykernel 
 conda activate cgras 
-
-
-
-
-
-
-
-
-
-## Running the Node
-
-After building the workspace, execute the following
-```
-rosrun cgras_detector run.py
 ```
 
-## Installation (Docker)
+6. Install Python 3.8 and various Python tools.
+```bash
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt-get update && sudo apt-get upgrade python3.8
+sudo apt-get update 
+sudo apt-get install python3-pip python3-rospkg python3-rosdep python3-setuptools
+pip install -U pip
+```
 
-The [Dockerfile](docker/Dockerfile) for building the environment is in the `docker` directory of this repository. The file [docker-compose.yaml](docker/docker-compose.yaml) enables the management of containers as services. It has been tested with Docker 25.0.3 and Ubuntu 20.04. First change directory to where the file is located, and then build the image using the command below.
+7. Install third-party Python modules.
+```bash
+cd ${CGRAS_WS}/cgras_detector
+pip install -r requirements.txt
 ```
-cd docker
-docker compose build cgras_image
+
+8. Install pytorch and ultralytics.
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu101
+pip install networkx==3.1 ultralytics>=8.3
 ```
-The image building may take some time. When the build is completed, execute the following to check if the image `cgras_image` is there.
-```
-docker image ls
-```
-Execute below to allow applications in the container to display a GUI on the host.
-```
-xhost +
-```
-Create a workspace for CGRAS in your local computer.
-```
-cd ~
-mkdir -p ~/cgras_ws/src
-```
-Clone the `cgras_detector` and `cgras_datatools` repositories to the workspace
-```
-cd ~/cgras_ws/src
-git clone git@github.com:REF-RAS/cgras_detector.git
-git clone git@github.com:REF-RAS/cgras_datatools.git
-```
-Create a folder for system data at `cgras_data`.
-```
-mkdir -p ~/cgras_data
-```
-Start a container based on the image. Note that the two packages above and the data folder will become read/write volumes mapped to the container. 
-```
-docker compose up cgras_image
-```
-To obtain an interactive shell of the container
-```
-docker compose exec cgras_image bash
-```
-In the interactive shell, build the system and launch the node.
-```
-cd ~/cgras_ws
-catkin_make
+
+9. Build the CGRAS package.
+```bash
+rosdep update
+cd ${CGRAS_WS}
+catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
 source devel/setup.bash
+```
+10. Launch the CCVS node.
+```bash
 roslaunch cgras_detector default.launch
 ```
 
+### System Properties
+
+The system will load properties from the yaml file `system_config.yaml` under the folder `config`. The properties can be divided into several cateogories: web interface, CGRAS system integration, CCVS system operation, and models/algorithms parameters.
+
+#### Properties: Web Interface
+
+```yaml
+cgras_detector:
+  # WEB INTERFACE
+  # main web server
+  web_host: 0.0.0.0
+  web_port: 8023
+  web_debug_mode: False             # for developers' use and not to be adjusted
+  web_debug_hot_reload: False       # for developers' use and not to be adjusted
+
+  # auxillary web server
+  aux_web_host: 0.0.0.0
+  aux_web_port: 8024
+  aux_web_directory: ~/cgras_data/detector/data    # for developers' use and not to be adjusted
+
+  # timers for driving the system and refresh the GUI
+  system_timer: 0.5  # seconds
+  dashboard_refresh_cycles: 2  # refresh rate of dashboard, the unit is system timer cycles
+  ...
+```
+The following table describes the purpose of the key properties.
+
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `web_host`             | The ip of the web interface                                    | 0.0.0.0 (str)     |
+| `web_port`             | The port number of the web interface                           | 8023          |
+| `aux_web_host`             | The ip of the auxilliary web host that serves image        | 0.0.0.0 (str)     |
+| `aux_web_port`             | The port number of the auxilliary web host                 | 8024          |
+| `system_timer`             | The clock that triggers signals in the web interface       | 0.5 (seconds)     |
+| `dashboard_refresh_cycles` | Number of system timer cycles to refresh the web interface | 2          |
+
+
+#### Properties: CGRAS Integration
+
+These properties are about connections to other components in the CGRAS platform.
+
+```yaml
+cgras_detector:
+  # CGRAS INTEGRATION
+  # default ros topics for the states of the coordinator and detector
+  ros_coordinator_state_topic: '/cgras/coordinator/state' 
+  ros_detector_state_topic: '/cgras/detector/state' 
+
+  # default ros topic for the service for querying tile sample
+  ros_query_tile_samples_topic: '/cgras/coordinator/query_tile_samples'
+
+  # suspend operation when executing a capture image program
+  suspend_when_capturing_image: False
+
+  # connection timeout
+  connection_timeout: 120   # seconds
+  ...
+```
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `ros_coordinator_state_topic` | The ROS topic where the IACS's state is published       | `/cgras/coordinator/state`  (str)     |
+| `ros_detector_state_topic` | The ROS topic where this CCVS's state is published         | `/cgras/detector/state`  (str)       |
+| `ros_query_tile_samples_topic` | The ROS service name for querying new tile samples at the IACS | `/cgras/coordinator/query_tile_samples` (str)     |
+| `suspend_when_capturing_image` | Whether the CCVS is suspended when the IACS is executing an image capture program  | False (bool)          |
+| `connection_timeout`           | The connection to the IACS is considered lost      | 120 (seconds)     |
+
+#### Properties: System Operations
+
+```yaml
+cgras_detector:
+  # OPERATION
+  # the data folder
+  cgras_data_folder: ~/cgras_data
+
+  # automation mode (whether the task execution is automated at system startup)
+  task_automation: False  
+
+  # yolo model range
+  max_coral_age: 120  # days
+
+  # heatmap properties
+  heatmap_colour_scale: viridis
+  heatmap_show_label_slider_max: 30
+  ...
+```
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `cgras_data_folder` | The location of the CGRAS data folder       | `~/cgras_data`  (str)     |
+| `task_automation` | The system starts with the automation mode turned on        | False (bool)      |
+| `max_coral_age` | The maximum age of corals assumed by the system | 120 (days)     |
+| `heatmap_colour_scale` | The colormap name used for coral count heatmaps| `viridis` (str)  |
+| `heatmap_show_label_slider_max` | The maximum value of the slider controlling label showing threshold in the heatmaps | 30 (integers) |
+
+For choices of colormaps, refer to [this tutorial](https://seaborn.pydata.org/tutorial/color_palettes.html).
+
+#### Properties: Models and Algorithms
+
+These system properties related to internal models and algorithms for computer vision based coral detection. They are further divided into reconstruction related (`reco`), tile locator related (`loctile`), and coral object detection related (`cod`).
+
+```yaml
+cgras_detector:
+  # MODELS AND ALGORITHMS
+  # general
+  task_params_filename: params.yaml             # for developers' use and not to be adjusted
+  reco_model_filename: reco_model.yaml          # for developers' use and not to be adjusted
+  loctile_model_filename: loctile_model.yaml    # for developers' use and not to be adjusted
+  cod_model_filename: coral_object_detect_model.yaml   # for developers' use and not to be adjusted
+  # detection task parameters: reconstruction
+  reco_working_scale: 0.1
+  reco_debug_images_at_original_scale: False
+  reco_debug_feature_matching_images: True
+  reco_feature_detectors: ['brisk', 'sift']     # sift, orb, brisk, akaze 
+  reco_feature_matching_confidence_threshold: 1.2
+  reco_image_matching_min_confidence: 1.0   # between rows matching confidence
+  reco_image2d_matching_min_confidence: 1.0 # row matching confidence
+  # reco_error_correction: False            # for developers' use and not to be adjusted
+  reco_aspect_ratio_roi_error_rel: 0.1           # the maximum relative error of aspect ratio of rois from that of the original image
+  reco_misplaced_roi_erro_rel: 0.1               # the maximum relative error of roi corner placement with respect to the roi sizes
+
+  # model of the tile holder and frame
+  tile_size_in_mm: [294, 294]  # default value, only if not defined in the metadata of the tile_sample 
+  frame_size_in_mm: [280, 280] # default value, only if not defined in the metadata of the tile_sample 
+
+  # detection task parameters: locate tile
+  loctile_rotate_angle_max: 3.0   # degrees
+  loctile_aspect_ratio_diff_max_rel: 0.05   # 0.05 relative difference
+  loctile_aspect_ratio_diff_max_abs: 0.05   # 0.05 absolute difference
+
+  # detection task parameters: object detection  
+  cod_debug_blob_images: True
+  cod_blob_overlap_pix: 128
+  cod_use_cached_object_detection: True
+  cod_coral_child_min_overlap_ratio: 0.25         # the pverlap ratio of a polyp_single or polyp_keypart that is considered a child of a polyp_multi
+  cod_merge_mutli_models: True                # merge the detection result with duplication removal
+  
+  # detection task parameters: object detection classification
+  cod_mask_polyp_keypart: False
+  ...
+```
+
+##### Geometry related
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `tile_size_in_mm` | The width and the height of the tiles | [294, 294] (a list of two lenghts in mm)    |
+| `frame_size_in_mm` | The width and the height of the frames | [280, 280] (a list of two lenghts in mm)    |
+
+##### Reconstruction related
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `reco_working_scale` | The image scale at which the reconstruction algorithm is operating | 0.1 (float)    |
+| `reco_debug_images_at_original_scale` | Save debug images of tile reconstruction at original scale      | False (bool)      |
+| `reco_debug_feature_matching_images` | Save debug feature matching images | True (bool)     |
+| `reco_feature_detectors` | A list of feature detectors to be tried in tile image reconstruction | [`brisk`, `sift`] (list)  |
+| `reco_feature_matching_confidence_threshold` | The minimum confidence value to consider feature matching acceptable | 1.2 (float) |
+| `reco_image_matching_min_confidence` | More specific minumum confidence value for reconstruction along a row of images | 1.0 (float) |
+| `reco_image2d_matching_min_confidence` | More specific minumum confidence value for reconstruction between rows of images | 1.0 (float) |
+| `reco_aspect_ratio_roi_error_rel` | The maximum relative error of aspect ratio of rois from that of the original image | 0.1 (ratio) |
+| `reco_misplaced_roi_erro_rel` | The maximum relative error of roi corner placement with respect to the roi sizes | 0.1 (ratio) |
+
+##### Tile Locator related
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `loctile_rotate_angle_max` | The maximum angle of rotation acceptable | 3.0 (degrees)   |
+| `loctile_aspect_ratio_diff_max_rel` | The maximum relative error between the aspect ratio of the reconstructed tile and that of `tile_size_in_mm`  | 0.05 (ratio)    |
+| `loctile_aspect_ratio_diff_max_abs` | The maximum absolute error between the aspect ratio of the reconstructed tile and that of `tile_size_in_mm`  | 0.05 (aspect ratio)    |
+
+##### Coral Object Detection related
+| Config variables     | Remarks                                                          | Default value (type) | 
+| :----------------    | :------:                                                         | :------:      |
+| `cod_debug_blob_images` | The maximum angle of rotation acceptable | True (bool)  |
+| `cod_blob_overlap_pix` | The size of the overlappign region between neighbouring blobs  | 128 (pixels)    |
+| `cod_use_cached_object_detection` | Use the cached object detection if available  | True (bool)   |
+| `cod_coral_child_min_overlap_ratio` | The minimum ratio to consider an overlapping object a child-parent pair  | 0.25 (ratio)    |
+| `cod_merge_mutli_models` | Use multiple applicable coral detection models | True (bool)   |
+| `cod_mask_polyp_keypart` | Mask the class polyp_keypart class when determining the presentation class | False (bool)   |
 
 ## Developer
 
