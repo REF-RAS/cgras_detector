@@ -80,11 +80,11 @@ The functions of the buttons are explained below.
 - `Delete`: Delete the tile sample permanantly from the CCVS (note: the IACS is not affected)
 - `Redo`: Move the selected tile to the queue for re-processing, existing results can be selectively kept.
 
-### The Detection Model Manager
+### The Detection Model Registry
 
-The Detection Model Manager provides an interface for the import of trained YOLO coral detection model into the system and for specifying the conditions in which the model is applied. The conditions include the coral species and the age of the tile sample. 
+A key feature of the CCVS is the ability to apply specialized coral detection models for tile samples of different species and development stages. The Detection Model Registry is the component that manages these specialized coral detection models. The Detection Model Registry provides an interface for the import of trained YOLO coral detection model into the system and for specifying the conditions in which the model is applied. The conditions include the coral species and the age of the tile sample. 
 
-![Detection Model Manager](docs/images/DetectModelManager.png)
+![Detection Model Registry](docs/images/DetectModelManager.png)
 
 The top pane is the drop area for the import of a detection model specification yaml file.  In the middle the table displays the imported detection models and there are buttons for updating and deleting a model. The bottom pane shows a visualization of the coverage of each model in the species and in the coral age of the target tile samples.
 
