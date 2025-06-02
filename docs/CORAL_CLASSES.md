@@ -1,22 +1,34 @@
 # CGRAS 2025: Semantics of Coral Classes and the Hierchical Class Structure
 
-The visual appearance of corals of different species and development stages can look significantly different. No one-size-fit-all YOLO-based detection model is likely to offer reasonable detection performance. To enable the CCVS improved capacity to handle increasing number of coral species and to enhance the detection performance, CCVS is designed with the following features.
+Coral recruitment involves multiple early life-history phases. Monitoring the number of corals in the post-settlement and metamorphosis of microscopic coral recruit phase is the major objective of CGRAS. The application of computer vision and autonomous image capturing devices for the task can save human effort, support large-scale restoration projects, and generate abundance of data for research and operational needs. However, a significant knowledge gap concerning the design and development of such autonomous solutions exists. In particular, effective use of the deep-learning object detection algorithm for early post-settlement corals is largely a untouched research topic.   
+
+The visual appearance of corals of different species can differ drastically. There are over 600 species in the Great Barrier Reef alone. Even for corals of the same species, the shape, color, and structure of corals can change significantly within weeks. The following figure illustrates the different appearance of the Amag species between week 1 to week 6 since settlement on the tile.
+
+![Coral Amag Development Visual Change](./images/CoralAmagDevelop.png)
+
+Counting the number of corals of tile samples, which comprise images captured of an aquaculture tiles, is a critical function of the Coral Counting and Visualization System (CCVS). The coral count is a tally of individual objects regarded as a coral. Accurate identification of individual corals is not straightforward. Corals considered as individuals can fuse together as they become more mature. Such composite objects may retain the original visual features each of which is considered an individual coral earlier. The CCVS has to be able to sometimes consider a visual object as a coral and other times to consider a cluster of visual objects as a coral. 
+
+### Innovative Features of the CCVS
+
+The Coral Object Detector (COD) of the CCVS is based on models trained with the YOLO object detection algorithm. The COD is designed to address the  challenges in accurate counting corals of different species and of different developmental stages.  The following lists the major design features of the COD.
+
+- Enable import 
+
+
+No one-size-fit-all YOLO-based detection model is likely to offer reasonable detection performance. To enable the CCVS improved capacity to handle increasing number of coral species and to enhance the detection performance, CCVS is designed with the following features.
 
 - Enable import of new YOLO coral object detection models.
 - Select and apply the YOLO models specialized for the coral species and the developmental stage that are present in the file sample.
 - Accept arbitrary object class names and conversion rules for mapping them to the cononical classes associated for coral counting and visualization.
 
-Computer vision-based coral detection is challenging. A coral object's visual appearance can change radically within a matter of weeks. The following figure illustrates the changes in the structure, shape, and colour of one of the target species during the development stages from week 1 to week 6.  With respect to the task of counting the number of corals, connection 
 
-![Coral Amag Development Visual Change](./images/CoralAmagDevelop.png)
 
-A reliable coral object detection model must be able to identify the whole coral 
+
 
 
 
 In the CCVS, specialized coral detection models can be selectivelty applied on tile samples of different species and development stages. 
 Part of the Coral Object Detector is the Coral Detection Model Registry that provides an interface for the import and management of specialized coral detection models. The ability to incorporate new models is important to the extensibility of the CCVS.  
-
 
 The Detection Model Registry is the component that manages these specialized coral detection models.  It supports the Coral Object Detector 
 
