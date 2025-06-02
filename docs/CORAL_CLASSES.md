@@ -1,12 +1,14 @@
 # CGRAS 2025: Semantics of Coral Classes and the Hierchical Class Structure
 
 The visual appearance of corals of different species and development stages can look significantly different. No one-size-fit-all YOLO-based detection model is likely to offer reasonable detection performance. To enable the CCVS improved capacity to handle increasing number of coral species and to enhance the detection performance, CCVS is designed with the following features.
+
 - Enable import of new YOLO coral object detection models.
 - Select and apply the YOLO models specialized for the coral species and the developmental stage that are present in the file sample.
 - Accept arbitrary object class names and conversion rules for mapping them to the cononical classes associated for coral counting and visualization.
 
-The understanding of vision-based coral detection is still inadequate. A coral object 
+Computer vision-based coral detection is challenging. A coral object's visual appearance can change radically within a matter of weeks. The following figure illustrates the changes in the structure, shape, and colour of one of the target species during the development stages from week 1 to week 6.  With respect to the task of counting the number of corals, connection 
 
+![Coral Amag Development Visual Change](./images/CoralAmagDevelop.png)
 
 A reliable coral object detection model must be able to identify the whole coral 
 
