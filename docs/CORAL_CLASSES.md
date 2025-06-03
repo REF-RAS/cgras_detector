@@ -10,9 +10,12 @@ Counting the number of corals of tile samples, which comprise images captured of
 
 ### Innovative Features of the CCVS
 
-The Coral Object Detector (COD) of the CCVS is based on models trained with the YOLO object detection algorithm. The COD is designed to address the  challenges in accurate counting corals of different species and of different developmental stages.  The following lists the major design features of the COD.
+The Coral Object Detector (COD) of the CCVS is based on models trained with the YOLO object detection algorithm. The COD is designed to address the challenges in accurate counting corals of different species and of different developmental stages.  The following lists the major design features of the COD.
 
-- Enable import 
+- Enable users to import of YOLO models into the __Detection Model Registry__ through the web interface. The Registry can enhance the range of species and the development stages that COD can handle. It also allows replacement of current models with better performance upgrades. 
+- Support the application of two or more YOLO models on a tile sample.  The typical use case is to apply the multiple models  
+
+use multiple models each of which is trained for a particular species or development stage. 
 
 
 No one-size-fit-all YOLO-based detection model is likely to offer reasonable detection performance. To enable the CCVS improved capacity to handle increasing number of coral species and to enhance the detection performance, CCVS is designed with the following features.
