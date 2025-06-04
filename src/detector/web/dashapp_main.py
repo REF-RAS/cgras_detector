@@ -172,7 +172,7 @@ class DashApplicationMain():
     # -- dash callback for system interval timer
     def _dash_system_timer(self):
         def dash_system_timer(n, pathname):
-            model.CALLBACK_MANAGER.fire_event(model.CallbackTypes.TIMER, n)
+            # model.CALLBACK_MANAGER.fire_event(model.CallbackTypes.TIMER, n)
             return (n,)
         return dash_system_timer 
     

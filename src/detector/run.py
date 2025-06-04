@@ -66,7 +66,11 @@ class ApplicationCoordinator(object):
         # create the work thread and the lock for execution of the detection task
         self.work_lock = threading.RLock()
         self.work_thread:threading.Thread = None
-
+        # create the application thread for executing the state machine
+        self.SYSTEM_TIMER = CONFIG.get(SystemConfigNames.SYSTEM_TIMER, 1) # in seconds
+        self._to_stop_application = False
+        self.application_thread = threading.Thread(target=self.run_application, args=[])
+        self.application_thread.start()
         # create the dash application
         try:
             self.dash_app_operator = DashApplicationMain()
@@ -89,7 +93,21 @@ class ApplicationCoordinator(object):
         sys.exit(0)
         
     def cb_shutdown(self):
+        self._to_stop_application = True
         time.sleep(2)
+        
+    def run_application(self):
+        last_callback_time = None
+        n = 0
+        while not self._to_stop_application:
+            time.sleep(0.01)
+            if self._to_stop_application:
+                break
+            current_time = time.time()
+            if last_callback_time is None or current_time - last_callback_time > self.SYSTEM_TIMER:
+                n += 1
+                CALLBACK_MANAGER.fire_event(CallbackTypes.TIMER, n)
+                last_callback_time = current_time
         
     def cb_coordinator(self, msg:Int8): 
         received_coordinator_state_value = msg.data
