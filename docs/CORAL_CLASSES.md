@@ -1,6 +1,11 @@
 # CGRAS 2025: Semantics of Coral Classes and the Hierchical Class Structure
 
-Coral recruitment involves multiple early life-history phases. Monitoring the number of corals in the post-settlement and metamorphosis of microscopic coral recruit phase is the major objective of CGRAS. The application of computer vision and autonomous image capturing devices for the task can save human effort, support large-scale restoration projects, and generate abundance of data for research and operational needs. However, a significant knowledge gap concerning the design and development of such autonomous solutions exists. In particular, effective use of the deep-learning object detection algorithm for early post-settlement corals is largely a untouched research topic.   
+Monitoring the number of corals in the early post-settlement period of microscopic coral recruit phase is often carried out in coral aquaculture operations and research. The data is imperative for evaluation of instrument design and operational parameters, and for extending the knowledge of coral growing in controlled environments. 
+
+The major objective of CGRAS is to automate the task.  
+
+
+Coral recruitment is divided into several early life-history phases. Monitoring the number of corals in the post-settlement and metamorphosis of microscopic coral recruit phase is the major objective of CGRAS. The application of computer vision and autonomous image capturing devices for the task can save human effort, support large-scale restoration projects, and generate abundance of data for research and operational needs. However, a significant knowledge gap concerning the design and development of such autonomous solutions exists. In particular, effective use of the deep-learning object detection algorithm for early post-settlement corals is largely a untouched research topic.   
 
 The visual appearance of corals of different species can differ drastically. There are over 600 species in the Great Barrier Reef alone. Even for corals of the same species, the shape, color, and structure of corals can change significantly within weeks. The following figure illustrates the different appearance of the Amag species between week 1 to week 6 since settlement on the tile.
 
