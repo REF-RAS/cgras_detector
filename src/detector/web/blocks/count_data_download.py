@@ -156,13 +156,19 @@ class CountResultDownloadBlock():
                     tile_sample_id = row['tile_sample_id']
                     # generate detected_object worksheet for the tile_sample_id
                     detected_objects_df = DETECT_DAO.query_detected_objects(tile_sample_id)
-                    detected_objects_df.to_excel(writer, sheet_name=f'Detect-{row["batch_time"][:11]}', index=False)
+                    detected_objects_df.to_excel(writer, sheet_name=f'Detect-{row["batch_time"][:10]}', index=False)
                     # generate count map for the tile sample id
                     vt_model = CoralObjectMapModel(tile_sample_id)
                     count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
                     count_map_df = pd.DataFrame(data=count_map)
-                    count_map_df.to_excel(writer, sheet_name=f'CountMap-{row["batch_time"][:11]}', index=False)
-
+                    count_map_df.to_excel(writer, sheet_name=f'CM-ALIVE-{row["batch_time"][:10]}', index=False)
+                    # iterate through each coral class assigned to the tile_sanmple_id
+                    coral_classes_list = DETECT_DAO.list_coral_classes(tile_sample_id=tile_sample_id)
+                    for coral_class in coral_classes_list:
+                        count_map, count_label_map = vt_model.compute_object_count_map(coral_class, count_range=self.default_count_range)
+                        count_map_df = pd.DataFrame(data=count_map)
+                        count_map_df.to_excel(writer, sheet_name=f'CM-{coral_class}-{row["batch_time"][:10]}', index=False)                        
+                
                 # latest_tile_sample_id = coral_count_trend_df.iloc[-1]['tile_sample_id']
                 # vt_model = CoralObjectMapModel(latest_tile_sample_id)
                 # count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
