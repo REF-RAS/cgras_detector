@@ -1,8 +1,8 @@
 # CGRAS 2025: Semantics of Coral Classes and the Hierchical Class Structure
 
-Monitoring the number of corals in the early post-settlement period of microscopic coral recruit phase is often carried out in coral aquaculture operations and research. The data is imperative for evaluation of instrument design and operational parameters, and for extending the knowledge of coral growing in controlled environments. 
+Monitoring the number of corals in the early post-settlement period of microscopic coral recruit phase is desirable in coral aquaculture operations and research. The data is imperative for the evaluation of instrument design and operational parameters, and for extending the knowledge of coral growing in controlled environments. The task is now often carried out by coral experts, who have the knowledge to identify coral recruits from images of coral aquaculture tiles captured by a camera. 
 
-The major objective of CGRAS is to automate the task.  
+The major objective of CGRAS is to automate the task. The task has become a two-stage procedure of capturing images with a robotic system and analysing the capture images using novel coral object detection models.  Building such coral object detection models is challenging because of several reasons.  First, the field of coral aquculture is being developed. 
 
 
 Coral recruitment is divided into several early life-history phases. Monitoring the number of corals in the post-settlement and metamorphosis of microscopic coral recruit phase is the major objective of CGRAS. The application of computer vision and autonomous image capturing devices for the task can save human effort, support large-scale restoration projects, and generate abundance of data for research and operational needs. However, a significant knowledge gap concerning the design and development of such autonomous solutions exists. In particular, effective use of the deep-learning object detection algorithm for early post-settlement corals is largely a untouched research topic.   
