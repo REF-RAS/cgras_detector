@@ -158,7 +158,8 @@ def test_build_coral_object_detect_model():
     yolo_model_file = params[ModelsConfigNames.YOLO_MODEL_FILE.value]
     yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file=yolo_model_file, 
                                                        blob_size=params[ModelsConfigNames.COD_BLOB_SIZE.value],
-                                                       classes_map=params['classes_map'])
+                                                       classes_map=params['classes_map'],
+                                                       predict_params={})
 
     # build a CoralOjbectDetectModel for the images 
     # cod_model = CoralObjectDetectModel(image_map_as_list, reco_model, yolo_model, loctile_model, **params)

@@ -138,7 +138,7 @@ class CountHeatmapBlock():
                 if self.class_options is not None:
                     for option in self.class_options:
                         if option['value'] == filter_class:
-                            title += f': # {option["label"]}'
+                            title += f': # {option["label"]}s'
                             break
                     
                 fig, count_map = self._generate_heatmap(the_sample_id, filter_class, title=title, show_count_threshold=show_count_threshold) 

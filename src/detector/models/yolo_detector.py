@@ -131,7 +131,7 @@ class YoloObjectDetector():
     """ A wrapper class for YOLO so that the results of object detection are presented as an object of YoloResult class providing
         convenient functions
     """
-    def __init__(self, yolo_model_file:str, blob_size:tuple, classes_map:dict):
+    def __init__(self, yolo_model_file:str, blob_size:tuple, classes_map:dict, predict_params:dict):
         """ the constructor
 
         :param yolo_model_file: the path to the .pt yolo model file 
@@ -143,6 +143,7 @@ class YoloObjectDetector():
         # assign other input parameters
         self.blob_size = blob_size
         self.classes_map = classes_map
+        self.predict_params = predict_params
     
     def detect(self, image_cv:np.ndarray) -> YoloResult:
         """ apply the Yolo model on the given numpy image and return the results as a YoloResult object
@@ -150,7 +151,8 @@ class YoloObjectDetector():
         :param image_cv: the numpy image 
         :return: a YoloResult object containing the detected objects in the numpy image
         """
-        yolo_result = self.model.predict(image_cv)
+        # logger.warning(f'YoloObjectDetector detect: apply parameters {self.predict_params}')
+        yolo_result = self.model.predict(image_cv, **self.predict_params)
         return YoloResult(yolo_result)
     
     def get_classes_list(self) -> list:
@@ -188,5 +190,5 @@ if __name__ == '__main__':
                         'POLYP_MULTI': ['mask_live'],
                         'DEAD_CORAL': ['dead', 'mask_dead'],
                         }
-    yolo_detector = YoloObjectDetector(yolo_model_file, blob_size=(640, 640), classes_map=classes_map)
+    yolo_detector = YoloObjectDetector(yolo_model_file, blob_size=(640, 640), classes_map=classes_map, predict_params={})
     print(yolo_detector.info())

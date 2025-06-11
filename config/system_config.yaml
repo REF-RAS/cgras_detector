@@ -5,7 +5,7 @@ cgras_detector:
   # main web server
   web_host: 0.0.0.0
   web_port: 8023
-  web_debug_mode: True          # for developers' use and not to be adjusted
+  web_debug_mode: False          # for developers' use and not to be adjusted
   web_debug_hot_reload: False   # for developers' use and not to be adjusted
 
   # auxillary web server

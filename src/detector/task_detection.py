@@ -278,17 +278,22 @@ class DetectionTaskModel():
                 yolo_model_file =  yolo_model_dict['model_file_path']
                 blob_size = (yolo_model_dict['input_image_width'], yolo_model_dict['input_image_height'], )
                 classes_map = yolo_model_dict['classes_map']
+                predict_params = yolo_model_dict['predict_params']
                 try:
                     logger.info(f'{type(self).__name__}: Attempting to load the yolo_model_file at {yolo_model_file}')
-                    yolo_detector_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file, blob_size, classes_map) 
+                    yolo_detector_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file, blob_size, classes_map, predict_params) 
                     yolo_detector_model_list.append(yolo_detector_model)
                 except Exception as e:
                     logger.info(f'{type(self).__name__}: Failed to load the yolo model file: {e}')
                     raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_FILE_ERROR, f'Failed to load the yolo model file ({yolo_model_file})', e = e)
-            # build the cod model
+            # raise execption if the current job is cancelled
             if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
+            # build the cod model
+            logger.info(f'DetectionTaskModel build COD for images of the tile sample ({self.tile_sample_id}) using yolo model file: {yolo_model_file}')
+            logger.info(f'object class map: {classes_map}')
+            logger.info(f'yolo predict params: {predict_params}')
             self.cod_model = CoralObjectDetectModel(self.image_map_as_list, yolo_detector_model_list, self.reco_model.map_bbox, self.loctile_model.map_and_normalize_bbox, self.loctile_model.get_tile_size_in_image_space(),
                                                     self._execute_task_object_detection_cb, **self.params)
             self.cod_model.build()

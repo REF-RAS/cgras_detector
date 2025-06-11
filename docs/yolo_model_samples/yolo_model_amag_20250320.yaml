@@ -13,3 +13,8 @@ classes_map:
   POLYP_KEYPART: ['alive']
   DEAD_CORAL: ['dead', 'mask_dead']
 remarks: 
+# yolo model predict parameters
+yolo_predict_params:
+  conf: 0.4    # default 0.25
+  iou:  0.8              # default 0.7
+  agnostic_nms:           # default False
