@@ -505,7 +505,10 @@ classes_map:
   POLYP_KEYPART: ['alive']
   DEAD_CORAL: ['dead', 'mask_dead']
 remarks: 
-
+yolo_predict_params:
+  conf:               # default 0.25
+  iou:                # default 0.7
+  agnostic_nms:       # default False
 ```
 | Parameter     | Remarks         |  |
 | :----------------    | :------: | :------: | 
@@ -518,6 +521,7 @@ remarks:
 | `valid_end_day` | The end of the age range that this model is applicable  | Optional | 
 | `classes_map` | The node that maps the output classes of YOLOv8 model to the internal classes | Mandatory | 
 | `remarks` | Additional description | Optional | 
+| `yolo_predict_params` | The node that defines yolo prediction parameters | Mandatory | 
 
 The significance of `classes_map` is to map the classes of the YOLOv8 model, which depends on the modelling of coral objects and the choice of class names, to the internal coral classes of the CCVS, which comprises of the following.
 
@@ -528,7 +532,13 @@ The significance of `classes_map` is to map the classes of the YOLOv8 model, whi
 | `POLYP_KEYPART` | Represents a keypart that distinguishes a cluster or colony |
 | `DEAD_CORAL` | Represents a dead coral whether it is a part or as a whole |
 
-The CCVS internal coral classes are part of the CGRAS hierarchical coral class framework, which is described in more details in another page.
+The `yolo_predict_params` contains parameters that are passed to the YOLO predict function call. (Ref: https://docs.ultralytics.com/modes/predict/#inference-arguments)
+
+| YOLO Predict Params     | Remarks         |  
+| :----------------    | :------: | 
+| `conf` | Sets the minimum confidence threshold for detections | 
+| `iou` | Intersection Over Union (IoU) threshold for Non-Maximum Suppression (NMS) | 
+| `agnostic_nms` | Enables class-agnostic Non-Maximum Suppression (NMS), which merges overlapping boxes of different classes |
 
 ### Import of a Tile Sample Specification
 
