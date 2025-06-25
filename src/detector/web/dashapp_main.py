@@ -92,7 +92,7 @@ class DashApplicationMain():
                         dbc.NavItem(dbc.NavLink('View', href='/page_viewer')), 
                         # dbc.NavItem(dbc.NavLink('Health', href='/page_coral_health')), 
                         dbc.NavItem(dbc.NavLink('Model', href='/page_yolo_model')), 
-                        dbc.NavItem(dbc.NavLink('System', href='/page_setup')),                                                 
+                        # dbc.NavItem(dbc.NavLink('System', href='/page_setup')),                                                 
                     ],
                     brand=brand_div,
                     brand_href='/page_monitor', color='#ffcc99', dark=False, className='fs-3 text-primary text')  # #ffcc99
