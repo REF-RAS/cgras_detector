@@ -40,7 +40,7 @@ class MonitorErrorTableBlock():
                 {'if': {
                     'filter_query': '{level} > 0',
                     'column_id': 'remarks'
-                }, 'backgroundColor': '#ffffff', 'color': 'rgb(64, 0, 0)'},  
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(256, 0, 0)'},  
                 {'if': {
                     'filter_query': '{remarks} contains "file"',
                     'column_id': 'remarks'

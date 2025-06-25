@@ -154,7 +154,7 @@ DETECT_DDL = {
     );
     """,    
     
-    'health_model':
+    'health_model':             # NOT USED
     """
     CREATE TABLE IF NOT EXISTS health_model (
         species text PRIMARY KEY,
@@ -164,7 +164,7 @@ DETECT_DDL = {
     );
     """,
 
-    'cache_tile_health_stat':
+    'cache_tile_health_stat':     # NOT USED
     """
     CREATE TABLE IF NOT EXISTS cache_tile_health_stat (
         tile_id text PRIMARY KEY,
@@ -1237,7 +1237,7 @@ class DetectorDAO():
     
     # - table: error flag
     @synchronized
-    def set_error_flag(self, id:int, obj:str, remarks:str, level:int=0) -> int:
+    def set_error_flag(self, id:int, obj:str=None, remarks:str=None, level:int=0) -> int:
         sql = 'REPLACE INTO error_flag(id, object, update_time, remarks, level) VALUES (?, ?, DATETIME("now", "localtime"), ?, ?)'
         return db_tools.update(self.db_file, sql, (id, obj, remarks, level,))    
 
@@ -1247,7 +1247,7 @@ class DetectorDAO():
         return db_tools.query(self.db_file, sql)
     
     @synchronized
-    def unset_error_flag(self, id:int, obj:str) -> int:
+    def unset_error_flag(self, id:int, obj:str=None) -> int:
         if obj is None or obj == '':
             sql = 'DELETE FROM error_flag WHERE id = ? AND object IS NULL'
             return db_tools.update(self.db_file, sql, (id,)) 

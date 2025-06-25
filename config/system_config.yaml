@@ -34,6 +34,7 @@ cgras_detector:
   # OPERATION
   # the data folder
   cgras_data_folder: ~/cgras_data
+  disk_space_min: 2.2                   # GBytes
   # the import image folder
   # cgras_captured_images_folder: /home/qcr/cgras_data/images/{tile_id}_{batch_id}/Export
 

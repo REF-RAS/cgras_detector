@@ -38,6 +38,7 @@ class SystemStates(Enum):
     SUSPENDED = -1
     # WARNING = -2
     # ERROR = -3
+    WAIT_RESOURCE = -4
     READY = 0
     AUTO_START = 1        
     CLICK_START = 2

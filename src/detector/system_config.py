@@ -21,6 +21,7 @@ class SystemConfigNames(Enum):
     """ Maps the config names as a sting to a constant
     """
     CGRAS_DATA_FOLDER = 'cgras_data_folder'
+    DISK_SPACE_MIN = 'disk_space_min'                                # GBytes
     # CGRAS_CAPTURED_IMAGES_FOLDER = 'cgras_captured_images_folder'  # obsolete as the query is changed to ros service call
     WEB_HOST = 'web_host'
     WEB_PORT = 'web_port'

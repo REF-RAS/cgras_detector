@@ -132,7 +132,15 @@ class MonitorTaskControlBlock():
             current_state = STATE.get_state()
             is_menu_appear = current_state in [SystemStates.CLICK_START]
             enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
-            if current_state in [SystemStates.SUSPENDED]:
+            if current_state in [SystemStates.WAIT_RESOURCE]:
+                return (
+                    {'visibility': 'visible'},
+                    'System suspended due to insufficient disk space.',
+                    'SUSPENDED Mode',
+                    'dark',
+                    True, True, True,
+                )
+            elif current_state in [SystemStates.SUSPENDED]:
                 return (
                     {'visibility': 'visible'},
                     'System suspended due to the execution of an image acquisition program.',
