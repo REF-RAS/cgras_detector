@@ -221,7 +221,7 @@ class DetectionTaskModel():
         try:
             self.image_map_as_list, self.image_grid_dim = self._build_image_map_as_list(self.tile_sample_id)
         except Exception as e:
-            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
+            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Image file in the capture grid not found', e = e)
         # load the cached ImageReconstructModel if exists, or build a new model from captured images
         reco_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.RECO_MODEL_FILENAME.value, 'reco_model.yaml'))
         try:

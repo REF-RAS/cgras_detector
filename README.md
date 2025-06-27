@@ -4,6 +4,13 @@ The **Coral Counting and Visualization System (CCVS)** is one of the two systems
 
 At the upstream of the CGRAS 2025 finds the **Image Acquisition Coorindation System (IACS)**, which is designed to autonomously capture images of acquaculture tiles in a operation zone called the **CGRAS Arena**. 
 
+> [!NOTE]
+> This document focusses on the introduction of the system operation and the installation of the system.
+> Please refer to the following documents for more specific purposes.
+> 
+> - [User Manual](./docs/USER_MANUAL.md)
+> - [List of Error Codes](./docs/ERROR_CODE.md)
+
 ## Basic Operation
 
 The CCVS can operate in tendem with the IACS, from which the input images of tile samples are retrieved through the ROS middleware. It can also operate in a stand-alone manner, in which case the input images can be imported through the user interface or a RESTful API.
@@ -609,4 +616,4 @@ Robotics and Autonomous Systems, Research Engineering Facility <br />
 Research Infrastructure <br />
 Queensland University of Technology <br />
 
-Latest update: May 2025
+Latest update: June 2025

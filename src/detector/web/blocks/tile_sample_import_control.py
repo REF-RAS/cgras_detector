@@ -36,9 +36,9 @@ class EnableTileSamplesImportBlock():
                                                 className='mx-auto col-8', searchable=False, clearable=False)
         # database reset panel
         self._panel = dbc.Col([
-                html.H4(dbc.Badge('IMPORT TILE SAMPLES FROM IAS', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('IMPORT TILE SAMPLES FROM UPSTREAM', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.P('', className='mt-3 text-danger'), 
-                html.P('Import Tile Samples from the Image Acquisition System', className='mx-auto col-8 fw-bold'),
+                html.P('Import Tile Samples from the Upstream', className='mx-auto col-8 fw-bold'),
                 html.Div([import_new_samples_select], className='mx-auto col-4'),
                 # html.P('New tile sample', id=prefix+'new_tile_sample_status', className='mt-3'),               
                 self._toast,

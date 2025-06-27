@@ -46,16 +46,16 @@ class ModelsPage():
 
         # putting the components together 
         rows = html.Div(id='scan-body', children =[
-            dbc.Row(html.H3(children = 'Detection Model Manager', className='mt-3 mb-3')),
-            dbc.Row(html.H4(children = 'Import Yolo Model', className='text-center mt-5 mb-3')),
-            dbc.Row([dbc.Col(self.yolo_model_file_import_panel.get_panel(), className='col-12 border'), 
-                     ], className='mx-auto'),
-            dbc.Row(html.H4(children = 'Available Yolo Models', className='text-center mt-5 mb-3')),
-            dbc.Row([dbc.Col(self.yolo_model_table_panel.get_panel(), className='col-12 border'), 
-                     ], className='mx-auto'),            
-            dbc.Row(html.H4(children = 'Scopes of Yolo Models', className='text-center mt-5 mb-3')),
+            dbc.Row(html.H3(children = 'Coral Object Detection Model Manager', className='mt-3 mb-3')),
+            # dbc.Row(html.H4(children = 'Model', className='text-center mt-5 mb-3')),
+            
+            dbc.Row([dbc.Col(self.yolo_model_file_import_panel.get_panel(), className='col-3 border'), 
+                     dbc.Col(self.yolo_model_table_panel.get_panel(), className='ps-3 pe-3 col-9 border'), 
+                     ], className='mx-auto mt-5'),
+           
+            # dbc.Row(html.H5(children = 'Scopes of Yolo Models', className='text-center mt-5 mb-3')),
             dbc.Row([dbc.Col(self.yolo_model_range_chart_panel.get_panel(), className='col-12 border'), 
-                     ], className='mx-auto'), 
+                     ], className='mx-auto mt-3'), 
             
             # dbc.Row(html.H4(children = 'Import Health Model', className='text-center mt-5 mb-3')),
             # dbc.Row([dbc.Col(self.health_model_file_import_panel.get_panel(), className='col-12 border'), 

@@ -98,11 +98,11 @@ class YoloModelTable():
                     ], className='mx-auto text-center')),
 
         self.the_panel = html.Div([
+                html.H4(dbc.Badge('CURRENT COD MODELS', className='ms-1 me-2', color='white', text_color='secondary')),
                 dbc.Row(html.Div([
-                    dbc.Button('Update', id={'type': prefix+'table', 'index': 'update'}, n_clicks=0, color='secondary', className='mb-1 me-1', size='sm'), 
+                    dbc.Button('Edit', id={'type': prefix+'table', 'index': 'update'}, n_clicks=0, color='secondary', className='mb-1 me-1', size='sm'), 
                     dbc.Button('Delete', id={'type': prefix+'table', 'index': 'delete'}, n_clicks=0, color='danger', className='mb-1', size='sm'),
-                    
-                    self._datatable], className='p-2', style={'background-color': 'rgb(225, 225, 225)'})
+                    self._datatable], className='p-3 text-start', style={'background-color': 'rgb(225, 225, 225)'})
                 ),
                 dcc.Store(id=prefix+'row_edit_store'),
                 dcc.Store(id=prefix+'row_delete_store'),
@@ -111,7 +111,7 @@ class YoloModelTable():
                 self._toast,
                 self._editdata_modal,    
                 self._user_confirm_modal,            
-                ], style={'margin-top':'24px'})
+                ], className='text-center')
                   
     
         self.app.callback([Output(prefix+'edit_modal', 'is_open', allow_duplicate=True),

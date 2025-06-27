@@ -842,7 +842,7 @@ class ImageReconstruct2DModel():
         if output_file is not None:  # save the images only if output_folder is provided
             self.logger.info(f'{type(self).__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
             if not cv2.imwrite(output_file, row_reco_image):
-                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write  row reconstructed image at scale to {output_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write row reconstructed image at scale to {output_file}')
         return row_reco_image, normalized_warped_roi_corners, warped_roi_sizes 
  
             

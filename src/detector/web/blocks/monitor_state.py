@@ -34,7 +34,7 @@ class MonitorStateBlock():
         # define widgets 
  
         self._panel = dbc.Row([
-            html.H4(dbc.Badge('SYSTEM STATUS', className='ms-2 mb-4', color='white', text_color='secondary')),
+            html.H4(dbc.Badge('SYSTEM RESOURCES', className='ms-2 mb-4', color='white', text_color='secondary')),
             dcc.Store(id=self.update_store_id),
             dbc.Col([_left_datatable], className='col-5'),
             dbc.Col([_right_datatable], className='col-7'),

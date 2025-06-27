@@ -50,7 +50,7 @@ class YoloModelFileImportBlock():
         self.file_upload_panel = html.Div([
                 dcc.Store(self.import_success_trigger_id),
                 dcc.Store(id=prefix+'imported_content'),
-                html.H4(dbc.Badge('IMPORT YOLO MODEL SPEC FILE', className='ms-1 me-2', color='white', text_color='secondary')),
+                html.H4(dbc.Badge('IMPORT COD MODEL SPEC FILE', className='ms-1 me-2', color='white', text_color='secondary')),
                 html.P('Select the yaml file that specifies a yolo model for coral detection.', style={'display': 'inline-block'}),
                 self.file_upload_area,
                 self._toast,
