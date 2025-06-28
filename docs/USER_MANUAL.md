@@ -384,5 +384,5 @@ Queensland University of Technology <br />
 
 ## Author
 
-This document is written by Dr Andrew Lui <br />
+Dr Andrew Lui <br />
 Latest update: June 2025

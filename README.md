@@ -609,8 +609,6 @@ The system provides several endpoints as a part of an experimental RESTful API.
 | `/api/tile_samples/import` | Import a new tile sample in yaml format | N/A |
 
 
-
-
 ## Developer
 
 Dr Andrew Lui, Senior Research Engineer <br />
