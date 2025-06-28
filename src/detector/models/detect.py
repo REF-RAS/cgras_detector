@@ -281,7 +281,8 @@ class CoralObjectDetectModel():
             ClassHierarchyCoral.POLYP_MULTI.value: (32, 32, 32,),
             ClassHierarchyCoral.POLYP_SINGLE.value: (64, 64, 192),
             ClassHierarchyCoral.POLYP_KEYPART.value: (64, 64, 192), 
-            ClassHierarchyCoral.DEAD_CORAL.value: (0, 0, 0),          
+            ClassHierarchyCoral.DEAD_CORAL.value: (0, 0, 0),
+            ClassHierarchyCoral.OTHER.value: (32, 192, 32),   
         } 
         # draw the color legend
         y, ystep = 20, 30
