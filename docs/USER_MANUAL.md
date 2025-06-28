@@ -368,9 +368,12 @@ Press the __Confirm__ button to save the change or the __Cancel__ button to clos
 
 The chart enables users to view the applicable scope of all the COD models currently in the system.  The chart makes it easier to find gaps in the scope. 
 
+## Links
 
-
-
+- [Introduction to the CCVS and Installation Guide](../README.md)
+- [Modelling Coral Object Detection](./CORAL_CLASSES.md)
+- [Design Diagrams](./DESIGN.md)
+- [Summary of Processing Errors and System Issues](./ERROR_CODE.md)
 
 ## Developer of the System
 
@@ -382,4 +385,4 @@ Queensland University of Technology <br />
 ## Author
 
 This document is written by Dr Andrew Lui <br />
-Latest update: June 20
+Latest update: June 2025

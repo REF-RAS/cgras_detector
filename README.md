@@ -9,7 +9,9 @@ At the upstream of the CGRAS 2025 finds the **Image Acquisition Coorindation Sys
 > Please refer to the following documents for more specific purposes.
 > 
 > - [User Manual](./docs/USER_MANUAL.md)
-> - [List of Error Codes](./docs/ERROR_CODE.md)
+> - [Modelling Coral Object Detection](./docs/CORAL_CLASSES.md)
+> - [Design Diagrams](./docs/DESIGN.md)
+> - [Summary of Processing Errors and System Issues](./docs/ERROR_CODE.md)
 
 ## Basic Operation
 
