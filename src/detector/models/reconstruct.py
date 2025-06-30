@@ -842,7 +842,7 @@ class ImageReconstruct2DModel():
         if output_file is not None:  # save the images only if output_folder is provided
             self.logger.info(f'{type(self).__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
             if not cv2.imwrite(output_file, row_reco_image):
-                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write  row reconstructed image at scale to {output_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write row reconstructed image at scale to {output_file}')
         return row_reco_image, normalized_warped_roi_corners, warped_roi_sizes 
  
             
@@ -885,7 +885,13 @@ class ImageReconstruct1DModel():
         # the desperate flag
         tried_desperate = False
         # the list of hyper-parameters for search
-        param_search_list = self._generate_parameter_search(image_matching_min_confidence)  
+        default_feature_detectors = ['brisk', 'sift']
+        try_feature_detectors = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTORS, default_feature_detectors)
+        if type(try_feature_detectors) == str:
+            try_feature_detectors = [try_feature_detectors]
+        try_matcher_types = ['affine']
+        param_search_list = self._generate_parameter_search(try_feature_detectors, try_matcher_types, image_matching_min_confidence)  
+        # attempt to reconstruct using each of the parameter sets
         while True:
             if len(param_search_list) == 0:
                 if not tried_desperate:
@@ -989,10 +995,8 @@ class ImageReconstruct1DModel():
         if not model_build_success and model_build_error is not None:
             raise model_build_error
         
-    def _generate_parameter_search(self, conf_matrix_min_confidence):
+    def _generate_parameter_search(self, try_feature_detectors, try_matcher_types, conf_matrix_min_confidence):
         # setup the list of parameters to search 
-        try_feature_detectors = ['brisk', 'sift']
-        try_matcher_types = ['affine']
         try_min_confidence = [conf_matrix_min_confidence]
         param_search_list = []
         for fd in try_feature_detectors:

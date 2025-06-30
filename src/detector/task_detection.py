@@ -221,7 +221,7 @@ class DetectionTaskModel():
         try:
             self.image_map_as_list, self.image_grid_dim = self._build_image_map_as_list(self.tile_sample_id)
         except Exception as e:
-            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Missing image in the capture grid', e = e)
+            raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Image file in the capture grid not found', e = e)
         # load the cached ImageReconstructModel if exists, or build a new model from captured images
         reco_model_file = os.path.join(self.logdata_folder, self.params.get(ModelsConfigNames.RECO_MODEL_FILENAME.value, 'reco_model.yaml'))
         try:
@@ -278,17 +278,22 @@ class DetectionTaskModel():
                 yolo_model_file =  yolo_model_dict['model_file_path']
                 blob_size = (yolo_model_dict['input_image_width'], yolo_model_dict['input_image_height'], )
                 classes_map = yolo_model_dict['classes_map']
+                predict_params = yolo_model_dict['predict_params']
                 try:
                     logger.info(f'{type(self).__name__}: Attempting to load the yolo_model_file at {yolo_model_file}')
-                    yolo_detector_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file, blob_size, classes_map) 
+                    yolo_detector_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file, blob_size, classes_map, predict_params) 
                     yolo_detector_model_list.append(yolo_detector_model)
                 except Exception as e:
                     logger.info(f'{type(self).__name__}: Failed to load the yolo model file: {e}')
                     raise DetectorAborted(DetectorExceptionCodes.YOLO_MODEL_FILE_ERROR, f'Failed to load the yolo model file ({yolo_model_file})', e = e)
-            # build the cod model
+            # raise execption if the current job is cancelled
             if self.to_cancel:
                 self.progress_model.end_stage(ProgressStages.OBJECT_DETECT)  
                 raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
+            # build the cod model
+            logger.info(f'DetectionTaskModel build COD for images of the tile sample ({self.tile_sample_id}) using yolo model file: {yolo_model_file}')
+            logger.info(f'object class map: {classes_map}')
+            logger.info(f'yolo predict params: {predict_params}')
             self.cod_model = CoralObjectDetectModel(self.image_map_as_list, yolo_detector_model_list, self.reco_model.map_bbox, self.loctile_model.map_and_normalize_bbox, self.loctile_model.get_tile_size_in_image_space(),
                                                     self._execute_task_object_detection_cb, **self.params)
             self.cod_model.build()
@@ -340,16 +345,14 @@ class DetectionTaskModel():
             self.progress_model.end_stage(ProgressStages.COLLECT_STAT) 
             raise DetectorCancelled(DetectorExceptionCodes.CANCELLED_BY_SYSTEM, 'Received an cancel command from the system')
         try:
-            stat = {
-                'coral_alive_count': 0,
-                'coral_dead_count': 0,
-                'other_count': 0,
-                'masked': 0,
-                'duplicates_removed': self.cod_model.get_num_invalidated_objects(),
-                'total_object_count': self.cod_model.get_num_objects(),
-            }            
             # stat = self._process_detected_objects(self.cod_model)    # DB operation
-            stat = DETECT_DAO.add_detected_object_from_coral_object_list(self.tile_sample_id, self.cod_model.get_object_list(), stat) # DB operation
+            stat = DETECT_DAO.add_detected_object_from_coral_object_list(self.tile_sample_id, self.cod_model.get_object_list(), exclude_outside_of_tile=True) # DB operation
+            stat.update(
+                {
+                    'duplicates_removed': self.cod_model.get_num_invalidated_objects(),
+                    'total_object_count': self.cod_model.get_num_objects(),
+                }
+            )
             logger.info(f'{type(self).__name__}: Statistics {stat}')
             self.detection_stat.update(stat)
             # save the statistics to the database
@@ -475,31 +478,32 @@ class DetectionTaskModel():
         DETECT_DAO.update_tile_sample_detect_stat(self.tile_sample_id, detection_stat['tile_pixel_x'], detection_stat['tile_pixel_y'], 
                             detection_stat['coral_alive_count'], detection_stat['coral_dead_count'], detection_stat['other_count'], 
                             detection_stat['duplicates_removed'], yaml_data)
-         
-    def _process_detected_objects(self, cod_model:CoralObjectDetectModel) -> dict:
-        stat = {
-            'coral_alive_count': 0,
-            'coral_dead_count': 0,
-            'other_count': 0,
-            'duplicates_removed': cod_model.get_num_invalidated_objects(),
-            'total_object_count': cod_model.get_num_objects(),
-        }
-        coral_object_list:list = cod_model.get_object_list()
-        coral_object:CoralObject
-        for coral_object in coral_object_list:
-            if coral_object.invalidated:
-                continue
-            centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
-            corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
-            size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
-            if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
-                stat['coral_alive_count'] += 1
-            elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:
-                stat['coral_dead_count'] += 1
-            elif coral_object.present_class == ClassHierarchyPresentation.OTHER.value:
-                stat['other_count'] += 1
-            DETECT_DAO.add_detected_object_from_coral_object(self.tile_sample_id, coral_object)
-        return stat
+
+    # NOTE: not used in execute_task_record     
+    # def _process_detected_objects(self, cod_model:CoralObjectDetectModel) -> dict:
+    #     stat = {
+    #         'coral_alive_count': 0,
+    #         'coral_dead_count': 0,
+    #         'other_count': 0,
+    #         'duplicates_removed': cod_model.get_num_invalidated_objects(),
+    #         'total_object_count': cod_model.get_num_objects(),
+    #     }
+    #     coral_object_list:list = cod_model.get_object_list()
+    #     coral_object:CoralObject
+    #     for coral_object in coral_object_list:
+    #         if coral_object.invalidated:
+    #             continue
+    #         centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
+    #         corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
+    #         size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
+    #         if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
+    #             stat['coral_alive_count'] += 1
+    #         elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:
+    #             stat['coral_dead_count'] += 1
+    #         elif coral_object.present_class == ClassHierarchyPresentation.OTHER.value:
+    #             stat['other_count'] += 1
+    #         DETECT_DAO.add_detected_object_from_coral_object(self.tile_sample_id, coral_object)
+    #     return stat
 
     @staticmethod
     def delete_cache_files(tile_sample_id:str, delete_reco=False, delete_object_list=False, delete_object_detection_model=False):
@@ -512,13 +516,12 @@ class DetectionTaskModel():
             if delete_object_list:
                 delete_object_detection_model = True
                 for file in glob.glob(os.path.join(logdata_folder, 'object_list_*.yaml')):
+                    logger.warning(f'delete_cache_files: {file}')
                     os.remove(file)
             
             if delete_object_detection_model:            
                 os.remove(os.path.join(logdata_folder, CONFIG.get(ModelsConfigNames.COD_MODEL_FILENAME.value, 'coral_object_detect_model.yaml')))
                 
-
-                    
     @staticmethod
     def delete_cache_folder(tile_sample_id:str):
         with contextlib.suppress(FileNotFoundError, Exception):

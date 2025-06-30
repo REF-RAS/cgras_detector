@@ -86,7 +86,6 @@ class CountScatterMapBlock():
             output_model = output_model.head(-1)  # remove the last row
         return coral_trend_model, output_model
 
-    
     def _generate_scatter_plot(self, tile_sample_id, title:str=None):
         detected_object_df = DETECT_DAO.query_detected_objects(tile_sample_id, 
                                         present_classes=(ClassHierarchyPresentation.ALIVE_CORAL.value, ClassHierarchyPresentation.DEAD_CORAL.value, ClassHierarchyPresentation.OTHER.value))
@@ -109,9 +108,6 @@ class CountScatterMapBlock():
         def update_panel(tile_id):
             if tile_id is None:
                 raise PreventUpdate
-            # the update is due to a new tile_id selected
-            # if self.current_tile_id is None or tile_id != self.current_tile_id:
-            #     self.current_tile_id = tile_id
 
             # update the coral_trend_model
             self.coral_trend_model, self.output_model = self._get_coral_trend_model(tile_id)

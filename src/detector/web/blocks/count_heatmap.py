@@ -114,9 +114,12 @@ class CountHeatmapBlock():
         vt_model = CoralObjectMapModel(tile_sample_id)
         # count_map stores the counts as integers and count_label_map is the string representation
         count_map, count_label_map = vt_model.compute_object_count_map(filter_class, count_range=count_range)
+        # find the sum of all cells
+        count_total = count_map.sum()
+        title += f' ({count_total})'
         # generate the heatmap for the given tile_sample_id
         color_scale = CONFIG.get(SystemConfigNames.HEATMAP_COLOUR_SCALE, None)
-        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(600, 600,), count_range=count_range, color_scale=color_scale)
+        fig = HeatmapHelper.generate_plotly_heatmap(count_map, count_label_map, title=title, fig_size=(640, 600,), count_range=count_range, color_scale=color_scale)
         return fig, count_map
     
     # internal function for generating the heatmaps based on the given filter_class, the indices of tile samples to show in additional to the most recent one, and the count show threshold 
@@ -135,10 +138,11 @@ class CountHeatmapBlock():
                 if self.class_options is not None:
                     for option in self.class_options:
                         if option['value'] == filter_class:
-                            title += f': # {option["label"]}'
+                            title += f': # {option["label"]}s'
                             break
                     
                 fig, count_map = self._generate_heatmap(the_sample_id, filter_class, title=title, show_count_threshold=show_count_threshold) 
+                # find the scale
                 max_count = max(max_count, count_map.max())                   
                 fig.update_layout(
                     margin=dict(l=5, r=5, b=10, t=50, pad=0),

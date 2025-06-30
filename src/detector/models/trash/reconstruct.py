@@ -802,7 +802,7 @@ class ImageReconstruct2DModel():
         if output_file is not None:  # save the images only if output_folder is provided
             self.logger.info(f'{type(self).__name__}: Writing 1d reconstructed image (size: {row_reco_image.shape[:2][::-1]}) to file {output_file}')
             if not cv2.imwrite(output_file, row_reco_image):
-                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write  row reconstructed image at scale to {output_file}')
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write row reconstructed image at scale to {output_file}')
         return row_reco_image, warped_roi_corners, warped_roi_sizes 
  
             
@@ -824,7 +824,14 @@ class ImageReconstruct1DModel():
         logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         debug_feature_matching_images = kwargs.get(ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value, False)
         # input parameters and model variables        
-        feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTOR.value, 'sift')
+        feature_detector = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTORS.value, 'sift')
+        # accept only one feature detector if it is a list or tuple
+        if type(feature_detector) in (list, tuple):
+            if len(feature_detector) > 0:
+                feature_detector = feature_detector[0]
+            else:
+                feature_detector = 'sift'
+
         feature_matching_confidence_threshold = kwargs.get(ModelsConfigNames.RECO_FEATURE_MATCHING_CONFIDENCE_THRESHOLD.value, 1.0)  # for matching features between two images
         if row_index is None:
             image_matching_min_confidence = kwargs.get(ModelsConfigNames.RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE.value, 1.0) 

@@ -22,7 +22,7 @@ def sample_reconstruct_params():
         ModelsConfigNames.RECO_MODEL_FILENAME.value: 'reco_model.yaml',
         ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value: False,
         ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value: True,
-        ModelsConfigNames.RECO_FEATURE_DETECTOR.value: 'brisk',
+        ModelsConfigNames.RECO_FEATURE_DETECTORS.value: 'brisk',
         ModelsConfigNames.RECO_FEATURE_MATCHING_CONFIDENCE_THRESHOLD.value: 1.0,
         ModelsConfigNames.RECO_IMAGE_MATCHING_MIN_CONFIDENCE.value: 1.0,
         ModelsConfigNames.RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE.value: 1.0,

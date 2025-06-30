@@ -58,6 +58,7 @@ RUN sudo add-apt-repository ppa:deadsnakes/ppa
 # install python
 RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 python3-pip \
+python3-rospkg \
 python3-rosdep \
 python3-setuptools \
 python3-tk
@@ -74,7 +75,7 @@ RUN rm ${CGRAS_WS}/src/requirements.txt
 
 # install yolo and pytorch
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-RUN pip install networkx ultralytics
+RUN pip install networkx==2.8.8 ultralytics
 
 # complete rosdep installation
 RUN rosdep update

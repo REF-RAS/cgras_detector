@@ -46,22 +46,20 @@ class MonitorTaskControlBlock():
                 dcc.Store(id=self.update_store_id),
                 dcc.Store(id=prefix+'task_execute_mode_store'),
                 html.H4(dbc.Badge('JOB CONTROL', className='ms-2 mb-4', color='white', text_color='secondary')),
-                html.Div([
-                   dbc.Button(' ', id=prefix+'mode_button', className='me-4', color='light', style={'width': '320px'}),
+                dbc.Row([
+                    html.H3(dbc.Badge(' ', id=prefix+'mode_label', color='white', text_color='primary', className='border mx-auto'), className='offset-4 col-4', style={'height': '30px'}),
+                    dbc.Button('Change Mode', id=prefix+'mode_button', className='me-4 offset-1 col-3', size='sm', color='light', style={'width': '180px'}),
                 ], className='mb-4 mx-auto col-12'), 
+
                 html.P(' ', id=prefix+'mode_message', className='mt-2 mx-auto col-12'),
                 self.button_panel,
                 self._toast,
             ], id=prefix+'main_panel', className='mx-auto text-center pb-2')
 
-        # self.app.callback([Output(prefix+'task_execute_mode_store', 'data')],
-        #                     [Input(prefix+'mode_dropdown', 'value')], 
-        #     prevent_initial_call=True)(self._mode_dropdown_changed())
-
         self.app.callback([Output(prefix+'button_panel', 'style'),
                            Output(prefix+'mode_message', 'children'),
-                           Output(prefix+'mode_button', 'children'),
-                           Output(prefix+'mode_button', 'color'),
+                           Output(prefix+'mode_label', 'children'),
+                           Output(prefix+'mode_label', 'text_color'),
                            Output(prefix+'mode_button', 'disabled'),
                            Output({'type': prefix+'button', 'index': 'process_tile'}, 'disabled'),
                            Output({'type': prefix+'button', 'index': 'import_sample'}, 'disabled'),],
@@ -134,7 +132,15 @@ class MonitorTaskControlBlock():
             current_state = STATE.get_state()
             is_menu_appear = current_state in [SystemStates.CLICK_START]
             enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
-            if current_state in [SystemStates.SUSPENDED]:
+            if current_state in [SystemStates.WAIT_RESOURCE]:
+                return (
+                    {'visibility': 'visible'},
+                    'System suspended due to insufficient disk space.',
+                    'SUSPENDED Mode',
+                    'dark',
+                    True, True, True,
+                )
+            elif current_state in [SystemStates.SUSPENDED]:
                 return (
                     {'visibility': 'visible'},
                     'System suspended due to the execution of an image acquisition program.',

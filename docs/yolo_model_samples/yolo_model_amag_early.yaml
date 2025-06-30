@@ -13,3 +13,8 @@ classes_map:
   POLYP_KEYPART: []
   DEAD_CORAL: []
 remarks: 
+# yolo model predict parameters
+yolo_predict_params:
+  conf:    # default 0.25
+  iou:              # default 0.7
+  agnostic_nms:           # default False

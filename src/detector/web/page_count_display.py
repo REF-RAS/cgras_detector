@@ -43,7 +43,7 @@ class CountViewerPage():
         # putting the components together 
         rows = html.Div(children = [
             dcc.Store(id=self.update_trigger_id), 
-            dbc.Row(html.H3(children = 'Browse Coral Detection Results', className='mt-3 mb-3')),
+            dbc.Row(html.H3(children = 'Coral Detection Findings Browser', className='mt-3 mb-3')),
             dbc.Row([
                 dbc.Col([self.tile_browse_table.get_panel(),], className='col-3'),
                 dbc.Col([

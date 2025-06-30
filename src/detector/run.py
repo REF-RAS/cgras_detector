@@ -44,6 +44,8 @@ class ApplicationCoordinator(object):
         rospy.on_shutdown(self.cb_shutdown)
         # model variables
         self.counter = 0
+        # min disk space
+        self.disk_space_min = CONFIG.get(SystemConfigNames.DISK_SPACE_MIN, 5.0)  # 5 GB
         # operation mode
         AUTOMATED_TASK_EXECUTION.set_value(bool(CONFIG.get(SystemConfigNames.TASK_AUTOMATION_MODE, False)))
         self.suspend_when_capturing_image = CONFIG.get(SystemConfigNames.SUSPEND_WHEN_CAPTURING_IMAGE, False)
@@ -66,7 +68,11 @@ class ApplicationCoordinator(object):
         # create the work thread and the lock for execution of the detection task
         self.work_lock = threading.RLock()
         self.work_thread:threading.Thread = None
-
+        # create the application thread for executing the state machine
+        self.SYSTEM_TIMER = CONFIG.get(SystemConfigNames.SYSTEM_TIMER, 1) # in seconds
+        self._to_stop_application = False
+        self.application_thread = threading.Thread(target=self.run_application, args=[])
+        self.application_thread.start()
         # create the dash application
         try:
             self.dash_app_operator = DashApplicationMain()
@@ -89,7 +95,21 @@ class ApplicationCoordinator(object):
         sys.exit(0)
         
     def cb_shutdown(self):
+        self._to_stop_application = True
         time.sleep(2)
+        
+    def run_application(self):
+        last_callback_time = None
+        n = 0
+        while not self._to_stop_application:
+            time.sleep(0.01)
+            if self._to_stop_application:
+                break
+            current_time = time.time()
+            if last_callback_time is None or current_time - last_callback_time > self.SYSTEM_TIMER:
+                n += 1
+                CALLBACK_MANAGER.fire_event(CallbackTypes.TIMER, n)
+                last_callback_time = current_time
         
     def cb_coordinator(self, msg:Int8): 
         received_coordinator_state_value = msg.data
@@ -131,6 +151,8 @@ class ApplicationCoordinator(object):
             if event == CallbackTypes.PROCESS_TILE_TO_CANCEL:
                 logger.warning(f'_console_callback: received CANCEL callback')
                 self.cancel_current_task()
+                logger.info(f'_console_callback: change execution mode to MANUEL')
+                AUTOMATED_TASK_EXECUTION.set_value(False)
                 
     def cancel_current_task(self) -> bool:
         with self.state_lock:
@@ -228,10 +250,24 @@ class ApplicationCoordinator(object):
                     STATE.del_var('tile_sample_id')
                     STATE.del_var('the_detection_task')
                     # logger.info(f'Initial Task Automation Mode: {AUTOMATED_TASK_EXECUTION.value}')
-                    if AUTOMATED_TASK_EXECUTION.value:
+                    
+                    # check if the disk space is below the minimum
+                    free_disk_space = APP_FILE_MANAGER.get_free_disk_space()
+                    if free_disk_space < self.disk_space_min:
+                        error_remarks = f'Current free disk space {free_disk_space:.1f} GB is too low. The processing is ceased until more space becomes available.'
+                        DETECT_DAO.set_error_flag(DetectorExceptionCodes.DISK_SPACE_ERROR.value, obj='Disk', remarks=error_remarks, level=1)  
+                        STATE.update(SystemStates.WAIT_RESOURCE)
+                    # change state depending on the task execution mode
+                    elif AUTOMATED_TASK_EXECUTION.value:
                         STATE.update(SystemStates.AUTO_START)
                     else:
                         STATE.update(SystemStates.CLICK_START)
+                
+                elif state == SystemStates.WAIT_RESOURCE:
+                    free_disk_space = APP_FILE_MANAGER.get_free_disk_space()
+                    if free_disk_space >= self.disk_space_min:
+                        DETECT_DAO.unset_error_flag(DetectorExceptionCodes.DISK_SPACE_ERROR.value, obj='Disk')
+                        STATE.update(SystemStates.READY)
                 
                 elif state == SystemStates.AUTO_START:
                     if COORDINATOR_STATE.get_state() in [CoordinatorStates.IDLE, CoordinatorStates.UNKNOWN]:
@@ -264,25 +300,6 @@ class ApplicationCoordinator(object):
                         STATE.update_state(SystemStates.READY)
                     except Exception as e:
                         STATE.update_state(SystemStates.READY)
-                    
-                # elif state == SystemStates.POLL_IMPORT_SAMPLE:
-                #     # check if import tile sample is enabled
-                #     enable_import_new_samples = PERSISTENT_STORE_DAO.get_config_value(PersistentStoreDAO.TILE_IMPORT_ENABLED, default=False)
-                #     if not enable_import_new_samples:
-                #         STATE.update_state(SystemStates.READY)
-                #         return
-                #     # query for new un-exported tile samples 
-                #     exportable_tile_samples_list = IMPORT_SAMPLE_DAO.query_to_export_sample_as_list_tuples()
-                #     if exportable_tile_samples_list is None or len(exportable_tile_samples_list) == 0:
-                #         STATE.update_state(SystemStates.READY)
-                #     else:
-                #         STATE.set_var('exportable_tile_samples_list', exportable_tile_samples_list)
-                #         STATE.update_state(SystemStates.IMPORT_SAMPLE)
-                        
-                # elif state == SystemStates.IMPORT_SAMPLE:
-                #     exportable_tile_samples_list = STATE.get_var('exportable_tile_samples_list')
-                #     self.process_exportable_tile_samples(exportable_tile_samples_list)
-                #     STATE.update_state(SystemStates.READY)
                     
                 elif state == SystemStates.POLL_DETECT:
                     # query for a tile sample pending processig 

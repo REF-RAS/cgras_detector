@@ -11,7 +11,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import sys, signal
+import sys, os, signal
 import http.server
 import socketserver
 
@@ -36,7 +36,7 @@ def cb_stop_server(*args, **kwargs):
 if __name__ == '__main__':
     SERVER = CONFIG.get(SystemConfigNames.AUX_WEB_HOST, '0.0.0.0')
     PORT = CONFIG.get(SystemConfigNames.AUX_WEB_PORT, 8024)
-    DIRECTORY = CONFIG.get(SystemConfigNames.AUX_WEB_DIRECTORY, '/home/qcr/cgras/images')
+    DIRECTORY = os.path.expanduser(CONFIG.get(SystemConfigNames.AUX_WEB_DIRECTORY, '/home/qcr/cgras/images'))
 
     # create the stop signal handler
     signal.signal(signal.SIGINT, cb_stop_server)

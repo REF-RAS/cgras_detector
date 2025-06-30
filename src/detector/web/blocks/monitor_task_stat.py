@@ -28,7 +28,8 @@ class MonitorTaskStatBlock():
                 'backgroundColor': '#FFFF99',
                 'font-weight': 'bold'},]
         # define widgets
-        _datatable = dash_table.DataTable(id=prefix+'datatable', style_data_conditional=style_data_conditional, style_cell={'fontSize': 14})
+        _datatable = dash_table.DataTable(id=prefix+'datatable', style_data_conditional=style_data_conditional, 
+                                          editable=False, row_selectable=False, cell_selectable=False, style_cell={'fontSize': 14})
 
         self.tile_stat_panel = dbc.Col([
                 html.H4(dbc.Badge('STATISTICS', className='ms-2 mb-4', color='white', text_color='secondary')),

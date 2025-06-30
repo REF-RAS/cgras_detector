@@ -71,6 +71,11 @@ class ApplicationFileManager():
             raise AssertionError(f'{type(self).__name__}: invalid parameter (subfolder): {subfolder} ')
         return self.get_subfolder(self.detector_folder, subfolder, *args)   
     
+    def get_free_disk_space(self) -> float:
+        total, used, free = shutil.disk_usage(self.cgras_data_folder)
+        free = free / (2**30) 
+        return free
+    
     def dump_exc_to_error_log(self, header=None):
         try:
             with open(self.error_log_file, 'a') as outfile:

@@ -100,6 +100,7 @@ DETECT_DDL = {
         end_day integer DEFAULT -1,
         classes_map_yaml TEXT DEFAULT NULL,
         remarks text,
+        predict_params_yaml text,
         UNIQUE (name)
     );
     """,
@@ -153,7 +154,7 @@ DETECT_DDL = {
     );
     """,    
     
-    'health_model':
+    'health_model':             # NOT USED
     """
     CREATE TABLE IF NOT EXISTS health_model (
         species text PRIMARY KEY,
@@ -163,7 +164,7 @@ DETECT_DDL = {
     );
     """,
 
-    'cache_tile_health_stat':
+    'cache_tile_health_stat':     # NOT USED
     """
     CREATE TABLE IF NOT EXISTS cache_tile_health_stat (
         tile_id text PRIMARY KEY,
@@ -727,15 +728,18 @@ class DetectorDAO():
     # - table: yolo_model
     @synchronized
     def add_yolo_model(self, name:str, model_file_path:str, species:str, start_day:int, end_day:int, input_image_width:int, input_image_height:int, 
-                       classes_map:dict, remarks:str) -> int:  
+                       classes_map:dict, remarks:str, predict_params_dict:dict) -> int:  
         classes_map = {} if classes_map is None else classes_map
         classes_map_yaml = yaml.dump(classes_map, Dumper=NoAliasDumper)
+
+        predict_params_dict = {} if predict_params_dict is None else predict_params_dict
+        predict_params_yaml = yaml.dump(predict_params_dict, Dumper=NoAliasDumper)
              
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO yolo_model (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, classes_map_yaml, remarks) '
-                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-                      (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, classes_map_yaml, remarks,))
+            c.execute('INSERT INTO yolo_model (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, classes_map_yaml, remarks, predict_params_yaml) '
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                      (name, model_file_path, species, start_day, end_day, input_image_width, input_image_height, classes_map_yaml, remarks, predict_params_yaml,))
             conn.commit()
             id = c.lastrowid
         return id
@@ -753,7 +757,6 @@ class DetectorDAO():
             if class_cat not in classes_map:
                 classes_map[class_cat] = []
                 
-    
     @synchronized
     def query_yolo_model(self, species, days_since_settle) -> list:
         sql = 'SELECT * FROM yolo_model WHERE species = ? AND (? >= start_day) AND (end_day == -1 or ? <= end_day) ORDER BY start_day ASC'
@@ -763,6 +766,10 @@ class DetectorDAO():
                 result['classes_map'] = yaml.load(result['classes_map_yaml'], Loader=yaml.Loader)
             except:     
                 result['classes_map'] = {}
+            try:
+                result['predict_params'] = yaml.load(result['predict_params_yaml'], Loader=yaml.Loader)
+            except:     
+                result['predict_params'] = {}                
             
         return result_list
     
@@ -775,7 +782,11 @@ class DetectorDAO():
         try:
             result['classes_map'] = yaml.load(result['classes_map_yaml'], Loader=yaml.Loader)
         except:     
-            result['classes_map'] = {}        
+            result['classes_map'] = {}   
+        try:
+            result['predict_params'] = yaml.load(result['predict_params_yaml'], Loader=yaml.Loader)
+        except:     
+            result['predict_params'] = {}                    
         return result
     
     @synchronized
@@ -787,6 +798,10 @@ class DetectorDAO():
     def update_yolo_model(self, name:str, species:str, start_day:int, end_day:int) -> int:
         sql = 'UPDATE yolo_model SET species = ?, start_day = ?, end_day = ? WHERE name = ?'
         return db_tools.update(self.db_file, sql, (species, start_day, end_day, name,))  
+
+    @staticmethod
+    def get_acceptable_yolo_predict_params_list():
+        return ['conf', 'iou', 'agnostic_nms']
 
     # composite operation: validate yaml file for a new yolo model
     @synchronized
@@ -806,7 +821,13 @@ class DetectorDAO():
         input_image_width = yolo_spec_data.get('input_image_width', None)
         input_image_height = yolo_spec_data.get('input_image_height', None)
         classes_map = yolo_spec_data.get('classes_map', {}) 
-        remarks = yolo_spec_data.get('remarks', None)         
+        remarks = yolo_spec_data.get('remarks', None)  
+        # extract the yolo predict params list
+        predict_params_dict = yolo_spec_data.get('yolo_predict_params', {}) 
+        accept_params_list = self.get_acceptable_yolo_predict_params_list()
+        for key in list(predict_params_dict.keys()):
+            if key not in accept_params_list or predict_params_dict[key] is None:
+                del predict_params_dict[key]             
         # validate data
         if name is None or file is None or species is None:
             error_list.append(f'One of the mandatory fields (name, file, species) is missing in the yaml file')
@@ -826,7 +847,11 @@ class DetectorDAO():
             model.loc[3] = ['species', species]
             model.loc[4] = ['valid period', self.get_period_str(valid_start_day, valid_end_day)]
             model.loc[5] = ['input image size', f'{input_image_width}(W) x {input_image_height}(H)']
-            row_index = 6
+            if predict_params_dict:
+                model.loc[6] = ['YOLO predict params', str(predict_params_dict)]
+                row_index = 7
+            else:
+                row_index = 6
             if len(classes_map) == 0:
                 model.loc[row_index] = ['classes map', 'not set']
             else:
@@ -881,11 +906,14 @@ class DetectorDAO():
                 continue
             if class_name.name not in classes_map:
                 classes_map[class_name.name] = []
+        # get the yolo predict params dict, the parameter list is already validated and trimmed in validate_yolo_model_file_import  
+        predict_params_dict = yolo_spec_data.get('yolo_predict_params', {}) 
+        # add yolo model to the db
         try:
             with db_tools.create_connection(self.db_file) as conn: 
                 conn.isolation_level = None  # to turn off auto-commit (may be unnecessary, minor issue, to check)
                 if self.add_yolo_model(name, model_file_path, species, valid_start_day, valid_end_day, input_image_width, input_image_height, 
-                                       classes_map, remarks) > 0:
+                                       classes_map, remarks, predict_params_dict) > 0:
                     return True
             logger.warning(f'Failed to add yolo model to the database')
             return False
@@ -915,16 +943,27 @@ class DetectorDAO():
         return self.add_detected_object(tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class,
                                         centre_x, centre_y, corner_x1, corner_y1, size_x, size_y)        
 
-    def add_detected_object_from_coral_object_list(self, tile_sample_id, coral_object_list, stat):
+    def add_detected_object_from_coral_object_list(self, tile_sample_id, coral_object_list, stat:dict=None, exclude_outside_of_tile:bool=True):
+        if stat is None:
+            stat = {
+                'coral_alive_count': 0,
+                'coral_dead_count': 0,
+                'other_count': 0,
+                'masked': 0,
+            } 
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()        
             coral_object:CoralObject
             for coral_object in coral_object_list:
                 if coral_object.invalidated:
                     continue
+                # exclude the objects that are outside of the tile area, which is between (0, 0) and (1, 1)
                 centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
+                if exclude_outside_of_tile and (centre_x < 0 or centre_x >= 1 or centre_y < 0 or centre_y >= 1):
+                    continue
                 corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
                 size_x, size_y = coral_object.bbox_normalized[2] - corner_x1, coral_object.bbox_normalized[3] - corner_y1
+                # tally the coral types
                 if coral_object.present_class == ClassHierarchyPresentation.ALIVE_CORAL.value:
                     stat['coral_alive_count'] += 1
                 elif coral_object.present_class == ClassHierarchyPresentation.DEAD_CORAL.value:
@@ -1198,7 +1237,7 @@ class DetectorDAO():
     
     # - table: error flag
     @synchronized
-    def set_error_flag(self, id:int, obj:str, remarks:str, level:int=0) -> int:
+    def set_error_flag(self, id:int, obj:str=None, remarks:str=None, level:int=0) -> int:
         sql = 'REPLACE INTO error_flag(id, object, update_time, remarks, level) VALUES (?, ?, DATETIME("now", "localtime"), ?, ?)'
         return db_tools.update(self.db_file, sql, (id, obj, remarks, level,))    
 
@@ -1208,9 +1247,13 @@ class DetectorDAO():
         return db_tools.query(self.db_file, sql)
     
     @synchronized
-    def unset_error_flag(self, id:int, obj:str) -> int:
-        sql = 'DELETE FROM error_flag WHERE id = ? AND object = ?'
-        return db_tools.update(self.db_file, sql, (id, obj))       
+    def unset_error_flag(self, id:int, obj:str=None) -> int:
+        if obj is None or obj == '':
+            sql = 'DELETE FROM error_flag WHERE id = ? AND object IS NULL'
+            return db_tools.update(self.db_file, sql, (id,)) 
+        else:
+            sql = 'DELETE FROM error_flag WHERE id = ? AND object = ?'
+            return db_tools.update(self.db_file, sql, (id, obj))       
 
     @synchronized
     def clear_error_flags(self) -> int:

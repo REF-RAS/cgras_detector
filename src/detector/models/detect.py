@@ -22,6 +22,7 @@ from detector.dao_detect import CoralObject, ClassHierarchyPresentation, ClassHi
 
 from cgras_datatools.opencv_tools import CompareTools
 
+
 class CoralObjectDetectModel():
     # constant
     ANNOTATED_WHOLE_RECO_IMAGE_FILENAME = 'rotated_whole_reco_image_annotated.jpg'
@@ -52,26 +53,23 @@ class CoralObjectDetectModel():
         self.count_images_completed = 0
         # keep input parameters
         self.images_2d_list = images_2d_list
-        # self.reco_model = reco_model
-        # self.locate_tile_model = locate_tile_model
         self.yolo_detect_model_list = yolo_detect_model_list
         self.map_bbox_image_fn = map_bbox_image_fn
         self.map_normalize_bbox_tile_fn = map_normalize_bbox_tile_fn
         self.tile_size = tile_size
         self.params = kwargs
-        # extract useful information
-        # self.tile_size = locate_tile_model.get_tile_size() if locate_tile_model is not None else None
-        # if self.tile_size is None:  # if the tile size is not known from LocateTileModel 
-        #     whole_reco_image_size = reco_model.get_whole_reco_image_size()
-        #     self.tile_size = whole_reco_image_size
+
         # extract other keyword parameters - operational
         self.blob_overlap_pix = kwargs.get(ModelsConfigNames.COD_BLOB_OVERLAP_PIX.value, 0)
-        # self.duplicate_max_displacement = kwargs.get(ModelsConfigNames.COD_DUPLICATE_MAX_DISPLACEMENT_IMAGES.value, 10)
         self.coral_child_min_overlap_ratio = kwargs.get(ModelsConfigNames.COD_CORAL_CHILD_MIN_OVERLAP_RATIO.value, 0.25)
-        self.debug_blob_images = kwargs.get(ModelsConfigNames.COD_DEBUG_BLOB_IMAGES.value, True)
+        self.debug_blob_images = kwargs.get(ModelsConfigNames.COD_DEBUG_BLOB_IMAGES.value, True) 
+
         # extract other keyword parameters - output cached data and debug information
         self.logdata_folder = kwargs.get(ModelsConfigNames.LOGDATA_FOLDER.value, None)
         self.cod_model_cache_filename = kwargs.get(ModelsConfigNames.COD_MODEL_FILENAME.value, f'coral_object_detect_model.yaml')
+
+        # extract keyword parameters - whether to label POLYP_KEYPART as ALIVE or MASK
+        self.mask_polyp_keypart = kwargs.get(ModelsConfigNames.COD_MASK_POLYP_KEYPART.value, False)
         # init model parameters
         self.object_list = None     # the master list of detected objects
         self.image_grid_size = (len(self.images_2d_list[0]), len(self.images_2d_list))
@@ -283,7 +281,8 @@ class CoralObjectDetectModel():
             ClassHierarchyCoral.POLYP_MULTI.value: (32, 32, 32,),
             ClassHierarchyCoral.POLYP_SINGLE.value: (64, 64, 192),
             ClassHierarchyCoral.POLYP_KEYPART.value: (64, 64, 192), 
-            ClassHierarchyCoral.DEAD_CORAL.value: (0, 0, 0),          
+            ClassHierarchyCoral.DEAD_CORAL.value: (0, 0, 0),
+            ClassHierarchyCoral.OTHER.value: (32, 192, 32),   
         } 
         # draw the color legend
         y, ystep = 20, 30
@@ -481,12 +480,14 @@ class CoralObjectDetectModel():
                                                                                 self._filter_valid_objects(object_list_of_images[object_list_index_2]), parent_children_table,
                                                                                 self.coral_child_min_overlap_ratio)
 
+        # implementation of the hierchical coral class framework
         # process the parent children table and annotate the parents as DEAD if all the children are dead
         parent_object:CoralObject
         child_object:CoralObject
         for parent_object in parent_children_table:
             children_set = parent_children_table[parent_object]
-            if parent_object.present_class == None:
+            if parent_object.present_class == None: # the parent object is not yet annotated, there is work to do
+                # if the parent object is identified as a POLYP_MULTI, the types of children needs to be worked out
                 if parent_object.coral_class == ClassHierarchyCoral.POLYP_MULTI.value:
                     counter = [0, 0, 0]     # alive, dead, other
                     for child_object in children_set:
@@ -502,13 +503,23 @@ class CoralObjectDetectModel():
                         elif maxcount == counter[1]:
                             parent_object.present_class = ClassHierarchyPresentation.DEAD_CORAL.value                   
                         else:
-                            parent_object.present_class = ClassHierarchyPresentation.OTHER.value 
-                elif parent_object.coral_class in (ClassHierarchyCoral.POLYP_KEYPART.value, ClassHierarchyCoral.POLYP_SINGLE.value):
+                            parent_object.present_class = ClassHierarchyPresentation.OTHER.value
+                # parent is ALIVE_CORAL if its coral class is POLYP_KEYPART and not mask_polyp_keypart, which is a system config
+                elif parent_object.coral_class == ClassHierarchyCoral.POLYP_KEYPART.value:
+                    if not self.mask_polyp_keypart:
+                        parent_object.present_class = None
+                    else:
+                        parent_object.present_class = ClassHierarchyPresentation.MASKED.value 
+                # parent is ALIVE_CORAL if its coral class is POLYP_SINGLE
+                elif parent_object.coral_class == ClassHierarchyCoral.POLYP_SINGLE.value:
                     parent_object.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value 
+                # parent is DEAD_CORAL if its coral class is DEAD_CORAL
                 elif parent_object.coral_class == ClassHierarchyCoral.DEAD_CORAL.value:
                     parent_object.present_class = ClassHierarchyPresentation.DEAD_CORAL.value
+                # parent is OTHER if its coral class is OTHER
                 elif parent_object.coral_class == ClassHierarchyCoral.OTHER.value:
-                    parent_object.present_class = ClassHierarchyPresentation.OTHER.value            
+                    parent_object.present_class = ClassHierarchyPresentation.OTHER.value   
+                # mask all the child objects
                 for child_object in children_set:
                     child_object.present_class = ClassHierarchyPresentation.MASKED.value                   
 
@@ -517,12 +528,23 @@ class CoralObjectDetectModel():
         for obj in all_objects_list:
             if obj.present_class is None:
                 if obj.coral_class is not None:
-                    if obj.coral_class in (ClassHierarchyCoral.POLYP_MULTI.value, ClassHierarchyCoral.POLYP_SINGLE.value, ClassHierarchyCoral.POLYP_KEYPART.value):
+                    # POLYP_MULTI and POLYP_SINGLE are always considered ALIVE_CORAL
+                    if obj.coral_class in (ClassHierarchyCoral.POLYP_MULTI.value, ClassHierarchyCoral.POLYP_SINGLE.value): 
                         obj.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value
+                    # POLYP_KEYPART depends on mask_polyp_keypart, which is a system config, 
+                    # to determine if it is considered ALIVE because sometimes the parent POLYP_MULTI is not detected
+                    elif obj.coral_class == ClassHierarchyCoral.POLYP_KEYPART.value:
+                        if not self.mask_polyp_keypart:
+                            obj.present_class = ClassHierarchyPresentation.ALIVE_CORAL.value 
+                        else:
+                            obj.present_class = ClassHierarchyPresentation.MASKED.value 
+                    # DEAD_CORAL is mapped to DEAD_CORAL
                     elif obj.coral_class == ClassHierarchyCoral.DEAD_CORAL.value:
                         obj.present_class = ClassHierarchyPresentation.DEAD_CORAL.value   
+                    # OTHER is mapped to OTHER
                     elif obj.coral_class == ClassHierarchyCoral.OTHER.value:
                         obj.present_class = ClassHierarchyPresentation.OTHER.value    
+                    # UNDEFINED is mapped to MASKED
                     elif obj.coral_class == ClassHierarchyCoral.UNDEFINED.value:
                         obj.present_class = ClassHierarchyPresentation.MASKED.value                                             
                 else:
@@ -707,6 +729,7 @@ class CoralObjectDetectImageModel():
                             # extract the detected objects from the output of the yolo model of this blob
                             object_list = self._extract_objects_from_result(yolo_result, classes_map, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, 
                                                                             self.map_bbox_image_fn, self.map_normalize_bbox_tile_fn)  
+                            # combine the object lists from the yolo detect models
                             if object_list_of_blob is None:
                                 object_list_of_blob = object_list
                             elif self.merge_mutli_yolo_models:

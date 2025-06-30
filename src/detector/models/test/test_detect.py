@@ -25,7 +25,7 @@ def sample_reconstruct_params():
         ModelsConfigNames.RECO_MODEL_FILENAME.value: 'reco_model.yaml',
         ModelsConfigNames.RECO_DEGUG_IMAGE_ORIGINAL_SCALE.value: False,
         ModelsConfigNames.RECO_DEBUG_FEATURE_MATCH_IMAGES.value: True,
-        ModelsConfigNames.RECO_FEATURE_DETECTOR.value: 'brisk',
+        ModelsConfigNames.RECO_FEATURE_DETECTORS.value: 'brisk',
         ModelsConfigNames.RECO_FEATURE_MATCHING_CONFIDENCE_THRESHOLD.value: 1.0,
         ModelsConfigNames.RECO_IMAGE_MATCHING_MIN_CONFIDENCE.value: 1.0,
         ModelsConfigNames.RECO_IMAGE2D_MATCHING_MIN_CONFIDENCE.value: 1.0,
@@ -158,7 +158,8 @@ def test_build_coral_object_detect_model():
     yolo_model_file = params[ModelsConfigNames.YOLO_MODEL_FILE.value]
     yolo_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file=yolo_model_file, 
                                                        blob_size=params[ModelsConfigNames.COD_BLOB_SIZE.value],
-                                                       classes_map=params['classes_map'])
+                                                       classes_map=params['classes_map'],
+                                                       predict_params={})
 
     # build a CoralOjbectDetectModel for the images 
     # cod_model = CoralObjectDetectModel(image_map_as_list, reco_model, yolo_model, loctile_model, **params)

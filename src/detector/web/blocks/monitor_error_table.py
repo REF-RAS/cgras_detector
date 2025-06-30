@@ -22,7 +22,7 @@ from detector.models import DetectorExceptionCodes
 from cgras_datatools.logging_tools import logger
 
 class MonitorErrorTableBlock():
-    def __init__(self, app, prefix):
+    def __init__(self, app, prefix, page_size=10):
         self.app = app 
         self.prefix = prefix = prefix + 'metb_'
         # model variable
@@ -40,7 +40,7 @@ class MonitorErrorTableBlock():
                 {'if': {
                     'filter_query': '{level} > 0',
                     'column_id': 'remarks'
-                }, 'backgroundColor': '#ffffff', 'color': 'rgb(64, 0, 0)'},  
+                }, 'backgroundColor': '#ffffff', 'color': 'rgb(256, 0, 0)'},  
                 {'if': {
                     'filter_query': '{remarks} contains "file"',
                     'column_id': 'remarks'
@@ -51,6 +51,7 @@ class MonitorErrorTableBlock():
                                                id=prefix+'datatable', style_header={}, fill_width=True, 
                                                style_data_conditional=self._style_data_conditional,
                                                style_cell={'textAlign': 'left', 'whiteSpace': 'normal', 'height': 'auto', 'fontSize': 14},
+                                               page_current=0, page_size=page_size,
                                                cell_selectable=False, row_selectable='single')
                 
         self.the_panel = html.Div([
@@ -94,7 +95,7 @@ class MonitorErrorTableBlock():
         return update_tile_stat_table  
     
     def _selected_rows(self):
-        def style_selected_rows(selected_rows, model):
+        def selected_rows(selected_rows, model):
             if selected_rows is None:
                 return dash.no_update
             row_index = selected_rows[0]
@@ -103,4 +104,4 @@ class MonitorErrorTableBlock():
             DETECT_DAO.unset_error_flag(id, obj)
             model.pop(row_index)
             return (model, [],)
-        return style_selected_rows
+        return selected_rows

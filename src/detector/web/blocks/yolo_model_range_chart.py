@@ -32,9 +32,10 @@ class YoloModelRangeChartBlock():
         self._model = self.get_default_chart_model()
         
         self.chart_panel = html.Div([
+                html.H4(dbc.Badge('APPLICABLE SCOPE OF COD MODELS', className='ms-1 me-2', color='white', text_color='secondary')),
                 dcc.Store(id=prefix+'update_chart_store'),
-                html.H4(dbc.Badge('', className='ms-1 me-2', color='white', text_color='secondary')),
-                html.P('', style={'display': 'inline-block'}),
+                # html.H4(dbc.Badge('', className='ms-1 me-2', color='white', text_color='secondary')),
+                # html.P('', style={'display': 'inline-block'}),
                 dcc.Graph(id=prefix+'chart', style={'visibility': 'hidden'}),
             ], className='text-center')   
                  
@@ -74,7 +75,9 @@ class YoloModelRangeChartBlock():
                                range_y=[0, 1])
             if len(model) > 0:
                 fig.update_xaxes(title='Age Range Covered by the Model (Days)', visible=True, showticklabels=True)
-                fig.update_layout(yaxis_visible=False, yaxis_showticklabels=False, plot_bgcolor='rgb(225, 225, 225)')
+                fig.update_layout(yaxis_visible=False, yaxis_showticklabels=False, 
+                                  margin=dict(l=5, r=5, t=0, b=5),
+                                  plot_bgcolor='rgb(225, 225, 225)')
                 fig.update_traces(textposition='top center')
                 for i in range(len(fig.data)):
                     fig.data[i].error_x.thickness = 12

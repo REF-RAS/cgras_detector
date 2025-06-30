@@ -324,7 +324,7 @@ class LocateTileModel():
                 rotated_reco_whole_image_filepath = os.path.join(self.logdata_folder, LocateTileModel.ROTATED_WHOLE_RECO_IMAGE_FILENAME)
                 cv2.imwrite(rotated_reco_whole_image_filepath, annotated_rotated_whole_image)
             except:
-                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write rotated whole reco image with tile bounds  output to {rotated_reco_whole_image_filepath}')                     
+                raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write rotated whole reco image with tile bounds output to {rotated_reco_whole_image_filepath}')                     
             return rotated_reco_whole_image_filepath
         return None
     
