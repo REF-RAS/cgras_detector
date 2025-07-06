@@ -73,7 +73,7 @@ cgras_detector:
   loctile_rotate_angle_max: 3.0   # degrees
   loctile_aspect_ratio_diff_max_rel: 0.05   # 0.05 relative difference
   loctile_aspect_ratio_diff_max_abs: 0.05   # 0.05 absolute difference
-
+  loctile_template_size: 24                 # pixels, default 20 
   # detection task parameters: object detection  
 
   cod_debug_blob_images: True

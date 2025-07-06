@@ -89,20 +89,38 @@ class LocateTileModel():
         self.tile_offset_in_px = self.tile_size_in_px = None
 
     def build(self):
+        single_row = len(self.images_2d_list) == 1
+        single_col = len(self.images_2d_list[0]) == 1
         # search for the 4 corners 
         # assume that the corners are in the topleft, topright, bottomleft and bottomright images
         image_filepath = self.images_2d_list[0][0]
         image = cv2.imread(image_filepath)
-        self.corners_in_reco_space[WhichCorner.TOP_LEFT] = self._locate_corner(image, WhichCorner.TOP_LEFT)
+        height, width, _ = image.shape
+        if single_col or single_row:
+            self.corners_in_reco_space[WhichCorner.TOP_LEFT] = self._locate_corner(image[:height//2, :width//2], WhichCorner.TOP_LEFT)
+        else:
+            self.corners_in_reco_space[WhichCorner.TOP_LEFT] = self._locate_corner(image, WhichCorner.TOP_LEFT)
         image_filepath = self.images_2d_list[0][-1]
-        image = cv2.imread(image_filepath)        
-        self.corners_in_reco_space[WhichCorner.TOP_RIGHT] = self._locate_corner(image, WhichCorner.TOP_RIGHT)
+        image = cv2.imread(image_filepath)
+        if single_col or single_row:
+            self.corners_in_reco_space[WhichCorner.TOP_RIGHT] = self._locate_corner(image[:height//2, width//2:], WhichCorner.TOP_RIGHT)
+            self.corners_in_reco_space[WhichCorner.TOP_RIGHT] = (self.corners_in_reco_space[WhichCorner.TOP_RIGHT][0] + width // 2, self.corners_in_reco_space[WhichCorner.TOP_RIGHT][1])
+        else:
+            self.corners_in_reco_space[WhichCorner.TOP_RIGHT] = self._locate_corner(image, WhichCorner.TOP_RIGHT)
         image_filepath = self.images_2d_list[-1][0]
         image = cv2.imread(image_filepath)
-        self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] = self._locate_corner(image, WhichCorner.BOTTOM_LEFT)
+        if single_row or single_col:
+            self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] = self._locate_corner(image[height//2:, :width//2], WhichCorner.BOTTOM_LEFT)
+            self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] = (self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT][0], self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT][1] + height // 2)
+        else:
+            self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] = self._locate_corner(image, WhichCorner.BOTTOM_LEFT)
         image_filepath = self.images_2d_list[-1][-1]
         image = cv2.imread(image_filepath)
-        self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] = self._locate_corner(image, WhichCorner.BOTTOM_RIGHT)
+        if single_row or single_col:
+            self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] = self._locate_corner(image[height//2:, width//2:], WhichCorner.BOTTOM_RIGHT)
+            self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] = (self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT][0] + width // 2, self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT][1] + height // 2)
+        else:
+            self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] = self._locate_corner(image, WhichCorner.BOTTOM_RIGHT)
         # report error
         if self.corners_in_reco_space[WhichCorner.TOP_LEFT] is None or self.corners_in_reco_space[WhichCorner.TOP_RIGHT] is None or self.corners_in_reco_space[WhichCorner.BOTTOM_LEFT] is None or self.corners_in_reco_space[WhichCorner.BOTTOM_RIGHT] is None:
             raise DetectorFailed(DetectorExceptionCodes.LOC_FRAME_MISSING, f'Not all four corners are found')
