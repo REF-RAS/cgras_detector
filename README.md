@@ -186,7 +186,7 @@ mkdir -p ~/cgras_data
 The CCVS is a complex software built on many third-party modules and middleware. Some of them are listed below.
 - ROS Noetic (ROS 1).
 - Python 3.8 (Python 3.9 if pytorch 2.0 or above)
-- Dash 3.0 or above
+- Dash 3.1 or above
 - Plotly 6.0 or above
 - Numpy 1.24, Pandas 2.0, OpenCV 4.8.1, SkLearn
 - Stitching 0.5.3
@@ -195,7 +195,7 @@ The CCVS is a complex software built on many third-party modules and middleware.
 
 It is recommended that the execution environment is to be set up by one of the following approaches: docker and virtual environment.  Docker is highly recommended for ease of setup. These two approaches are explained in the next sections.
 
-Note that this instruction does not cover the installation of GPU driver (for Nvidia) and CUDA and the NVidia container toolkit.  Follow this page for a [easy-to-follow instruction](https://dev.to/thenjdevopsguy/using-nvidia-gpus-with-docker-in-5-minutes-386g) to enable GPU computation for CCVS.
+Note that this instruction does not cover the installation of GPU driver (for Nvidia) and CUDA and the NVidia container toolkit.  Follow this page for an [easy-to-follow instruction](https://dev.to/thenjdevopsguy/using-nvidia-gpus-with-docker-in-5-minutes-386g) to enable GPU computation for CCVS. Unless the computer and the OS is clean, a purge of prior installation of Nvidia, CUDA, and CUDNN is advised. In addition, alignment of versions of Python, Pytorch, CUDA, Nvidia, and the GPU model can be tricky. The installation of these drivers is for experienced Linux/GPU users only. 
 
 ### Docker Installation
 
@@ -209,7 +209,6 @@ The following docker compose services are defined in file `docker/docker-compose
 | `cgras-cpu`                 | Start a container suitable for the running of the system with CPU only | `docker compose up cgras-cpu` |
 | `cgras-system`             | Execute the CCVS system in the `cgras` container | `docker compose up cgras-system` |
 | `cgras-system-cpu`         | Execute the CCVS system in the `cgras-cpu` container  | `docker compose up cgras-system-cpu` |
-
 
 1. Change directory to the `docker` folder of this respository
 ```bash
