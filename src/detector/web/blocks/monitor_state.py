@@ -18,7 +18,7 @@ from dash import html, dcc, Input, Output, State, dash_table, ctx
 import dash_bootstrap_components as dbc
 from dash.exceptions import PreventUpdate
 # project modules
-from detector.model import STATE, COORDINATOR_STATE, SystemStates
+from detector.model import STATE, COORDINATOR_STATE, SystemStates, APP_FILE_MANAGER
 
 class MonitorStateBlock():
     def __init__(self, app, prefix):
@@ -113,9 +113,9 @@ class MonitorStateBlock():
         model.loc[2] = ['CPU Usage', f'{cpu_percent:.1f} %']
         model.loc[3] = ['Virtual Memory', f'{mem_total / (2**30):.2f} GB'] 
         model.loc[4] = ['Virtual Memory Usage', f'{mem_percent:.1f} %']      
-        total, used, free = shutil.disk_usage(os.path.expanduser("~"))
+        total, used, free = APP_FILE_MANAGER.get_free_disk_space()
         free_diskspace_percent = free * 100 / total if total > 0 else 0
-        model.loc[5] = ['Free/Total Disk Space', f'{free / (2**30):.1f}/{total / (2**30):.1f} GB ({free_diskspace_percent:.1f} %)']
+        model.loc[5] = ['Free/Total Disk Space', f'{free:.1f}/{total:.1f} GB ({free_diskspace_percent:.1f} %)']
         return model
 
     # generate the model for the left status table display

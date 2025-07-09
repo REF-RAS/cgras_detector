@@ -252,7 +252,7 @@ class ApplicationCoordinator(object):
                     # logger.info(f'Initial Task Automation Mode: {AUTOMATED_TASK_EXECUTION.value}')
                     
                     # check if the disk space is below the minimum
-                    free_disk_space = APP_FILE_MANAGER.get_free_disk_space()
+                    _, _, free_disk_space = APP_FILE_MANAGER.get_free_disk_space()
                     if free_disk_space < self.disk_space_min:
                         error_remarks = f'Current free disk space {free_disk_space:.1f} GB is too low. The processing is ceased until more space becomes available.'
                         DETECT_DAO.set_error_flag(DetectorExceptionCodes.DISK_SPACE_ERROR.value, obj='Disk', remarks=error_remarks, level=1)  
@@ -264,7 +264,7 @@ class ApplicationCoordinator(object):
                         STATE.update(SystemStates.CLICK_START)
                 
                 elif state == SystemStates.WAIT_RESOURCE:
-                    free_disk_space = APP_FILE_MANAGER.get_free_disk_space()
+                    _, _, free_disk_space = APP_FILE_MANAGER.get_free_disk_space()
                     if free_disk_space >= self.disk_space_min:
                         DETECT_DAO.unset_error_flag(DetectorExceptionCodes.DISK_SPACE_ERROR.value, obj='Disk')
                         STATE.update(SystemStates.READY)

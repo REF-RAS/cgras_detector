@@ -41,11 +41,11 @@ class DiskspaceBlock():
         
     # generate the model for the diskspace table display
     def _define_diskspace_model(self):
-        total, used, free = shutil.disk_usage(APP_FILE_MANAGER.cgras_data_folder)
+        total, used, free = APP_FILE_MANAGER.get_free_disk_space()
         model = pd.DataFrame(columns=('Parameters', 'Values'))
-        model.loc[1] = ['Total', f'{total / (2**30):.1f} GB']
-        model.loc[2] = ['Used', f'{used / (2**30):.1f} GB']
-        model.loc[3] = ['Free', f'{free / (2**30):.1f} GB']        
+        model.loc[1] = ['Total', f'{total:.1f} GB']
+        model.loc[2] = ['Used', f'{used:.1f} GB']
+        model.loc[3] = ['Free', f'{free:.1f} GB']        
         return model
 
     # callback for the diskspace table

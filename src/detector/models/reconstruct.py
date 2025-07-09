@@ -176,7 +176,10 @@ class ImageReconstructModel():
             # 2. map (ax2, ay2) to (bx, by) which is the location in the counter-clockwise rotated row reconstructed image
             # 3. map (bx, by) to (cx2, cy2) which is the location in the whole constructed image using the whole image warper and the output (cx, cy) offseted to find (cx2, cy2).
             # 4. map (cx2, cy2) to (dx, dy) which is the location in the clockwise rotated whole reconstructed image  
-            ax, ay = self.warper[row_index].warpPoint((sx, sy,), K, camera_transform.R)
+            if self.ncols == 1:
+                ax, ay = sx, sy
+            else:
+                ax, ay = self.warper[row_index].warpPoint((sx, sy,), K, camera_transform.R)
             self.logger.debug(f'ax, ay = {ax, ay}')
             ax2, ay2 = ax - row_reco_image_origin_offset[0], ay - row_reco_image_origin_offset[1]
             self.logger.debug(f'offseted ax, ay = {ax2, ay2} based on {row_reco_image_origin_offset}')
@@ -184,8 +187,11 @@ class ImageReconstructModel():
             bx, by = ay2, reco_image_size[0] - ax2
             self.logger.debug(f'rotated ax, ay = {bx, by}')
             camera_transform_between_row = self.camera_transforms_between_rows[row_index]
-            K2 = camera_transform_between_row.K().astype(np.float32)
-            cx, cy = self.warper_between_rows.warpPoint((bx, by,), K2, camera_transform_between_row.R)
+            if self.nrows == 1:
+                cx, cy = bx, by
+            else:
+                K2 = camera_transform_between_row.K().astype(np.float32)
+                cx, cy = self.warper_between_rows.warpPoint((bx, by,), K2, camera_transform_between_row.R)
             self.logger.debug(f'cx, cy = {cx, cy}')
             cx2, cy2 = cx - self.whole_reco_image_origin_offset[0], cy - self.whole_reco_image_origin_offset[1]
             self.logger.debug(f'offseted cx, cy = {cx2, cy2} based on {self.whole_reco_image_origin_offset}')                                
@@ -606,6 +612,7 @@ class ImageReconstruct2DModel():
             whole_reco_image = row_recoimages_list[0]
             self.camera_transforms_between_rows = self.reco_row_model_list[0].get_camera_transforms_row()
             self.whole_reco_image_origin_offset = self.reco_row_model_list[0].get_reco_image_origin_offset()
+            self.confidence_matrix_between_rows = np.asarray([[1.0]], dtype=np.float32)
         else:
             # step 4: prepare between rows image stitching by rotating each row reco images counterclockwise 
             self.logger.info(f'{type(self).__name__} Step 4: Rotate counter-clockwise the {self.nrows} reconstructed row images')
@@ -858,6 +865,8 @@ class ImageReconstruct1DModel():
         """
         assert images_1d_list is not None and len(images_1d_list) > 0, 'Parameter images_as_list is empty'
         assert type(images_1d_list[0]) == np.ndarray, 'Parameter images_as_list should contain only numpy images'
+
+
         
         # input parameters
         self.logger = kwargs.get('logger', get_logger())
@@ -879,6 +888,24 @@ class ImageReconstruct1DModel():
         self.image_sizes, self.image_nchannels = ImageReconstruct1DModel.extract_image_sizes_nchannels(images_1d_list)
         # self.image_size = self.image_sizes[0]
         self.logger.info(f'{type(self).__name__}: Number of images: {len(images_1d_list)}')
+        # test if there is a single image
+        # reco_image_origin_offset = (0, 0)
+        # camera_transforms_row
+        if len(images_1d_list) == 1:
+            self.reco_image_origin_offset = (0, 0,)
+            data = {
+                'R': [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                't': [0, 0, 0],
+                'aspect': 0.0,
+                'focal': 1.0,
+                'ppx': self.image_sizes[0][0] / 2,
+                'ppy': self.image_sizes[0][1] / 2,
+            }
+            self.camera_transforms_row = [CameraTransformTools.dict_to_camera(data)]
+            self.confidence_matrix = np.asarray([[1.0]], dtype=np.float32)
+            self.debug_images_feature_matching = []
+            return
+
         # attempt to build model with different combinations of feature extractors
         model_build_success:bool = False
         model_build_error:Exception = None
@@ -1046,7 +1073,7 @@ class ImageReconstruct1DModel():
         return self.camera_transforms_row
 
     def get_camera_transform(self, index:int) -> cv2.detail.CameraParams:
-        """ Returns the camera transform object of the image at a given index 
+        """ Returns the camera transform object of the image at a given index (NOT USED)
 
         :param index: The index of the image 
         :type index: int
@@ -1072,7 +1099,7 @@ class ImageReconstruct1DModel():
         return self.confidence_matrix
 
     def get_roi_corners_sizes(self) -> list:
-        """ Returns the roi corners, normalized roi corners, and roi sizes of the image list
+        """ Returns the roi corners, normalized roi corners, and roi sizes of the image list (NOT USED)
 
         :return: A 3-tuple
         :rtype: 3-tuple of list
@@ -1230,6 +1257,11 @@ class ImageReconstruct1DModel():
         :param scaling_factor_of_images: the resize scale of the images compared to the source input images, defaults to 1.0
         :type scaling_factor_of_images: float, optional
         """
+        if len(images_as_list) == 1:
+            the_image = images_as_list[0]
+            normalized_warped_roi_corners = [(0, 0,)]
+            warped_roi_sizes = the_image[:2][::-1]
+            return the_image, normalized_warped_roi_corners, warped_roi_sizes
         image_sizes, image_nchannels = ImageReconstruct1DModel.extract_image_sizes_nchannels(images_as_list)
         # create warper
         warper = Warper()

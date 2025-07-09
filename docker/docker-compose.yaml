@@ -7,7 +7,7 @@ services:
     cgras:
         build:
             context: .
-            dockerfile: Dockerfile.cuda101.py38
+            dockerfile: Dockerfile.cuda118.py38
         image: cgras
         container_name: cgras
         devices:
@@ -38,6 +38,13 @@ services:
             - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
             - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
             - ~/cgras_data:/home/qcr/cgras_data:rw
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
         command:
             bash
     # the service based on the container installed with cpu version of pytorch
@@ -106,6 +113,13 @@ services:
             - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
             - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
             - ~/cgras_data:/home/qcr/cgras_data:rw
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
         command:
             ['/bin/bash', '-c', 'cd /home/qcr/cgras_ws && catkin_make && source /home/qcr/cgras_ws/devel/setup.bash && roslaunch cgras_detector default.launch']
     # the service that runs the cgras systems using the cpu enabled container
