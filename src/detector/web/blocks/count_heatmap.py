@@ -57,7 +57,9 @@ class CountHeatmapBlock():
                             _sample_select_datatable,
                             dbc.Button('Reverse Order', id=prefix+'reverse_button', color='secondary', className='mt-5'),
                         ], className='col-2', style={'background-color': '#dddddd'}),
-                    dbc.Col(id=prefix+'chart_panel', className='col-10'),                    
+                    dbc.Col(
+                        html.Div(id=prefix+'chart_panel')
+                        , className='col-10'),                    
                 ], className='mx-auto col-12'),            
             ], className='text-center')
         
