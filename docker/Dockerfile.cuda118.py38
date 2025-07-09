@@ -76,7 +76,7 @@ RUN rm ${CGRAS_WS}/src/requirements.txt
 # install yolo and pytorch
 # RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-RUN pip install networkx==3.1 ultralytics>=8.3
+RUN pip install ultralytics>=8.3
 
 # complete rosdep installation
 RUN rosdep update

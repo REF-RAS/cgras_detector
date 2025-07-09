@@ -72,9 +72,12 @@ class ApplicationFileManager():
         return self.get_subfolder(self.detector_folder, subfolder, *args)   
     
     def get_free_disk_space(self) -> float:
+        # return the disk space status in GB of the disk where cgras data folder is located 
         total, used, free = shutil.disk_usage(self.cgras_data_folder)
+        total = total / (2**30) 
+        used = used / (2**30) 
         free = free / (2**30) 
-        return free
+        return total, used, free
     
     def dump_exc_to_error_log(self, header=None):
         try:

@@ -20,7 +20,7 @@ services:
         environment:
             - DISPLAY
             - QT_X11_NO_MITSHM=1
-            - ROS_MASTER=true
+            - ROS_MASTER=false
             - ROS_MASTER_URI=http://localhost:11311
             # - ROS_MASTER_URI=http://192.168.1.50:11311
             # - ROS_IP=192.168.1.50
@@ -38,6 +38,13 @@ services:
             - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
             - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
             - ~/cgras_data:/home/qcr/cgras_data:rw
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
         command:
             bash
     # the service based on the container installed with cpu version of pytorch
@@ -57,7 +64,7 @@ services:
         environment:
             - DISPLAY
             - QT_X11_NO_MITSHM=1
-            - ROS_MASTER=true
+            - ROS_MASTER=false
             - ROS_MASTER_URI=http://localhost:11311
             # - ROS_MASTER_URI=http://192.168.1.50:11311
             # - ROS_IP=192.168.1.50
@@ -88,7 +95,7 @@ services:
         environment:
             - DISPLAY
             - QT_X11_NO_MITSHM=1
-            - ROS_MASTER=true
+            - ROS_MASTER=false
             - ROS_MASTER_URI=http://localhost:11311
             # - ROS_MASTER_URI=http://192.168.1.50:11311
             # - ROS_IP=192.168.1.50
@@ -106,6 +113,13 @@ services:
             - ~/cgras_ws/src/cgras_coordinator:/home/qcr/cgras_ws/src/cgras_coordinator:rw 
             - ~/cgras_ws/src/cgras_datatools:/home/qcr/cgras_ws/src/cgras_datatools:rw                      
             - ~/cgras_data:/home/qcr/cgras_data:rw
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
         command:
             ['/bin/bash', '-c', 'cd /home/qcr/cgras_ws && catkin_make && source /home/qcr/cgras_ws/devel/setup.bash && roslaunch cgras_detector default.launch']
     # the service that runs the cgras systems using the cpu enabled container
@@ -119,7 +133,7 @@ services:
         environment:
             - DISPLAY
             - QT_X11_NO_MITSHM=1
-            - ROS_MASTER=true
+            - ROS_MASTER=false
             - ROS_MASTER_URI=http://localhost:11311
             # - ROS_MASTER_URI=http://192.168.1.50:11311
             # - ROS_IP=192.168.1.50
