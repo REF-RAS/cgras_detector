@@ -81,7 +81,9 @@ class LocateTileModel():
         # self.blue_ratio_min = kwargs.get(ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value, 0.35)
         # self.red_ratio_max = kwargs.get(ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value, 0.15)
         self.working_scale = kwargs.get(ModelsConfigNames.LOCTILE_WORKING_SCALE.value, 0.1)
-        self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 21)
+        # other input parameters: template matching of corner
+        self.template_corner_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_CORNER_SIZE.value, 60)  # default 60 pixels
+        self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 12)  # default 12 pixels
         self.matching_score_min = kwargs.get(ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value, 0.5)
         self.rotate_angle_max = kwargs.get(ModelsConfigNames.LOCTILE_ROTATE_ANGLE_MAX, 3.0)
         # important model variables
@@ -204,16 +206,19 @@ class LocateTileModel():
         down_width, down_height = int(image.shape[1] * self.working_scale), int(image.shape[0] * self.working_scale)
         image_downscaled = cv2.resize(image, (down_width, down_height,))
         # generate template
-        template = self._generate_template(which_corner, self.template_size, self.template_size)
+        template, corner_offset = self._generate_template(which_corner, self.template_corner_size, self.template_size)
+
         res = cv2.matchTemplate(image_downscaled, template, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
         if max_val < self.matching_score_min:
             return None
         # compute the corner at working scale
         top_left = max_loc
-        bottom_right = (max_loc[0] + self.template_size, max_loc[1] + self.template_size)
+        # bottom_right = (max_loc[0] + self.template_size, max_loc[1] + self.template_size)
         # calciulate corner and scale up to the original resolution
-        corner = (int((top_left[0] + bottom_right[0]) / self.working_scale / 2), int((top_left[1] + bottom_right[1]) / self.working_scale / 2))
+        # corner = (int((top_left[0] + bottom_right[0]) / self.working_scale / 2), int((top_left[1] + bottom_right[1]) / self.working_scale / 2))
+        corner = (int((top_left[0] + corner_offset[0]) / self.working_scale), int((top_left[1] + corner_offset[1]) / self.working_scale))
+
         if fine_search:
             # extract a local search region for fine tuning
             search_rectangle_size = int(2 / self.working_scale) 
@@ -225,15 +230,15 @@ class LocateTileModel():
             if max_val < self.matching_score_min:
                 ...
             else:
-                corner = (int(search_bbox[0] + max_loc[0] + self.template_size / 2), int(search_bbox[1] + max_loc[1] + self.template_size / 2))
+                corner = (int(search_bbox[0] + max_loc[0] + self.template_corner_size / 2), int(search_bbox[1] + max_loc[1] + self.template_corner_size / 2))
 
         # write annotated image related to corner detection
         if self.write_debug_images is not None and self.logdata_folder is not None:
             try:
                 debug_image_filepath = os.path.join(self.logdata_folder, f'locate_corner_{which_corner.name}.jpg')
                 image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-                point_1 = (int(corner[0] - self.template_size / self.working_scale), int(corner[1] - self.template_size / self.working_scale))
-                point_2 = (int(corner[0] + self.template_size / self.working_scale), int(corner[1] + self.template_size / self.working_scale))
+                point_1 = (int(corner[0] - self.template_corner_size / self.working_scale), int(corner[1] - self.template_corner_size / self.working_scale))
+                point_2 = (int(corner[0] + self.template_corner_size / self.working_scale), int(corner[1] + self.template_corner_size / self.working_scale))
                 image_bgr = cv2.rectangle(image_bgr, point_1, point_2, (0, 0, 255,), 10)
                 cv2.imwrite(debug_image_filepath, image_bgr)
             except:
@@ -372,18 +377,23 @@ class LocateTileModel():
         return cv2.LUT(image, table)
 
     @classmethod
-    def _generate_template(cls, type:WhichCorner, width:int, height:int):
+    def _generate_template(cls, type:WhichCorner, template_corner_size:int, template_size:int):
         
-        blank_image = np.full((height, width), 255, dtype=np.uint8)
+        blank_image = np.full((template_size, template_size), 255, dtype=np.uint8)
         if type == WhichCorner.TOP_LEFT:
-            blank_image[int(height // 2):, int(width // 2):] = 0
+            blank_image[int(template_corner_size):, int(template_corner_size):] = 0
+            corner_offset = (template_corner_size, template_corner_size,)
         elif type == WhichCorner.TOP_RIGHT:
-            blank_image[int(height // 2):, :int(width // 2)] = 0
+            blank_image[int(template_corner_size):, :int(template_size - template_corner_size)] = 0
+            corner_offset = (template_size - template_corner_size, template_corner_size,)
         elif type == WhichCorner.BOTTOM_RIGHT:
-            blank_image[:int(height // 2), :int(width // 2)] = 0
+            blank_image[:int(template_size - template_corner_size), :int(template_size - template_corner_size)] = 0
+            corner_offset = (template_size - template_corner_size, template_size - template_corner_size,)
         elif type == WhichCorner.BOTTOM_LEFT:
-            blank_image[:int(height // 2), int(width // 2):] = 0
-        return blank_image
+            blank_image[:int(template_size - template_corner_size), int(template_corner_size):] = 0
+            corner_offset = (template_corner_size, template_size - template_corner_size,)
+
+        return blank_image, corner_offset
 
     def _evaluate_image(self, image:np.ndarray):
         for c in range(3):

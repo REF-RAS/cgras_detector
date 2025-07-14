@@ -172,7 +172,8 @@ class TileSampleTable():
                         State(self.update_table_store_id, 'data'),], prevent_initial_call=True)(self._redo_row_confirmed())      
              
         self.app.callback([Output(prefix+'toast', 'is_open', allow_duplicate=True),
-                           Output(prefix+'toast', 'children', allow_duplicate=True)],
+                           Output(prefix+'toast', 'children', allow_duplicate=True),
+                           Output(prefix+'datatable', 'page_current')],
                             [Input(prefix+'row_priority_store', 'data'),], prevent_initial_call=True)(self._priority_row_confirmed())  
         
         self.app.callback([Output(prefix+'confirm_modal', 'is_open', allow_duplicate=True),
@@ -350,7 +351,7 @@ class TileSampleTable():
                 DETECT_DAO.set_top_priority(id)
                 message_info.append(id)
             message = f'The tile sample(s) {message_info} have been moved to the top priority'
-            return (True, message) 
+            return (True, message, 0) 
         return priority_row_confirmed 
     
     def _view_row_confirmed(self):

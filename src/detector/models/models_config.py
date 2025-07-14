@@ -40,6 +40,7 @@ class ModelsConfigNames(Enum):
     
     LOCTILE_WORKING_SCALE = 'loctile_working_scale'
     LOCTILE_TEMPLATE_SIZE = 'loctile_template_size'
+    LOCTILE_TEMPLATE_CORNER_SIZE = 'loctile_template_corner_size'
     LOCTILE_MATCHING_SCORE_MIN = 'loctile_matching_score_min'
     LOCTILE_DEBUG_IMAGES = 'loctile_debug_images'
     LOCTILE_ROTATE_ANGLE_MAX = 'loctile_rotate_angle_max'
