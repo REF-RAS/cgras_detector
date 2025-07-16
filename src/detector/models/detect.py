@@ -940,7 +940,6 @@ class CoralObjectDetectImageModel():
             # convert locations in the recontructed image space into tile space, by considering the location of the frames
             # bbox_in_tile = locate_tile_model.map_bbox(bbox_in_reconstructed_image)
             # bbox_in_tile_normalized = locate_tile_model.normalize_bbox(bbox_in_tile)
-            
             bbox_in_tile, bbox_in_tile_normalized = map_normalize_bbox_tile_fn(bbox_in_reconstructed_image)  # revised
             centre_normalized = ((bbox_in_tile_normalized[0] + bbox_in_tile_normalized[2]) / 2, (bbox_in_tile_normalized[1] + bbox_in_tile_normalized[3]) / 2,)
             size_normalized = bbox_in_tile_normalized[2] - bbox_in_tile_normalized[0], bbox_in_tile_normalized[3] - bbox_in_tile_normalized[1] 

@@ -409,6 +409,13 @@ class DetectorDAO():
     @synchronized
     def get_tile_sample_of_tile_id(self, tile_id:str, limit:int=1) -> dict:
         return db_tools.query_for_list_of_dicts(self.db_file, 'SELECT * FROM tile_sample WHERE tile_id = ? LIMIT ?', (tile_id, limit))
+
+    @synchronized
+    def list_tile_samples_of_tile_id(self, tile_id:str, status:int=None) -> dict:
+        if status is not None:
+            return db_tools.query(self.db_file, 'SELECT * FROM tile_sample WHERE tile_id = ? AND status = ?', (tile_id, status,))
+        else:
+            return db_tools.query(self.db_file, 'SELECT * FROM tile_sample WHERE tile_id = ?', (tile_id,))
     
     # return a list of unique tile_id found in the tile_sample table
     @synchronized

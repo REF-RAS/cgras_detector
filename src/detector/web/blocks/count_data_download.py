@@ -20,7 +20,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash.exceptions import PreventUpdate
 from cgras_datatools.logging_tools import logger
-from detector.model import DETECT_DAO
+from detector.model import DETECT_DAO, SampleStatusNames
 from detector.models.visualize import CoralObjectMapModel, CoralObjectMapModelHelper
 
 class CountResultDownloadBlock():
@@ -148,15 +148,71 @@ class CountResultDownloadBlock():
                 tile_info_df = DETECT_DAO.get_tile_info_from_tile_sample(tile_id, to_dataframe=True)
                 tile_info_df.to_excel(writer, sheet_name='TileInfo', index=False)
                 
+                tile_sample_df = DETECT_DAO.list_tile_samples_of_tile_id(tile_id, status=SampleStatusNames.DONE.value)
+                tile_sample_df.drop(columns=['spawn_time', 'status', 'priority', 'metadata'], inplace=True)
+                tile_sample_df.to_excel(writer, sheet_name='TileSamples', index=False)
+                
                 coral_count_trend_df = DETECT_DAO.get_coral_count_trend_as_df(tile_id)
                 coral_count_trend_df.to_excel(writer, sheet_name='CoralCountTrend', index=False)
+                
+                # create complex index for tab indices
+                tab_index_list = None
 
                 # go through each tile sample id and retrieve the coral detection
                 for index, row in coral_count_trend_df.iterrows():
                     tile_sample_id = row['tile_sample_id']
+                    age = row['age']
+                    # extract tile sample info
+                    tile_sample_row = tile_sample_df[tile_sample_df['id'] == tile_sample_id]
+
+                    batch_time = tile_sample_row.iloc[0]['batch_time']
                     # generate detected_object worksheet for the tile_sample_id
                     detected_objects_df = DETECT_DAO.query_detected_objects(tile_sample_id)
+                    detected_objects_df['age'] = age
+                    detected_objects_df['tile_id'] = tile_id
+                    detected_objects_df['species'] = species = tile_info_df.loc[0, 'species']
+                    detected_objects_df['batch_time'] = batch_time
+                    # compute the tab index
+                    map_size = (tile_info_df.loc[0, 'tab_ncols'], tile_info_df.loc[0, 'tab_nrows'],)
+                    detected_objects_df['tab_xindex'] = detected_objects_df['centre_x'] * map_size[0]
+                    detected_objects_df['tab_yindex'] = detected_objects_df['centre_y'] * map_size[1]
+                    detected_objects_df['tab_xindex'].clip(upper = map_size[0] - 1, inplace=True)
+                    detected_objects_df['tab_yindex'].clip(upper = map_size[1] - 1, inplace=True)
+                    detected_objects_df = detected_objects_df.astype({'tab_xindex': int, 'tab_yindex': int})
+                    # save to excel
                     detected_objects_df.to_excel(writer, sheet_name=f'Detect-{row["batch_time"][:10]}', index=False)
+
+                    # logger.warning(f'detected_tab_df: {detected_tab_df.index}')
+                    # detected_tab_df.index.set_names(['tab_xindex', 'tab_yindex'])
+                    # generate group by present_class
+                    present_count_df = detected_objects_df.groupby(by=['tab_xindex', 'tab_yindex', 'present_class'], group_keys=False).size()
+                    present_count_df = present_count_df.reset_index()
+                    present_count_df = present_count_df.pivot(index=['tab_xindex', 'tab_yindex'], columns='present_class')
+                    # generate group by coral_class
+                    coral_count_df = detected_objects_df.groupby(by=['tab_xindex', 'tab_yindex', 'coral_class'], group_keys=False).size()
+                    coral_count_df = coral_count_df.reset_index()
+                    coral_count_df = coral_count_df.pivot(index=['tab_xindex', 'tab_yindex'], columns='coral_class')                   
+                    # merge the two sets
+                    merged_df = pd.merge(present_count_df, coral_count_df, left_index=True, right_index=True)
+                    # fix the multiindex of the merged columns
+                    new_columns = []
+                    merged_df.columns = merged_df.columns.to_flat_index()
+                    for index in range(len(merged_df.columns)):
+                        new_columns.append(merged_df.columns[index][1])
+                    merged_df.columns = new_columns 
+                    # add the missing row index
+                    if tab_index_list is None:
+                        tab_index_list = [(x, y) for y in range(map_size[1]) for x in range(map_size[0])]
+                    merged_df = merged_df.reindex(tab_index_list)
+                    
+                    merged_df = merged_df.fillna(0).astype(int)
+                    merged_df = merged_df.reset_index()
+                    merged_df.insert(loc=0, column='species', value=species)
+                    merged_df.insert(loc=1, column='tile_id', value=tile_id)
+                    merged_df.insert(loc=2, column='batch_time', value=batch_time)
+                    merged_df.insert(loc=3, column='age', value=age)
+                    merged_df.to_excel(writer, sheet_name=f'Detect-Tabs-{row["batch_time"][:10]}', index=False)
+                    
                     # generate count map for the tile sample id
                     vt_model = CoralObjectMapModel(tile_sample_id)
                     count_map, count_label_map = vt_model.compute_object_count_map(CoralObjectMapModelHelper.VISCLASS_CORAL['value'], count_range=self.default_count_range)
