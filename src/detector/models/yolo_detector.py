@@ -19,7 +19,7 @@ import seaborn as sns
 from detector.models import logger
 
 # a data structure representing a coral object detected by the YOLO model
-ObjectType = namedtuple('ObjectType', ['cls_id', 'cls_name', 'bbox', 'topleft', 'size', 'centre'])
+ObjectType = namedtuple('ObjectType', ['cls_id', 'cls_name', 'bbox', 'topleft', 'size', 'centre', 'points', 'conf'])
 
 class YoloResult():
     """ Model the object detection results returned by YOLO and provide functions for getting the results easier
@@ -80,8 +80,14 @@ class YoloResult():
         bbox = [int(a) for a in box.xyxy.tolist()[0]]
         size = (bbox[2] - bbox[0], bbox[3] - bbox[1],)
         centre = (bbox[0] + size[0] // 2, bbox[1] + size[1] // 2,)
+        # handle the mask
+        points = []
+        mask = self.yolo_predict_results[0].masks[index]
+        if mask is not None:
+            for point in mask.xy[0]:
+                points.append(point.tolist())
         # create and return the object as an ObjectType
-        return ObjectType(cls_id, self.yolo_predict_results[0].names[cls_id], bbox, bbox[:2], size, centre)
+        return ObjectType(cls_id, self.yolo_predict_results[0].names[cls_id], bbox, bbox[:2], size, centre, points, box.conf.tolist()[0])
     
     def get_all_objects(self) -> list:
         """ return a list of all detected objects
@@ -122,7 +128,8 @@ class YoloResult():
                 cv2.rectangle(image, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),
                             (int(box.xyxy[0][2]), int(box.xyxy[0][3])), color, 3)
                 if print_name:
-                    cv2.putText(image, f'{result.names[int(box.cls[0])]}',
+                    text_to_draw = f'{result.names[int(box.cls[0])]} ({box.conf.tolist()[0]:.1f})'
+                    cv2.putText(image, text_to_draw,
                             (int(box.xyxy[0][0]), int(box.xyxy[0][1]) - 10),
                             cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 0, 0), 1)
         return image

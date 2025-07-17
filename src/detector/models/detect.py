@@ -323,7 +323,7 @@ class CoralObjectDetectModel():
                 text_pos = (int(bbox_in_tile[0]) + random.randint(-30, 30), int(bbox_in_tile[3]) + random.randint(15, 30))
                 # text_to_draw = coral_object.index_str.replace(' ', '')
                 text_to_draw = coral_object.yolo_class
-                text_to_draw = f'{coral_object.centre_normalized[0]:.3f},{coral_object.centre_normalized[1]:.3f}'
+                text_to_draw = f'{coral_object.centre_normalized[0]:.3f},{coral_object.centre_normalized[1]:.3f} ({coral_object.confidence:.1f})'
                 # text_to_draw the text
                 cv2.putText(rotated_reco_image, f'{text_to_draw}', text_pos,
                             cv2.FONT_HERSHEY_PLAIN, max(font_size * 0.6, 0.6), (0, 0, 0), int(font_size + 0.5))   
@@ -761,7 +761,9 @@ class CoralObjectDetectImageModel():
                             raise DetectorExceptionCodes(DetectorExceptionCodes.OS_ERROR, f'Failed to save annotated image to {target_image_file}')
                 else:
                     # if the object_list for the cache_index exists, just get it from the data structure
-                    object_list = self.raw_object_list_of_blobs[cache_index]
+                    object_list_of_blob = self.raw_object_list_of_blobs[cache_index]
+                    object_count += len(object_list_of_blob)
+                    
                 # print the information about the coral objects
                 # for coral_object in object_list:
                 #     logger.info(coral_object)
@@ -949,12 +951,20 @@ class CoralObjectDetectImageModel():
                 if yolo_result.cls_name in classes_map[coral_class_in_map]:
                     coral_class = coral_class_in_map
                     break            
-            
-            # class_cat = ClassHierarchyPresentation.OTHER.value
-            # if yolo_result.cls_name in self.coral_classes:
-            #     class_cat = ClassHierarchyPresentation.ALIVE_CORAL.value
-            # elif yolo_result.cls_name in self.dead_coral_classes:
-            #     class_cat = ClassHierarchyPresentation.DEAD_CORAL.value
+            # populate the contour with normalized points
+            contour_points = []
+            for point in yolo_result.points:
+                point_in_image = (point[0] + corner[0], point[1] + corner[1], 0, 0)
+                point_in_reconstructed_image = map_bbox_image_fn(image_col_index, image_row_index, point_in_image)
+                point_in_tile, point_in_tile_normalized = map_normalize_bbox_tile_fn(point_in_reconstructed_image)  # revised    
+                contour_points.append([point_in_tile_normalized[0], point_in_tile_normalized[1],])
+            # find area defined by the contour
+            contour_area = None
+            if len(contour_points) > 0:
+                shape_geometries = self._get_shape_geometries(contour_points)
+                contour_area = shape_geometries['contour_area']
+                
+            confidence = yolo_result.conf
             # create the object from the extracted data
             coral_object = CoralObject(
                 blob_row_index = blob_row_index,
@@ -974,10 +984,33 @@ class CoralObjectDetectImageModel():
                 bbox_normalized = bbox_in_tile_normalized,
                 centre_normalized = centre_normalized,
                 size_normalized = size_normalized,
+                points_normalized = contour_points,
+                contour_area_normalized = contour_area,
+                confidence = confidence
             )
             object_list.append(coral_object)
         return object_list
-               
+    
+    @staticmethod
+    def _get_shape_geometries(points):
+        ctr = np.array(points).reshape((-1, 1, 2)).astype(np.float32)
+        contour_area = cv2.contourArea(ctr)
+        # moments = cv2.moments(ctr)
+        # bounding rectangles
+        rect = cv2.minAreaRect(ctr)
+        bbox = np.float32(cv2.boxPoints(rect))  # list of 2-lists
+        # compute length long and short side
+        length_1 = math.dist(bbox[0], bbox[1])
+        length_2 = math.dist(bbox[1], bbox[2])
+        if length_1 > length_2:
+            long, short = length_1, length_2
+        else:
+            long, short = length_2, length_1
+        return {
+            'contour_area': contour_area,
+            'long_side': long,
+            'short_side': short,
+        }           
     
     @staticmethod
     def _invalidate_duplicate_objects(raw_object_list_of_blobs:dict, image_col_index:int, image_row_index:int, image_blob_grid_size:tuple) -> int:
@@ -1108,7 +1141,8 @@ class CoralObjectListHelper():
             color = palette[int(coral_object.cls_id)]
             cv2.rectangle(output_image, (int(coral_object.bbox_in_image[0]), int(coral_object.bbox_in_image[1])), (int(coral_object.bbox_in_image[2]), int(coral_object.bbox_in_image[3])), color, 3)          
             if print_name:
-                cv2.putText(output_image, f'{coral_object.yolo_class}/{coral_object.coral_class}',
+                text_to_draw = f'{coral_object.yolo_class}/{coral_object.coral_class} ({coral_object.confidence:.1f})'
+                cv2.putText(output_image, text_to_draw,
                         (int(coral_object.bbox_in_image[0]) + random.randint(0, 20), int(coral_object.bbox_in_image[1]) - 10 + random.randint(0, 20)),
                         cv2.FONT_HERSHEY_PLAIN, 1.2, (0, 0, 0), 1)
         return output_image        

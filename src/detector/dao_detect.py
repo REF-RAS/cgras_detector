@@ -137,6 +137,9 @@ DETECT_DDL = {
         corner_y1 real,
         size_x real,
         size_y real,
+        contour_area real DEFAULT -1,
+        confidence real DEFAULT 0,
+        metadata text DEFAULT NULL,
         CONSTRAINT fk_tile_sample_id
             FOREIGN KEY (tile_sample_id) REFERENCES tile_sample (id) ON DELETE CASCADE
     );
@@ -252,7 +255,10 @@ class CoralObject():
         self.size = kwargs.get('size', None)                        # the size of the coral object (xdim, ydim)
         self.bbox_normalized = kwargs.get('bbox_normalized', None)  # the normalized bounding box of the coral object in the tile space
         self.centre_normalized = kwargs.get('centre_normalized', None) # the normalized centre of the coral object in the tile space    
-        self.size_normalized = kwargs.get('size_normalized', None) # the normalized size of the coral object in the tile space              
+        self.size_normalized = kwargs.get('size_normalized', None) # the normalized size of the coral object in the tile space
+        self.points_normalized = kwargs.get('points_normalized', None) # a list of normalized points that defines the contour of the object
+        self.contour_area_normalized = kwargs.get('contour_area_normalized', None) # the normalized area of the coral object in the tile space based on the contour
+        self.confidence = kwargs.get('confidence', None)            # the confidence of the detection
         self.invalidated = False
         self.inside_of = None                                      # the object is inside of the set object, only relevant during COD model building
         self.index_str = f'{self.image_col_index, self.image_row_index, self.blob_col_index, self.blob_row_index}'
@@ -322,13 +328,13 @@ class DetectorDAO():
     # add a record to the tile_sample table, with species normalized to lower case
     @synchronized
     def add_tile_sample(self, tile_id:str, batch_id:str, batch_time:str, age:int, species:str, season:str, tab_ncols:int, tab_nrows:int, settle_time:str, spawn_time:str='', importer_id:str='', operator:str='', 
-                        status:int=SampleStatusNames.QUEUED.value, metadata=None):
+                        status:int=SampleStatusNames.QUEUED.value, remarks:str='', metadata=None):
         if metadata is not None and not isinstance(metadata, str):
             metadata = json.dumps(metadata)
-        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
+        sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, remarks, create_time, modify_time, priority) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
         tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
-        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status))
+        return db_tools.update(self.db_file, sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, remarks))
     
     # return True if a record of tile_sample exists given the tile_id and the batch_id
     @synchronized
@@ -387,7 +393,7 @@ class DetectorDAO():
     
     @synchronized
     def get_tile_info_from_tile_sample(self, tile_id:str, to_dataframe:bool=False) -> pd.DataFrame:
-        sql = 'SELECT tile_id, species, season, settle_time, spawn_time, tab_ncols, tab_nrows FROM tile_sample WHERE tile_id = ? LIMIT 1'
+        sql = 'SELECT tile_id, species, season, settle_time, spawn_time, tab_ncols, tab_nrows, remarks FROM tile_sample WHERE tile_id = ? LIMIT 1'
         if to_dataframe:
             return db_tools.query(self.db_file, sql, (tile_id,))                
         return db_tools.query_for_dict(self.db_file, sql, (tile_id,))     
@@ -575,6 +581,7 @@ class DetectorDAO():
         
         importer_id = tile_sample_data.get('importer_id', 'Unknown')
         operator = tile_sample_data.get('operator', 'Unknown') 
+        remarks = tile_sample_data.get('remarks', '')
         images_dict = dict()
         image_files_parent_folder = tile_sample_data.get('image_files_parent_folder', None)
         yaml_images_list = tile_sample_data.get('images', None)
@@ -635,9 +642,10 @@ class DetectorDAO():
             model.loc[2] = ['batch_id', batch_id]
             model.loc[3] = ['batch_time', batch_time]
             model.loc[4] = ['species', species]
-            model.loc[5] = ['season', season]            
-            model.loc[6] = ['capture grid dim', f'{max_x + 1} x {max_y + 1}']
-            model.loc[7] = ['num images', len(images_dict)]
+            model.loc[5] = ['season', season]     
+            model.loc[6] = ['remarks', remarks]       
+            model.loc[7] = ['capture grid dim', f'{max_x + 1} x {max_y + 1}']
+            model.loc[8] = ['num images', len(images_dict)]
             return True, model
                 
     # composite operation: import yaml file for a new tile sample
@@ -660,6 +668,7 @@ class DetectorDAO():
         spawn_time = tile_sample_data.get('spawn_time', None)
         importer_id = tile_sample_data.get('importer_id', 'Unknown')
         operator = tile_sample_data.get('operator', 'Unknown') 
+        remarks = tile_sample_data.get('remarks', '')
         image_files_parent_folder = tile_sample_data.get('image_files_parent_folder', None)
         tile_images_list = tile_sample_data.get('images', None)
         # construct metadata dict
@@ -673,10 +682,10 @@ class DetectorDAO():
                 c = conn.cursor()
                 tile_sample_id = self.compute_tile_sample_id(tile_id, batch_id)
                 metadata = json.dumps(metadata)
-                sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, create_time, modify_time, priority) \
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
+                sql = 'INSERT INTO tile_sample (id, tile_id, batch_id, batch_time, age, species, season, tab_ncols, tab_nrows, metadata, settle_time, spawn_time, importer_id, operator, status, remarks, create_time, modify_time, priority) \
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATETIME("now", "localtime"), DATETIME("now", "localtime"), DATETIME("now", "localtime"))'
                 c.execute(sql, (tile_sample_id, tile_id, batch_id, batch_time, age, species.lower(), season, num_tabs[0], num_tabs[1], metadata, settle_time, spawn_time, 
-                                importer_id, operator, SampleStatusNames.QUEUED.value,))
+                                importer_id, operator, SampleStatusNames.QUEUED.value, remarks))
                 # self.add_tile_sample(tile_id, batch_id, batch_time, age, species, season, num_tabs[0], num_tabs[1], settle_time, spawn_time, importer_id, operator, metadata=metadata)
                 sql = 'DELETE FROM source_image WHERE tile_sample_id = ?'
                 c.execute(sql, (tile_sample_id,))
@@ -931,12 +940,12 @@ class DetectorDAO():
     # - table: detected_objet
     @synchronized
     def add_detected_object(self, tile_sample_id:str, yolo_class:str, coral_class:str, present_class:str, centre_x:float, centre_y:float, 
-                            corner_x1:float, corner_y1:float, size_x:float, size_y:float) -> int:
+                            corner_x1:float, corner_y1:float, size_x:float, size_y:float, contour_area:float=-1, confidence:float=0, metadata:str=None) -> int:
         with db_tools.create_connection(self.db_file) as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO detected_object (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y) '
-                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-                      (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y,))
+            c.execute('INSERT INTO detected_object (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y, contour_area, confidence, metadata) '
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                      (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y, contour_area, confidence, metadata))
             conn.commit()
             id = c.lastrowid
         return id
@@ -947,8 +956,17 @@ class DetectorDAO():
         centre_x, centre_y = coral_object.centre_normalized[0], coral_object.centre_normalized[1]
         corner_x1, corner_y1 = coral_object.bbox_normalized[0], coral_object.bbox_normalized[1]
         size_x, size_y = coral_object.size_normalized[0], coral_object.size_normalized[1] 
+        contour_area, confidence, metadata = -1, 0, None
+        if hasattr(coral_object, 'contour_area_normalized'):
+            contour_area = coral_object.contour_area_normalized
+        if hasattr(coral_object, 'points_normalized'):
+            points_normalized = coral_object.points_normalized
+            metadata = yaml.dump(points_normalized, Dumper=yaml.Dumper)
+        if hasattr(coral_object, 'confidence'):
+            confidence = coral_object.confidence
+            
         return self.add_detected_object(tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class,
-                                        centre_x, centre_y, corner_x1, corner_y1, size_x, size_y)        
+                                        centre_x, centre_y, corner_x1, corner_y1, size_x, size_y, contour_area, confidence, metadata)        
 
     def add_detected_object_from_coral_object_list(self, tile_sample_id, coral_object_list, stat:dict=None, exclude_outside_of_tile:bool=True):
         if stat is None:
@@ -978,10 +996,18 @@ class DetectorDAO():
                 elif coral_object.present_class == ClassHierarchyPresentation.OTHER.value:
                     stat['other_count'] += 1
                 elif coral_object.present_class == ClassHierarchyPresentation.MASKED.value:
-                    stat['masked'] += 1                    
-                c.execute('INSERT INTO detected_object (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y) '
-                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-                      (tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y,))
+                    stat['masked'] += 1 
+                # handle contour points and contour size
+                if hasattr(coral_object, 'contour_area_normalized'):
+                    contour_area = coral_object.contour_area_normalized
+                if hasattr(coral_object, 'points_normalized'):
+                    points_normalized = coral_object.points_normalized
+                    metadata = yaml.dump(points_normalized, Dumper=yaml.Dumper)
+                if hasattr(coral_object, 'confidence'):
+                    confidence = coral_object.confidence       
+                c.execute('INSERT INTO detected_object (tile_sample_id, yolo_class, coral_class, present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y, contour_area, confidence, metadata) '
+                      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                      (tile_sample_id, coral_object.yolo_class, coral_object.coral_class, coral_object.present_class, centre_x, centre_y, corner_x1, corner_y1, size_x, size_y, contour_area, confidence, metadata))
             conn.commit()
         return stat
 
@@ -1026,6 +1052,16 @@ class DetectorDAO():
         detected_object_list = self.query_detected_objects(tile_sample_id, yolo_classes, coral_classes, present_classes).to_dict('records')
         coral_object_list = []
         for detected_object in detected_object_list:
+            contour_area = detected_object.get('contour_area', -1)
+            confidence = detected_object.get('confidence', 0)
+            metadata = detected_object.get('metadata', None)
+            
+            contour_points = None
+            if metadata is not None:
+                try:
+                    contour_points = yaml.load(metadata, Loader=yaml.Loader)
+                except:
+                    ...
             # create the object from db results
             coral_object = CoralObject(
                 yolo_class = detected_object['yolo_class'],
@@ -1035,6 +1071,9 @@ class DetectorDAO():
                 bbox_normalized = (detected_object['corner_x1'], detected_object['corner_y1'], detected_object['corner_x1'] + detected_object['size_x'], detected_object['corner_y1'] + detected_object['size_y']),
                 centre_normalized = (detected_object['centre_x'], detected_object['centre_y'],),
                 size_normalized = (detected_object['size_x'], detected_object['size_y'],),
+                points_normalized = contour_points,
+                contour_area_normalized = contour_area,
+                confidence = confidence
             )
             coral_object_list.append(coral_object)
         return coral_object_list

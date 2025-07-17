@@ -358,6 +358,7 @@ class DetectionTaskModel():
             # save the statistics to the database
             self._update_detection_stat(self.detection_stat)     # DB opration
         except Exception:
+            traceback.print_exc()
             raise DetectorAborted(DetectorExceptionCodes.DB_ERROR, 'Failed to write detection results to the database')
         # generate html files
         try:
