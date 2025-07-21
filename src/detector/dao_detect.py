@@ -137,7 +137,7 @@ DETECT_DDL = {
         corner_y1 real,
         size_x real,
         size_y real,
-        contour_area real DEFAULT -1,
+        contour_area real DEFAULT NULL,
         confidence real DEFAULT 0,
         metadata text DEFAULT NULL,
         CONSTRAINT fk_tile_sample_id

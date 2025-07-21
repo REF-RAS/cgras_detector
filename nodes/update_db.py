@@ -22,8 +22,8 @@ DETECT_DBFILE = os.path.join(APP_FILE_MANAGER.database_folder, 'detector.db')
 def run_update_table_definitions_060():
     sql_list = [
         # 'ALTER TABLE detected_object RENAME COLUMN contour_size TO contour_area',
-        'ALTER TABLE detected_object ADD COLUMN contour_area real DEFAULT -1',
-        'ALTER TABLE detected_object ADD COLUMN confidence real DEFAULT 0',
+        'ALTER TABLE detected_object ADD COLUMN contour_area real DEFAULT NULL',
+        'ALTER TABLE detected_object ADD COLUMN confidence real DEFAULT NULL',
         'ALTER TABLE detected_object ADD COLUMN metadata text DEFAULT NULL'  
     ]
     for sql in sql_list:
