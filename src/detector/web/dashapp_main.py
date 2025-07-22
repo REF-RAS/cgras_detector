@@ -79,11 +79,14 @@ class DashApplicationMain():
     def _define_app(self):
         # brand_div = html.Div([html.H3('CGRAS Coral Counting and Visualization'), html.H6('Robotics and Autonomous Systems Group, REF, RI, Queensland University of Technology')])    
         brand_div = dbc.Row([
-            html.Img(src='/assets/images/QUTLogo.png', width='75', height='75', className='col-2 mx-auto'),
-            html.Img(src='/assets/images/CGRASLogo.gif', height='75', className='col-2 mx-auto'),
+            html.Div([
+                html.Img(src='/assets/images/QUTLogo.png',  height='75', className='me-3'),
+                
+                html.Img(src='/assets/images/CGRASLogo2.png', height='75'),
+            ], className='col-3 mx-auto'),
             html.Div([html.H3('CGRAS Coral Counting and Visualization'), 
                       html.H6('Robotics and Autonomous Systems Group, REF')
-                      ], className='col-8')
+                      ], className='col-9')
         ])
         self._navbar_with_menu = dbc.NavbarSimple(
                     children=[
