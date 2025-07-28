@@ -629,7 +629,6 @@ class CoralObjectDetectImageModel():
         self.image = image
         self.image_col_index, self.image_row_index = image_col_index, image_row_index
 
-
         self.map_bbox_image_fn = map_bbox_image_fn
         self.map_normalize_bbox_tile_fn = map_normalize_bbox_tile_fn
         self.params = kwargs
@@ -729,6 +728,21 @@ class CoralObjectDetectImageModel():
                             # extract the detected objects from the output of the yolo model of this blob
                             object_list = self._extract_objects_from_result(yolo_result, classes_map, self.image_col_index, self.image_row_index, corner, blob_col_index, blob_row_index, 
                                                                             self.map_bbox_image_fn, self.map_normalize_bbox_tile_fn)  
+                            # mark geometrically invalid objects
+                            keep_object_filter = yolo_detect_model.get_keep_object_filter()
+                            to_apply_keep_object_filter = keep_object_filter.get('apply', False)
+                            if to_apply_keep_object_filter:
+                                aspect_ratio_max = keep_object_filter.get('aspect_ratio_max', 4.5)
+                                area_min = keep_object_filter.get('area_min', 100)                      # pixels
+                                obj: CoralObject
+                                for obj in object_list:
+                                    if obj.invalidated:
+                                        continue
+                                    aspect_ratio = max(obj.size[0] / obj.size[1], obj.size[1] / obj.size[0])
+                                    object_area = obj.size[0] * obj.size[1]
+                                    if aspect_ratio > aspect_ratio_max or object_area < area_min:
+                                        obj.invalidated = True
+                                
                             # combine the object lists from the yolo detect models
                             if object_list_of_blob is None:
                                 object_list_of_blob = object_list

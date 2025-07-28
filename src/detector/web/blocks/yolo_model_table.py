@@ -57,6 +57,8 @@ class YoloModelTable():
         , className='col-10'),])  
 
         yolo_predict_params_label = dbc.Row([dbc.Label('YOLO Predict Params:', width=2), dbc.Label(id=prefix+'predict_params_label', width=10), ])
+        
+        keep_object_filter_label = dbc.Row([dbc.Label('Keep Object Filters:', width=2), dbc.Label(id=prefix+'keep_object_filter_label', width=10), ])
 
         # model_coral_class_label = dbc.Row([dbc.Label('Coral Classes:', width=2), dbc.Label(id=prefix+'coral_classes_label', width=10), ])
         # model_dead_coral_class_label = dbc.Row([dbc.Label('Dead Coral Classes:', width=2), dbc.Label(id=prefix+'dead_coral_classes_label', width=10), ])
@@ -77,7 +79,7 @@ class YoloModelTable():
                     }, tooltip={"placement": "bottom", "always_visible": True}))
         ])
         
-        define_yolo_model_form = dbc.Form([model_name_label, model_file_label, classes_map_label, yolo_predict_params_label, species_input, range_input]) 
+        define_yolo_model_form = dbc.Form([model_name_label, model_file_label, classes_map_label, yolo_predict_params_label, keep_object_filter_label, species_input, range_input]) 
                 
         self._editdata_modal = dbc.Modal(id=prefix+'edit_modal', children=[
                 dbc.ModalHeader(dbc.ModalTitle(children='Edit Model Attributes',)),
@@ -118,6 +120,7 @@ class YoloModelTable():
                            Output(prefix+'name_label', 'children'),
                            Output(prefix+'file_label', 'children'),
                            Output(prefix+'predict_params_label', 'children'),
+                           Output(prefix+'keep_object_filter_label', 'children'),
                            Output(prefix+'class_map_1', 'children'),
                            Output(prefix+'class_map_2', 'children'),
                            Output(prefix+'class_map_3', 'children'),
@@ -239,10 +242,11 @@ class YoloModelTable():
                 class_map_str_3 = f'POLYP_KEYPART: {row["classes_map"][ClassHierarchyCoral.POLYP_KEYPART.value]}'
                 class_map_str_4 = f'DEAD_CORAL: {row["classes_map"][ClassHierarchyCoral.DEAD_CORAL.value]}'
                 # convert predict_params_dict to a string
-                predict_params = row['predict_params']
-                return (True, row['name'], row['model_file_path'], str(predict_params), class_map_str_1, class_map_str_2, class_map_str_3, class_map_str_4, row['species'], (start_day, end_day,),)
+                predict_params = row.get('predict_params', '')
+                keep_object_filter = row.get('predict_params', '')
+                return (True, row['name'], row['model_file_path'], str(predict_params), str(keep_object_filter), class_map_str_1, class_map_str_2, class_map_str_3, class_map_str_4, row['species'], (start_day, end_day,),)
             except:
-                return (True, row['name'], row['model_file_path'], None, None, None, None, None, row['species'], (start_day, end_day,),)
+                return (True, row['name'], row['model_file_path'], None, None, None, None, None, None, row['species'], (start_day, end_day,),)
         return edit_row_received     
 
     def _edit_row_confirmed(self): 

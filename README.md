@@ -480,6 +480,8 @@ cgras_detector:
 | `loctile_rotate_angle_max` | The maximum angle of rotation acceptable | 3.0 (degrees)   |
 | `loctile_aspect_ratio_diff_max_rel` | The maximum relative error between the aspect ratio of the reconstructed tile and that of `tile_size_in_mm`  | 0.05 (ratio)    |
 | `loctile_aspect_ratio_diff_max_abs` | The maximum absolute error between the aspect ratio of the reconstructed tile and that of `tile_size_in_mm`  | 0.05 (aspect ratio)    |
+| `loctile_template_size` | The size (at the working scale) of the template used for corner detection | 60 (pixels) |
+| `loctile_template_corner_size` | The size (at the working scale) of the corner part of the template | 12 (pixels) |
 
 ##### Coral Object Detection related
 | Config variables     | Remarks                                                          | Default value (type) | 
@@ -517,6 +519,10 @@ yolo_predict_params:
   conf:               # default 0.25
   iou:                # default 0.7
   agnostic_nms:       # default False
+keep_object_filter:
+  apply: True        # True to apply filter
+  aspect_ratio_max: 4.5   # default 4.5
+  area_min: 100           # default 100 pixels 
 ```
 | Parameter     | Remarks         |  |
 | :----------------    | :------: | :------: | 
@@ -530,6 +536,7 @@ yolo_predict_params:
 | `classes_map` | The node that maps the output classes of YOLOv8 model to the internal classes | Mandatory | 
 | `remarks` | Additional description | Optional | 
 | `yolo_predict_params` | The node that defines yolo prediction parameters | Mandatory | 
+| `keep_object_filter` | The node that specifies filter conditions for keeping objects | Optional | 
 
 The significance of `classes_map` is to map the classes of the YOLOv8 model, which depends on the modelling of coral objects and the choice of class names, to the internal coral classes of the CCVS, which comprises of the following.
 
@@ -547,6 +554,14 @@ The `yolo_predict_params` contains parameters that are passed to the YOLO predic
 | `conf` | Sets the minimum confidence threshold for detections | 
 | `iou` | Intersection Over Union (IoU) threshold for Non-Maximum Suppression (NMS) | 
 | `agnostic_nms` | Enables class-agnostic Non-Maximum Suppression (NMS), which merges overlapping boxes of different classes |
+
+The `keep_object_filter` contains parameters that specifies the conditions for keeping objects
+
+| YOLO Predict Params     | Remarks         |  
+| :----------------    | :------: | 
+| `apply` | `True` if the conditions are to be applied | 
+| `aspect_ratio_max` | Objects with their bounding boxes' aspect ratio greater than the parameter are discarded  | 
+| `area_min` | Objects with their areas (in pixels) less than the parameter are discarded |
 
 ### Import of a Tile Sample Specification
 

@@ -138,12 +138,14 @@ class YoloObjectDetector():
     """ A wrapper class for YOLO so that the results of object detection are presented as an object of YoloResult class providing
         convenient functions
     """
-    def __init__(self, yolo_model_file:str, blob_size:tuple, classes_map:dict, predict_params:dict):
+    def __init__(self, yolo_model_file:str, blob_size:tuple, classes_map:dict, predict_params:dict, keep_object_filter:dict):
         """ the constructor
 
         :param yolo_model_file: the path to the .pt yolo model file 
         :param blob_size: a tuple of two integer indicating the input image size for the yolo model
         :param classes_map: a dict that contains mapping between yolo model classes and internal coral classes
+        :param predict_params: a dict that contains parameters of inference using yolo model
+        :param keep_object_filter: a dict that contains conditions that filter and keep objects      
         """
         assert yolo_model_file is not None, 'Parameter (yolo_model_file) is None'
         self.model:YOLO = YOLO(yolo_model_file)
@@ -151,6 +153,7 @@ class YoloObjectDetector():
         self.blob_size = blob_size
         self.classes_map = classes_map
         self.predict_params = predict_params
+        self.keep_object_filter = keep_object_filter
     
     def detect(self, image_cv:np.ndarray) -> YoloResult:
         """ apply the Yolo model on the given numpy image and return the results as a YoloResult object
@@ -168,6 +171,13 @@ class YoloObjectDetector():
         :return: the class names in a list
         """
         return self.model.names
+    
+    def get_keep_object_filter(self) -> list:
+        """ return the dict containing conditions for keep object filter
+
+        :return: the dict containing the conditions
+        """
+        return self.keep_object_filter
     
     def get_blob_size(self) -> tuple:
         """ return tuple of two integer indicating the input image size for the yolo model
@@ -197,5 +207,5 @@ if __name__ == '__main__':
                         'POLYP_MULTI': ['mask_live'],
                         'DEAD_CORAL': ['dead', 'mask_dead'],
                         }
-    yolo_detector = YoloObjectDetector(yolo_model_file, blob_size=(640, 640), classes_map=classes_map, predict_params={})
+    yolo_detector = YoloObjectDetector(yolo_model_file, blob_size=(640, 640), classes_map=classes_map, predict_params={}, keep_object_filter={})
     print(yolo_detector.info())

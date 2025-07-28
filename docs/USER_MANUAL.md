@@ -257,6 +257,18 @@ The __Download Data and Report__ button offers the users several options.
 - Figure Images (ZIP): The charts and graphics saved as image files.
 - Coral Count Report (Print): The web page in printable format.
 
+#### The Count Data Excel File
+
+Each Excel file contains data of detected objects and tab-based object count of all the sampling batch (dates) of a particular tile.  The worksheets can be divided into the following types, which are indicated by the worksheet names.
+
+- `TileInfo`: basic information of the tile.
+- `TileSamples`: the sampled batches (datetimes) of the tile in a list.
+- `CoralCountTrend`: the number of alive coral count of each sample ordered chronologically.
+- `Detect-YYYY-MM-DD`: the detected objects' classes, locaton on the tile (normalized to the dimensions of the tile), the area, detection confidence, and the indices of the tab they are found from the sample dated `YYYY-MM-DD`.
+-  `CM-[Class]-YY-MM-DD`: the count of the object of the `Class` in each tab from the sample dated `YYYY-MM-DD`.
+
+Note that the locations and the sizes of objects are normalized to the tile's dimension. For locations, (0, 0) indicates the top-left corner and (1, 1) indicates the bottom-right corner. For areas, the tile's area is regarded as 1.0. 
+
 ### The Scatter Plot of Coral Objects Panel
 
 This panel displays a scatter plot of coral objects of a tile sample to illustrate the spatial distribution.  Each dot represents an object.  By default, the latest tile sample is displayed.  To compare the latest tile sample with one of the earlier samples, click on one of the dates in the list to the left of the scatter plot chart. 
@@ -312,6 +324,10 @@ yolo_predict_params:
   conf:               # default 0.25
   iou:                # default 0.7
   agnostic_nms:       # default False
+keep_object_filter:
+  apply: True        # True to apply filter
+  aspect_ratio_max: 4.5  # default 4.5
+  area_min: 100          # default 100 pixels 
 ```
 | Parameter     | Remarks         |  |
 | :----------------    | :------: | :------: | 
@@ -325,6 +341,7 @@ yolo_predict_params:
 | `classes_map` | The node that maps the output classes of YOLOv8 model to the internal classes | Mandatory | 
 | `remarks` | Additional description | Optional | 
 | `yolo_predict_params` | The node that defines yolo prediction parameters | Mandatory | 
+| `keep_object_filter` | The node that specifies filter conditions for keeping objects | Optional | 
 
 The significance of `classes_map` is to map the classes of the YOLOv8 model, which depends on the modelling of coral objects and the choice of class names, to the internal coral classes of the CCVS, which comprises of the following.
 
@@ -342,6 +359,14 @@ The `yolo_predict_params` contains parameters that are passed to the YOLO predic
 | `conf` | Sets the minimum confidence threshold for detections | 
 | `iou` | Intersection Over Union (IoU) threshold for Non-Maximum Suppression (NMS) | 
 | `agnostic_nms` | Enables class-agnostic Non-Maximum Suppression (NMS), which merges overlapping boxes of different classes |
+
+The `keep_object_filter` contains parameters that specifies the conditions for keeping objects
+
+| YOLO Predict Params     | Remarks         |  
+| :----------------    | :------: | 
+| `apply` | `True` if the conditions are to be applied | 
+| `aspect_ratio_max` | Objects with their bounding boxes' aspect ratio greater than the parameter are discarded  | 
+| `area_min` | Objects with their areas (in pixels) less than the parameter are discarded |
 
 > [!NOTE]
 > The YOLOv8 model file (parameter `file`) referred in the YAML files must be found on the hard disk mounted to the host computer (either locally mounted or network mounted).

@@ -24,7 +24,9 @@ def run_update_table_definitions_060():
         # 'ALTER TABLE detected_object RENAME COLUMN contour_size TO contour_area',
         'ALTER TABLE detected_object ADD COLUMN contour_area real DEFAULT NULL',
         'ALTER TABLE detected_object ADD COLUMN confidence real DEFAULT NULL',
-        'ALTER TABLE detected_object ADD COLUMN metadata text DEFAULT NULL'  
+        'ALTER TABLE detected_object ADD COLUMN metadata text DEFAULT NULL',
+        'ALTER TABLE yolo_model ADD COLUMN predict_params_yaml text DEFAULT NULL' ,
+        'ALTER TABLE yolo_model ADD COLUMN keep_object_filter_yaml text DEFAULT NULL' ,
     ]
     for sql in sql_list:
         try:

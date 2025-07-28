@@ -279,9 +279,10 @@ class DetectionTaskModel():
                 blob_size = (yolo_model_dict['input_image_width'], yolo_model_dict['input_image_height'], )
                 classes_map = yolo_model_dict['classes_map']
                 predict_params = yolo_model_dict['predict_params']
+                keep_object_filter = yolo_model_dict['keep_object_filter']
                 try:
                     logger.info(f'{type(self).__name__}: Attempting to load the yolo_model_file at {yolo_model_file}')
-                    yolo_detector_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file, blob_size, classes_map, predict_params) 
+                    yolo_detector_model:YoloObjectDetector = YoloObjectDetector(yolo_model_file, blob_size, classes_map, predict_params, keep_object_filter) 
                     yolo_detector_model_list.append(yolo_detector_model)
                 except Exception as e:
                     logger.info(f'{type(self).__name__}: Failed to load the yolo model file: {e}')
