@@ -880,8 +880,8 @@ class ImageReconstruct1DModel():
         else:
             image_matching_min_confidence = kwargs.get(ModelsConfigNames.RECO_IMAGE_MATCHING_MIN_CONFIDENCE.value, 1.0) 
         # input parameters: reconstruction error checking
-        aspect_ratio_roi_error_rel = kwargs.get(ModelsConfigNames.RECO_ASPECT_RATIO_ROI_ERROR_REL, 0.1)
-        misplaced_roi_error_rel = kwargs.get(ModelsConfigNames.RECO_MISPLACED_ROI_ERROR_REL, 0.1)
+        aspect_ratio_roi_error_rel = kwargs.get(ModelsConfigNames.RECO_ASPECT_RATIO_ROI_ERROR_REL.value, 0.1)
+        misplaced_roi_error_rel = kwargs.get(ModelsConfigNames.RECO_MISPLACED_ROI_ERROR_REL.value, 0.1)
         # get image size
         self.images_as_list = images_1d_list
         # step 1: extract the keyword parameters
@@ -913,7 +913,8 @@ class ImageReconstruct1DModel():
         tried_desperate = False
         # the list of hyper-parameters for search
         default_feature_detectors = ['brisk', 'sift']
-        try_feature_detectors = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTORS, default_feature_detectors)
+        try_feature_detectors = kwargs.get(ModelsConfigNames.RECO_FEATURE_DETECTORS.value, default_feature_detectors)
+        self.logger.info(f'try_feature_detectors: {try_feature_detectors}')
         if type(try_feature_detectors) == str:
             try_feature_detectors = [try_feature_detectors]
         try_matcher_types = ['affine']

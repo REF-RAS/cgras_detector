@@ -85,7 +85,7 @@ class LocateTileModel():
         self.template_corner_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_CORNER_SIZE.value, 60)  # default 60 pixels
         self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 12)  # default 12 pixels
         self.matching_score_min = kwargs.get(ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value, 0.5)
-        self.rotate_angle_max = kwargs.get(ModelsConfigNames.LOCTILE_ROTATE_ANGLE_MAX, 3.0)
+        self.rotate_angle_max = kwargs.get(ModelsConfigNames.LOCTILE_ROTATE_ANGLE_MAX.value, 3.0)
         # important model variables
         self.corners_in_reco_space = {}
         self.tile_offset_in_px = self.tile_size_in_px = None
@@ -166,8 +166,8 @@ class LocateTileModel():
         # test if the ratio of the length and width is not similar to the given frame dimension
         detected_frame_size_ratio = self.detected_frame_size_in_px[0] / self.detected_frame_size_in_px[1]
         frame_size_in_mm_ratio = self.frame_size_in_mm[0] / self.frame_size_in_mm[1]  
-        rel_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_REL, 0.1)
-        abs_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_ABS, 0.1)
+        rel_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_REL.value, 0.1)
+        abs_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_ABS.value, 0.1)
         if not math.isclose(detected_frame_size_ratio, frame_size_in_mm_ratio, rel_tol=rel_tol, abs_tol=abs_tol):
             raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'The aspect ratio of the detected frame ({self.detected_frame_size_in_px} {detected_frame_size_ratio}) does not match the given frame size in mm ({frame_size_in_mm_ratio})')
 

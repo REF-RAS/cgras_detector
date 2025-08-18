@@ -54,13 +54,13 @@ cgras_detector:
   reco_model_filename: reco_model.yaml          # for developers' use and not to be adjusted
   loctile_model_filename: loctile_model.yaml    # for developers' use and not to be adjusted
   cod_model_filename: coral_object_detect_model.yaml  # for developers' use and not to be adjusted
-  reco_working_scale: 0.1
+  reco_working_scale: 0.2
   reco_debug_images_at_original_scale: False
   reco_debug_feature_matching_images: True
-  reco_feature_detectors: ['brisk', 'sift']     # sift, orb, brisk, akaze 
+  reco_feature_detectors: ['brisk', 'sift', 'orb', 'akaze']     # sift, orb, brisk, akaze 
   reco_feature_matching_confidence_threshold: 1.2
   reco_image_matching_min_confidence: 1.0   # between rows matching confidence
-  reco_image2d_matching_min_confidence: 1.0 # row matching confidence
+  reco_image2d_matching_min_confidence: 0.1 # row matching confidence
   # reco_error_correction: False            # for developers' use and not to be adjusted
   reco_aspect_ratio_roi_error_rel: 0.1           # the maximum relative error of aspect ratio of rois from that of the original image
   reco_misplaced_roi_erro_rel: 0.1               # the maximum relative error of roi corner placement with respect to the roi sizes
