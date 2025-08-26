@@ -63,6 +63,10 @@ python3-rosdep \
 python3-setuptools \
 python3-tk
 
+# install ur message for coordinator (NOTE: a better design is to encapsulate ur dependencies within the robot ros node) 
+RUN sudo DEBIAN_FRONTEND=noninteractive apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+ros-noetic-ur-dashboard-msgs
+
 # workspace create and make 
 RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
 cd ${CGRAS_WS} && \
