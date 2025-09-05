@@ -70,10 +70,11 @@ cgras_detector:
   frame_size_in_mm: [280, 280] # default value, only if not defined in the metadata of the tile_sample 
 
   # detection task parameters: locate tile
+  loctile_pixel_classifier_filename: train_set_20250905.model
   loctile_rotate_angle_max: 3.0   # degrees
   loctile_aspect_ratio_diff_max_rel: 0.05   # 0.05 relative difference
   loctile_aspect_ratio_diff_max_abs: 0.05   # 0.05 absolute difference
-  loctile_template_size: 60                        # pixels, default 60
+  loctile_template_size: 240                        # pixels, default 60
   loctile_template_corner_size: 12                 # pixels, default 12
   # detection task parameters: object detection  
 

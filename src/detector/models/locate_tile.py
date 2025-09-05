@@ -81,9 +81,11 @@ class LocateTileModel():
         # self.blue_ratio_min = kwargs.get(ModelsConfigNames.LOCTILE_BLUE_RATIO_MIN.value, 0.35)
         # self.red_ratio_max = kwargs.get(ModelsConfigNames.LOCTILE_RED_RATIO_MAX.value, 0.15)
         self.working_scale = kwargs.get(ModelsConfigNames.LOCTILE_WORKING_SCALE.value, 0.1)
+        # pixel classifier model filename
+        self.pixel_classifier_model_filename = kwargs.get(ModelsConfigNames.LOCTILE_PIXEL_CLASSIFIER_FILENAME.value, 'train_set_1.model')
         # other input parameters: template matching of corner
         self.template_corner_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_CORNER_SIZE.value, 60)  # default 60 pixels
-        self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 12)  # default 12 pixels
+        self.template_size = kwargs.get(ModelsConfigNames.LOCTILE_TEMPLATE_SIZE.value, 120)  # default 120 pixels
         self.matching_score_min = kwargs.get(ModelsConfigNames.LOCTILE_MATCHING_SCORE_MIN.value, 0.5)
         self.rotate_angle_max = kwargs.get(ModelsConfigNames.LOCTILE_ROTATE_ANGLE_MAX.value, 3.0)
         # important model variables
@@ -235,12 +237,17 @@ class LocateTileModel():
         # write annotated image related to corner detection
         if self.write_debug_images is not None and self.logdata_folder is not None:
             try:
+                # write corner detect
                 debug_image_filepath = os.path.join(self.logdata_folder, f'locate_corner_{which_corner.name}.jpg')
                 image_bgr = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
                 point_1 = (int(corner[0] - self.template_corner_size / self.working_scale), int(corner[1] - self.template_corner_size / self.working_scale))
                 point_2 = (int(corner[0] + self.template_corner_size / self.working_scale), int(corner[1] + self.template_corner_size / self.working_scale))
                 image_bgr = cv2.rectangle(image_bgr, point_1, point_2, (0, 0, 255,), 10)
                 cv2.imwrite(debug_image_filepath, image_bgr)
+                # write template
+                debug_image_filepath = os.path.join(self.logdata_folder, f'template_{which_corner.name}.jpg')
+                template = cv2.cvtColor(template, cv2.COLOR_GRAY2BGR)
+                cv2.imwrite(debug_image_filepath, template)
             except:
                 raise DetectorAborted(DetectorExceptionCodes.OS_ERROR, f'Failed to write feature matching output to {debug_image_filepath}')
         return corner
@@ -411,7 +418,7 @@ class LocateTileModel():
     #     return image
     
     def _apply_tile_filter_classifier(self, image:np.ndarray):
-        frame_detector = FrameDetector(os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_1.model'))
+        frame_detector = FrameDetector(os.path.join(os.path.dirname(__file__), f'tile_filter/{self.pixel_classifier_model_filename}'))
         return frame_detector.classify_image(image)
     
     def map_and_normalize_bbox(self, bbox:tuple):

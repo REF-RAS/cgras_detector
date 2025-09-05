@@ -39,6 +39,7 @@ class ModelsConfigNames(Enum):
     
     
     LOCTILE_WORKING_SCALE = 'loctile_working_scale'
+    LOCTILE_PIXEL_CLASSIFIER_FILENAME = 'loctile_pixel_classifier_filename'
     LOCTILE_TEMPLATE_SIZE = 'loctile_template_size'
     LOCTILE_TEMPLATE_CORNER_SIZE = 'loctile_template_corner_size'
     LOCTILE_MATCHING_SCORE_MIN = 'loctile_matching_score_min'

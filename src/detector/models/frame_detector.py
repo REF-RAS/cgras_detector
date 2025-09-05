@@ -124,16 +124,17 @@ class FrameDetector():
             self.classifier = pickle.load(infile)
 
 if __name__ == '__main__':
-    train_spec_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_1.yaml')
-    classifier_model_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_1.model')
+    train_spec_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_20250905.yaml')
+    classifier_model_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_20250905.model')
     
-    # frame_detector = FrameDetector()
-    # frame_detector.train(train_spec_file)
-    # frame_detector.save_classifier(classifier_model_file)
+    frame_detector = FrameDetector()
+    frame_detector.train(train_spec_file)
+    frame_detector.save_classifier(classifier_model_file)
     # load the model from a file
     frame_detector_2 = FrameDetector(classifier_model_file)
     # load test image
     # image_bgr = cv2.imread('/home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241031/CGRAS_Amag_241031_T01_00.jpg')
-    image_bgr = cv2.imread('/home/qcr/cgras_data/Source/2024/MIS5_T14_241031/CGRAS_Amag_241031_T14_00.jpg')
+    # image_bgr = cv2.imread('/home/qcr/cgras_data/Source/2024/MIS5_T14_241031/CGRAS_Amag_241031_T14_00.jpg')
+    image_bgr = cv2.imread('/home/qcr/cgras_ws/src/cgras_detector/src/detector/models/tile_filter/samples/2024Oct-982091078955895_CG1-250903142352_0_3.jpg')
     image_threshold = frame_detector_2.classify_image(image_bgr)
     cv2.imwrite(os.path.join(os.path.dirname(__file__), 'tile_filter/output.jpg'), image_threshold)
