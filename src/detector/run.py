@@ -270,17 +270,12 @@ class ApplicationCoordinator(object):
                         STATE.update(SystemStates.READY)
                 
                 elif state == SystemStates.AUTO_START:
-                    if COORDINATOR_STATE.get_state() in [CoordinatorStates.IDLE, CoordinatorStates.UNKNOWN]:
-                        if len(args) > 1:
-                            if args[0] % 10 == 1:
+                    if not self.suspend_when_capturing_image or COORDINATOR_STATE.get_state() in [CoordinatorStates.IDLE, CoordinatorStates.UNKNOWN]:
+                        if random.random() > 0.8:
+                            if DETECT_DAO.count_tile_samples() == 0:
                                 STATE.update(SystemStates.POLL_IMPORT_SAMPLE)
-                            elif args[0] % 2 == 0:
+                            else:
                                 STATE.update(SystemStates.POLL_DETECT)
-                        else:
-                            if random.random() < 0.5:
-                                STATE.update(SystemStates.POLL_DETECT)
-                            elif random.random() > 0.8:
-                                STATE.update(SystemStates.POLL_IMPORT_SAMPLE)
                         
                 elif state == SystemStates.CLICK_START:
                     ...
@@ -376,8 +371,9 @@ class ApplicationCoordinator(object):
                         STATE.update_state(SystemStates.READY)                                                     
 
                 # check if connection to other component is lost
-                if not COORDINATOR_STATE.is_state(CoordinatorStates.UNKNOWN) and COORDINATOR_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CONNECTION_TIMEOUT, 30):
-                    COORDINATOR_STATE.update(CoordinatorStates.UNKNOWN)
+                if not COORDINATOR_STATE.is_state(CoordinatorStates.UNKNOWN):
+                    if COORDINATOR_STATE.time_lapsed_since_update() > CONFIG.get(SystemConfigNames.CONNECTION_TIMEOUT, 30):
+                        COORDINATOR_STATE.update(CoordinatorStates.UNKNOWN)
 
             except DetectorFailed as e: 
                 logger.warning(f'Detector FAILED (Reject): {e}')

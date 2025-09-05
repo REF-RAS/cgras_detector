@@ -119,7 +119,7 @@ class DetectionTaskModel():
             self.tile_size, self.frame_size = self.medadata.get('tile_size', None), self.medadata.get('frame_size', None)
         else:
             self.tile_size = self.frame_size = None
-        # tile_size and frame_size are essential parameters
+        # tile_size and frame_size are essential parameters, should not use any default value
         if self.tile_size is None or self.frame_size is None:
             raise DetectorFailed(DetectorExceptionCodes.INPUT_DATA_INVALID, f'Tile sample does not contain tile size or frame size', e = AssertionError('Tile sample error'))
             

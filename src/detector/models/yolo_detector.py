@@ -82,7 +82,9 @@ class YoloResult():
         centre = (bbox[0] + size[0] // 2, bbox[1] + size[1] // 2,)
         # handle the mask
         points = []
-        mask = self.yolo_predict_results[0].masks[index]
+        mask = None
+        if isinstance(self.yolo_predict_results[0].masks, list):
+            mask = self.yolo_predict_results[0].masks[index]
         if mask is not None:
             for point in mask.xy[0]:
                 points.append(point.tolist())
