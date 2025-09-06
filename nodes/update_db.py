@@ -37,8 +37,36 @@ def run_update_table_definitions_060():
             traceback.print_exc()
     logger.info(f'Update DB tables completed')
 
+def run_update_tile_sample():
+    sql = 'UPDATE tile_sample SET metadata = ?'
+    metadata = {
+        'num_tabs': [20, 20],
+        'tile_size': [280, 280],
+        'frame_size': [294, 294],
+    }
+    metadata = json.dumps(metadata)
+    try:
+        logger.info(f'Update: {sql}')
+        db_tools.update(DETECT_DBFILE, sql, (metadata,))
+    except:
+        logger.warning(f'Error occurred in DB table update')
+        traceback.print_exc()
+    logger.info(f'Update DB tables completed')
+
+
 # ------------------------------------------------
 # The main program for running a command line 
 # program for executing sql statements
 if __name__ == '__main__':
-    run_update_table_definitions_060()
+    print(f'''
+        (E): Exit
+        (1): Update Table Schema
+        (2): Update Tile Sample Metadata
+        ''')
+    command = input('Select Update: ')
+    if command == 'E':
+        sys.exit()
+    elif command == '1':
+        run_update_table_definitions_060()
+    elif command == '2':
+        run_update_tile_sample()
