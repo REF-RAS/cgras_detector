@@ -171,7 +171,7 @@ class LocateTileModel():
         rel_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_REL.value, 0.1)
         abs_tol = self.params.get(ModelsConfigNames.LOCTILE_ASPECT_RATIO_DIFF_MAX_ABS.value, 0.1)
         if not math.isclose(detected_frame_size_ratio, frame_size_in_mm_ratio, rel_tol=rel_tol, abs_tol=abs_tol):
-            raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'The aspect ratio of the detected frame ({self.detected_frame_size_in_px} {detected_frame_size_ratio}) does not match the given frame size in mm ({frame_size_in_mm_ratio})')
+            raise DetectorFailed(DetectorExceptionCodes.LOC_FAILED, f'The aspect ratio of the detected frame ({self.detected_frame_size_in_px} {detected_frame_size_ratio:.2f}) is deviated from that of the frame size ({frame_size_in_mm_ratio})')
 
         # compute the detected tile size in pixels from the tile size and frame size
         # approx_pixel_per_mm_x = detected_frame_size_x / self.frame_size_in_mm[0]

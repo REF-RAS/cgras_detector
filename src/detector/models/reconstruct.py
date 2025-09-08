@@ -1013,7 +1013,7 @@ class ImageReconstruct1DModel():
                     break
                 except Exception as e:
                     self.logger.info(e)
-                    raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot combine image as a grid: possibly wayward homography matrices')
+                    raise DetectorFailed(DetectorExceptionCodes.RECO_FAILED, f'Cannot combine images into a grid: wayward homography due to inadequate quality unique features')
             except DetectorFailed as e:
                 model_build_error = e            
             except Exception as e:

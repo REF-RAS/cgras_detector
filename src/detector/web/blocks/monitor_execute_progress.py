@@ -93,7 +93,7 @@ class MonitorExecuteProgressBlock():
             progress_message = None
             if the_detection_task is not None:
                 progress_bar_style = {'visibility': 'visible'}
-                progress_label = f'Finding Corals on the Tile Sample of ID "{the_detection_task.get_tile_sample_id()}"'
+                progress_label = f'Finding Corals in the Tile Sample of ID "{the_detection_task.get_tile_sample_id()}"'
                 progress_time = f'{int(the_detection_task.get_time_since_start())} sec'
                 
                 state:SystemStates = STATE.get()

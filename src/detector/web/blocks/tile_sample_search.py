@@ -51,11 +51,12 @@ class TileSampleSearchBlock():
                                        searchable=False, clearable=False, className='ms-2', style={'width': '240px', 'zIndex': 10})  
         # the page size filter
         self.pagesize_options = [
-            {'label': 'Recent 10', 'value': 10},
-            {'label': 'Recent 25', 'value': 25},
+            {'label': 'Recent 50', 'value': 50},
             {'label': 'Recent 100', 'value': 100},
+            {'label': 'Recent 150', 'value': 150},
             {'label': 'Recent 250', 'value': 250},]
-        pagesize_dropdown = dcc.Dropdown(options=self.pagesize_options, id=prefix+'pagesize_dropdown', 
+        self.DEFAULT_PAGE_SIZE = 100
+        pagesize_dropdown = dcc.Dropdown(options=self.pagesize_options, id=prefix+'pagesize_dropdown', value=100,
                                        searchable=False, clearable=False, className='ms-2', maxHeight=200, style={'width': '160px', 'zIndex': 10})
       
         self.tile_sample_search_panel = html.Div([
@@ -116,8 +117,8 @@ class TileSampleSearchBlock():
                 season_titles_list = DETECT_DAO.list_seasons_in_tile_sample()
                 for season_title in season_titles_list:
                     period_options.append({'label': f'{season_title} Season', 'value': season_title})
-                value = 0
-                return ('', '', period_options, value, 10, SampleStatusNames.ALL.value, 0)
+                DEFAULT_PERIOD_VALUE = 0
+                return ('', '', period_options, DEFAULT_PERIOD_VALUE, self.DEFAULT_PAGE_SIZE, SampleStatusNames.ALL.value, 0)
             time.sleep(1.0)
             return (dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, 0)
         return reset_filter_button_clicked

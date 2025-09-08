@@ -26,7 +26,7 @@ If any of the above error occurred is associated with a tile sample that is impo
 | RECO_FAILED  | Cannot find warp rois for all images in the row | Possibly due to poor image quality or the original tile is devoid of visual features |
 | RECO_FAILED  | The aspect ratio of one or more rois is different from the original image | A result of reconstructon validation that is possibly due to a problem in image capture |
 | RECO_FAILED  | Roi corners not regularly placed | A result of reconstructon validation that is possibly due to a problem in image capture |
-| RECO_FAILED  | Cannot combine image as a grid: possibly wayward homography matrices| As above |
+| RECO_FAILED  | annot combine images into a grid: wayward homography due to inadequate quality unique features | As above |
 | RECO_MATCH_FAILED  | Cannot merge adjacent images: possibly error in image capturing | Possibly due to misplaced image in the capture grid (for manaul import) or generally poor image quality or the original tile is devoid of visual features |
 | RECO_MATCH_FAILED  | Cannot obtain camera transform for every rows: lack sufficient features or feature detector not suitable | Ditto |
 | RECO_MATCH_FAILED  | Cannot obtain camera transforms between rows: lack sufficient between row features or feature detector not suitable | Ditto |

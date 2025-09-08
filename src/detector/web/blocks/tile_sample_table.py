@@ -49,7 +49,7 @@ class TileSampleTable():
                          {'name': 'Season', 'id': 'season', 'type': 'text', 'editable': False},
                          {'name': 'Age', 'id': 'age', 'type': 'text', 'editable': False},
                          {'name': 'Settled On', 'id': 'settle_time', 'type': 'text', 'editable': False},
-                         {'name': 'Importer', 'id': 'importer_id', 'type': 'text', 'editable': False},
+                         # {'name': 'Importer', 'id': 'importer_id', 'type': 'text', 'editable': False},
                          {'name': 'Import Time', 'id': 'create_time', 'type': 'text', 'editable': False},  
                          {'name': 'Status', 'id': 'status', 'type': 'text', 'editable': False},    
                          {'name': 'Remarks', 'id': 'remarks', 'type': 'text', 'editable': False},                                                                         
