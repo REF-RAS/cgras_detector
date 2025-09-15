@@ -68,7 +68,7 @@ class ValueHolder:
             self.value = value
 
 # global variable for accessing the system configuration
-CONFIG:SystemConfig = SystemConfig(os.path.join(os.path.dirname(__file__), '../../config/system_config.yaml'))
+CONFIG:SystemConfig = SystemConfig(namespace='cgras_detector', default_config_folder=os.path.join(os.path.dirname(__file__), '../../config'))
 CGRAS_DATA_FOLDER = os.path.expanduser(CONFIG.get(SystemConfigNames.CGRAS_DATA_FOLDER, '/home/qcr/cgras_data'))
 # global variables for import by other modules
 STATE = model_base.StateManager(SystemStates.READY)                              # the state of the detection and visualization processor

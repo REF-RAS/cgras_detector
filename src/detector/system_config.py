@@ -11,7 +11,7 @@ __version__ = '1.0'
 __email__ = 'ak.lui@qut.edu.au'
 __status__ = 'Development'
 
-import yaml, os
+import yaml, os, logging, shutil
 from enum import Enum
 from collections.abc import MutableMapping
 # ros params
@@ -53,20 +53,63 @@ class SystemConfigNames(Enum):
 class SystemConfig(MutableMapping):
     """ The class providing easy query of the hierarcy of configurations in yaml
     """
-    def __init__(self, config_file:str, *args, **kwargs):
+    CONFIG_FILENAME = 'system_config.yaml'
+    DEFAULT_CONFIG_FOLDER = os.path.join(os.path.dirname(__file__), '../../config')
+    logger = logging.getLogger('global')
+    """ The class providing easy query of the hierarcy of configurations in yaml
+    """
+    def __init__(self, namespace:str='cgras_detector', default_config_folder:str=None, use_default=False, *args, **kwargs):
         """the constructor
-        :param scene_config_file: the path to the yaml configuration file
-        :type scene_config_file: str, optional
+        :param default_config_folder: the path to the folder where the yaml configuration file resides
+        :type default_config_folder: str, optional
         """
+        # input parameters
+        self.namespace = namespace
+        # model variables
+        self.config = None
+        
+        if not use_default:
+            # create config folder
+            self.config_folder = os.path.join(os.path.expanduser(f'~/.config/{self.namespace}'))
+            os.makedirs(self.config_folder, exist_ok=True)
+            # attempt to load config yaml file from the .config folder under the user home folder
+            self.config_file = os.path.join(self.config_folder, self.CONFIG_FILENAME)
+            self.config = self._load_config_file(self.config_file)
         # load data from the config yaml file
-        if config_file is None:
-            raise AssertionError(f'{__class__.__name__} parameter (config_file) is None')
-        with open(config_file, 'r') as f:
-            self.config = yaml.safe_load(f)
-            if 'cgras_detector' not in self.config:
-                raise AssertionError(f'{__class__.__name__} the config yaml file does not contain a branch named cgras_detector')
-            self.config = self.config['cgras_detector'] 
+        if default_config_folder is None:
+            default_config_folder = self.DEFAULT_CONFIG_FOLDER
+        # if no config file is found under the .config folder, use the default one from the source code
+        if self.config is None:
+            if not use_default:
+                # copy the default config file to the .config folder
+                shutil.copy(os.path.join(default_config_folder, self.CONFIG_FILENAME), self.config_folder)   
+                self.logger.info(f'SystemConfig: using the configuration file at {self.config_file} after copied from the default folder {default_config_folder}')
+            else:
+                self.logger.info(f'SystemConfig: using the configuration file at {default_config_folder}/{self.CONFIG_FILENAME}')
+                self.config_file = os.path.join(default_config_folder, self.CONFIG_FILENAME)
+            self.config = self._load_config_file(self.config_file) 
+        else:
+            self.logger.info(f'SystemConfig: using the configuration file at {self.config_file}')
+        # use the remaining input parameters to the config to add or update
         self.update(dict(*args, **kwargs))
+
+    def _load_config_file(self, config_file) -> dict:
+        if not os.path.isfile(config_file):
+            return None
+        try:
+            with open(config_file, 'r') as f:
+                config_dict = yaml.safe_load(f)
+                if self.namespace not in config_dict:
+                    raise AssertionError(f'{__class__.__name__} the config yaml file at ({config_file}) does not contain a branch named {self.namespace}')
+                config_dict = config_dict[self.namespace] 
+                return config_dict
+        except AssertionError: 
+            raise
+        except Exception as e:
+            raise        
+        
+    def get_namespace(self) -> str:
+        return self.namespace
         
     def __getitem__(self, key):
         name = f'~{self._keytransform(key)}'
@@ -110,7 +153,7 @@ if __name__ == '__main__':
     rospy.init_node('config_manager')
     print(f'ros_param: {rospy.get_param("~data_folder")}')
     
-    CONFIG:SystemConfig = SystemConfig(os.path.join(os.path.dirname(__file__), '../../config/system_config.yaml'))
+    CONFIG:SystemConfig = SystemConfig(namespace='cgras_detector', default_config_folder=os.path.join(os.path.dirname(__file__), '../../config'))
     print(f'{type(SystemConfigNames.CGRAS_DATA_FOLDER)}')
     print(f'{isinstance(SystemConfigNames.CGRAS_DATA_FOLDER, Enum)}')
     print(f'{CONFIG[SystemConfigNames.CGRAS_DATA_FOLDER]}')

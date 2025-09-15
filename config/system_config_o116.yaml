@@ -1,4 +1,9 @@
 # YAML file for the system
+
+# IMPORTANT NOTE
+# The system will first look for system_config.yaml file under ~/.config/cgras_coordinator
+# If the file is not found, then the system will copy the default file cgras_coordinator/config/system.config.yaml to ~/.config/cgras_coordinator and then use the one under the .config folder 
+
 ---
 cgras_detector:
   # WEB INTERFACE

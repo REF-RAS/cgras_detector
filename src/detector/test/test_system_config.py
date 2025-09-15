@@ -18,19 +18,19 @@ import rospy
 
 from detector.system_config import SystemConfig, SystemConfigNames
 
-def sample_system_config_file():
+def sample_system_config_folder():
     CURRENT_FOLDER = os.path.dirname(__file__)
-    SYSTEM_CONFIG_FILE = os.path.join(CURRENT_FOLDER, '../../../config/system_config.yaml')
-    return SYSTEM_CONFIG_FILE
+    SYSTEM_CONFIG_FOLDER = os.path.join(CURRENT_FOLDER, '../../../config')
+    return SYSTEM_CONFIG_FOLDER
 
 def load_system_config_file() -> dict:
-    with open(sample_system_config_file(), 'r') as infile:
+    with open(os.path.join(sample_system_config_folder(), SystemConfig.CONFIG_FILENAME), 'r') as infile:
         config_dict = yaml.load(infile, Loader=yaml.Loader)
     return config_dict
 
 # test the basic operation of system config
 def test_setup_config():
-    CONFIG:SystemConfig = SystemConfig(sample_system_config_file())
+    CONFIG:SystemConfig = SystemConfig(namespace='cgras_detector', default_config_folder=sample_system_config_folder(), use_default=True)
     for config_name in SystemConfigNames:
         value = CONFIG.get(config_name.value, None)
         if value is None:
@@ -50,7 +50,7 @@ def test_config_value_consistent():
     assert 'cgras_detector' in config_dict
     config_dict = config_dict['cgras_detector']
     # instantiate SystemConfig
-    CONFIG:SystemConfig = SystemConfig(sample_system_config_file())
+    CONFIG:SystemConfig = SystemConfig(namespace='cgras_detector', default_config_folder=sample_system_config_folder(), use_default=True)
     # test if the two methods give consistent value for all config names
     for config_name in SystemConfigNames:
         try:
@@ -67,7 +67,7 @@ def test_ros_override():
         rospy.init_node('config_manager')
     except:
         return
-    CONFIG:SystemConfig = SystemConfig(sample_system_config_file())
+    CONFIG:SystemConfig = SystemConfig(namespace='cgras_detector', default_config_folder=sample_system_config_folder(), use_default=True)
     # assign test param name
     test_param_name = 'test_param'
     # reset the param name in rospy in case it has been assigned before
