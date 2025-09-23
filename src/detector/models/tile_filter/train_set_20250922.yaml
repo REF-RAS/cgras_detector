@@ -1,0 +1,26 @@
+# TRAINING SET FOR BLACK DETECTOR
+train_set:
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/air_0_0.jpg
+    frame: [[618, 16, 23, 135], [103, 493, 264, 27]]
+    tile: [[328, 332, 266, 132]]
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/air_0_5.jpg
+    frame: [[280, 201, 278, 22], [626, 362, 14, 406]]
+    tile: [[353, 259, 233, 118]]  
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/air_3_5.jpg
+    frame: [[53, 211, 653, 19], [231, 44, 17, 603]]
+    tile: [[278, 253, 297, 143]]   
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/air_3_0.jpg
+    frame: [[32, 511, 866, 22], [242, 26, 24, 500]]
+    tile: [[294, 15, 62, 454], [330, 295, 285, 175]] 
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/water_0_0.jpg
+    frame: [[194, 679, 996, 26], [1005, 17, 30, 687]]
+    tile: [[228, 66, 746, 572]]  
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/water_0_5.jpg 
+    frame: [[529, 293, 661, 27], [965, 74, 32, 580]]
+    tile: [[348, 349, 594, 436]] 
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/water_3_5.jpg
+    frame: [[33, 293, 1157, 42], [487, 34, 44, 695]]
+    tile: [[29, 369, 439, 421], [551, 7, 641, 262], [0, 9, 457, 246]]    
+  - image_file: /home/qcr/Workspace/training_images/black_corners/resized/water_3_0.jpg # <- Do this!
+    frame: [[51, 690, 1131, 30], [512, 32, 36, 691]] # might remove the second patch because lots of white
+    tile: [[584, 17, 599, 639]]

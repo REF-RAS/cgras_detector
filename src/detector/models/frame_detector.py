@@ -51,15 +51,16 @@ class FrameDetector():
             print(image_spec)
             # load the image
             image_bgr = cv2.imread(image_spec['image_file'])
+            image_hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
             # extract the pixel values of the frame class
             self.px_in_roi_frame = None
             for roi in image_spec['frame']:
-                px_in_roi = self._extract_px_in_roi(image_bgr, *roi)
+                px_in_roi = self._extract_px_in_roi(image_hsv, *roi)
                 self.px_in_roi_frame = px_in_roi if self.px_in_roi_frame is None else np.vstack((self.px_in_roi_frame, px_in_roi))
             # extract the pixel values of the tile class
             self.px_in_roi_tile = None
             for roi in image_spec['tile']:
-                px_in_roi = self._extract_px_in_roi(image_bgr, *roi)
+                px_in_roi = self._extract_px_in_roi(image_hsv, *roi)
                 self.px_in_roi_tile = px_in_roi if self.px_in_roi_tile is None else np.vstack((self.px_in_roi_tile, px_in_roi))     
         # build input parameter set
         self.data_X = np.vstack((self.px_in_roi_frame, self.px_in_roi_tile))
@@ -92,10 +93,10 @@ class FrameDetector():
             
     def _extract_px_in_roi(self, image:np.ndarray, x, y, size_x, size_y):
         x2, y2 = x + size_x, y + size_y
-        B = image[y:y2, x:x2, 0].flatten()
-        G = image[y:y2, x:x2, 1].flatten()
-        R = image[y:y2, x:x2, 2].flatten()
-        px_in_roi = np.stack((B, G, R), axis=1)        
+        ch1 = image[y:y2, x:x2, 0].flatten()
+        ch2 = image[y:y2, x:x2, 1].flatten()
+        ch3 = image[y:y2, x:x2, 2].flatten()
+        px_in_roi = np.stack((ch1, ch2, ch3), axis=1)        
         return px_in_roi
     
     def predict(self, X:np.ndarray) -> np.ndarray:
@@ -103,10 +104,11 @@ class FrameDetector():
     
     def classify_image(self, image_bgr:np.ndarray) -> np.ndarray:
         # convert the image 2d numpy array of shape (height, width, 3) into (height * width, 3), each row is BGR value of a pixel
+        image_hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
         X = np.stack((
-            image_bgr[:, :, 0].flatten(),
-            image_bgr[:, :, 1].flatten(),
-            image_bgr[:, :, 2].flatten(),
+            image_hsv[:, :, 0].flatten(),
+            image_hsv[:, :, 1].flatten(),
+            image_hsv[:, :, 2].flatten(),
         ), axis = 1)
         # classified each pixel
         y = self.predict(X)
@@ -125,7 +127,7 @@ class FrameDetector():
 
 if __name__ == '__main__':
     train_spec_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_20250905.yaml')
-    classifier_model_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_20250905.model')
+    classifier_model_file = os.path.join(os.path.dirname(__file__), 'tile_filter/train_set_20250905_hsv.model')
     
     frame_detector = FrameDetector()
     frame_detector.train(train_spec_file)
@@ -134,7 +136,6 @@ if __name__ == '__main__':
     frame_detector_2 = FrameDetector(classifier_model_file)
     # load test image
     # image_bgr = cv2.imread('/home/qcr/cgras_data/Source/2024/Chris_MIS5_T01_241031/CGRAS_Amag_241031_T01_00.jpg')
-    # image_bgr = cv2.imread('/home/qcr/cgras_data/Source/2024/MIS5_T14_241031/CGRAS_Amag_241031_T14_00.jpg')
-    image_bgr = cv2.imread('/home/qcr/cgras_ws/src/cgras_detector/src/detector/models/tile_filter/samples/2024Oct-982091078955895_CG1-250903142352_0_3.jpg')
+    image_bgr = cv2.imread('/home/qcr/Workspace/training_images/blue_corners/resized/water_0_5.jpg')
     image_threshold = frame_detector_2.classify_image(image_bgr)
     cv2.imwrite(os.path.join(os.path.dirname(__file__), 'tile_filter/output.jpg'), image_threshold)
