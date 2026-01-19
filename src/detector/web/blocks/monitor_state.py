@@ -75,26 +75,26 @@ class MonitorStateBlock():
                 self.current_detect_message = None
                 if previous_state not in [SystemStates.READY, SystemStates.AUTO_START, SystemStates.CLICK_START] or random.random() < 0.2:
                     self.banner_message = [
-                        'I am consuming electricity but there is no coral babies to look after. Can you feel my guilt?',
-                        'I am wasting my talent here. Got nothing to do. I should be nursing coral babies. ',
-                        'I turn into a couch potato. Is it my destiny?'
+                        'Waiting for coral babies to count.',
+                        'Counting corals to assess their health and save our time.',
+                        'Reef restoration for healthy oceans.'
                     ][random.randrange(0, 3)]
             elif state in [SystemStates.POLL_DETECT, SystemStates.POLL_IMPORT_SAMPLE]:
                 if previous_state not in [SystemStates.POLL_DETECT, SystemStates.POLL_IMPORT_SAMPLE] or random.random() < 0.2:
                     self.banner_message = [
-                        'I just asked my supervisor for more coral larvae but got nothing. I am feeling insecure.',
-                        'No new coral again! Should I look elsewhere for coral babies?',
-                        'Can we make corals more productive? '
+                        'Can we correlate the spatial distribution of corals to benthic community factors?',
+                        'Making large-scale reef restoration a little bit more viable.',
+                        'How can we improve coral growth?'
                     ][random.randrange(0, 3)]
             elif state in [SystemStates.SUSPENDED]:
                 self.current_detect_message = None
-                self.banner_message = 'I am on leave now as the system is suspended. Ping me if you want but I am not reading messages.'
+                self.banner_message = 'I am on leave now as the system is suspended.'
             else:
                 if self.current_detect_message is None:
                     self.current_detect_message = [
-                        'Leave me alone. I am working hard to keep large and small corals happy in the playpen.',
-                        'The corals are noisy. No time to entertain you now.',
-                        'Shhh! The corals are sleeping and their tentacles are being counted.'
+                        'Busy counting corals.',
+                        'It used to take 1-2 hours to count a single coral tile.',
+                        'Using AI to count tiny corals automatically.'
                     ][random.randrange(0, 3)]
                 self.banner_message = self.current_detect_message
             return (self.banner_message,)
