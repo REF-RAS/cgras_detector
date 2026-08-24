@@ -2,6 +2,7 @@
 
 This document explains the semantics of coral counting and coral object classes in CCVS.
 
+---
 ## Counting Coral Objects
 
 CCVS is designed to count three types of objects: alive corals, dead corals, and other objects. The _other objects_ refer to those that are not corals, alive or dead, but of interest to the users.  CCVS uses a combination of bespoke object detection models and heuristics to infer these classes of objects based on their visual appearance. 
@@ -14,6 +15,7 @@ Counting alive coral objects depends on accurate identification of individual co
 
 CCVS has adopted a hierarchical framework of coral classes in order to support the two modelling approaches.
 
+---
 ## Hierarchical Framework of Coral Classes
 
 The hierarchical framework of the CCVS is described in the following figure.
@@ -146,6 +148,7 @@ The extensibility of coral detection capability is largely enabled by the hierar
 
 Further research on more expressive connection between object detection and coral counting is expected. No attempt of developing object development model has yet to be made to many coral species.  It is likely that the hierarchical framework may need further extension or even an overhaul for a difficult coral species. 
 
+---
 ## Links
 
 - [Introduction to the CCVS and Installation Guide](../README.md)
@@ -153,14 +156,15 @@ Further research on more expressive connection between object detection and cora
 - [Design Diagrams](./DESIGN.md)
 - [Summary of Processing Errors and System Issues](./ERROR_CODE.md)
 
-## Developer of the System
+---
+### Developer of the System
 
 Dr Andrew Lui, Senior Research Engineer <br />
 Robotics and Autonomous Systems, Research Engineering Facility <br />
 Research Infrastructure <br />
 Queensland University of Technology <br />
 
-## Author
+### Author
 
 Dr Andrew Lui <br />
 Latest update: June 2025

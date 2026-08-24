@@ -1,6 +1,6 @@
 # CGRAS 2025: Coral Counting and Visualization System
 
-The **Coral Counting and Visualization System (CCVS)** is one of the two systems of the CGRAS 2025 platform. It is designed to monitor the coral recruitment process in tanks with acquaculture tiles. It achieves the objective based on visual analytics on images captured of the tiles, which involves the application of deep-learning based object detection models, the post-processing of identified objects, and the presentation of the findings. CCVS provides a web interface for users to monitor and control the visual analytics process, to manage the image samples, and to visualize the trend and distribution of corals of a tile. 
+The **Coral Counting and Visualization System (CCVS)** is one of the two systems of the CGRAS 2025 platform. It is designed to monitor coral recruitment process in tanks with acquaculture tiles. It achieves the objective based on visual analytics on images captured of the tiles, which involves the application of deep-learning based object detection models, the post-processing of identified objects, and the presentation of the findings. CCVS provides a web interface for users to monitor and control the visual analytics process, to manage the image samples, and to visualize the trend and distribution of corals of a tile. 
 
 At the upstream of the CGRAS 2025 finds the **Image Acquisition Coorindation System (IACS)**, which is designed to autonomously capture images of acquaculture tiles in a operation zone called the **CGRAS Arena**. 
 
@@ -12,6 +12,8 @@ At the upstream of the CGRAS 2025 finds the **Image Acquisition Coorindation Sys
 > - [Modelling Coral Object Detection](./docs/CORAL_CLASSES.md)
 > - [Design Diagrams](./docs/DESIGN.md)
 > - [Summary of Processing Errors and System Issues](./docs/ERROR_CODE.md)
+
+---
 
 ## Basic Operation
 
@@ -97,6 +99,7 @@ A key feature of the CCVS is the ability to apply specialized coral detection mo
 
 The top pane is the drop area for the import of a detection model specification yaml file.  In the middle the table displays the imported detection models and there are buttons for updating and deleting a model. The bottom pane shows a visualization of the coverage of each model in the species and in the coral age of the target tile samples.
 
+---
 ## System Installation
 
 The CCVS is written in Python and it is designed to run in a ROS1 (noetic) environment. It will run significantly more efficient with the support of CUDA/GPU but it can also run on a pure CPU host. 
@@ -118,7 +121,6 @@ In addition to this repository, the repositories of `cgras_datatools`, `cgras_me
 ```bash
 cd ${CGRAS_WS}/src
 git clone git@github.com:REF-RAS/cgras_detector.git
-
 git clone git@github.com:REF-RAS/cgras_datatools.git
 git clone git@github.com:REF-RAS/cgras_messages.git
 git clone git@github.com:REF-RAS/cgras_coordinator.git
@@ -491,6 +493,7 @@ cgras_detector:
 | `cod_merge_mutli_models` | Use multiple applicable coral detection models | True (bool)   |
 | `cod_mask_polyp_keypart` | Mask the class polyp_keypart class when determining the presentation class | False (bool)   |
 
+---
 ## System Setup
 
 The operation of CCVS requires a coral detection model based on YOLO and a source of tile samples to be processed. 
@@ -607,8 +610,9 @@ The system provides several endpoints as a part of an experimental RESTful API.
 | `/api/detected_objects/query/<string:tile_sample_id>` | Query for the detected objects of a tile sample | A list of detected objects (json) |
 | `/api/tile_samples/import` | Import a new tile sample in yaml format | N/A |
 
+---
 
-## Developer
+### Developer
 
 Dr Andrew Lui, Senior Research Engineer <br />
 Robotics and Autonomous Systems, Research Engineering Facility <br />

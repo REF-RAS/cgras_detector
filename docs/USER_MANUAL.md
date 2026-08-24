@@ -2,6 +2,8 @@
 
 The Coral Counting and Visualization System (CCVS) is designed for learning the amount and spatial-temporal distributions of post-settlement corals growing on aquaculture tiles. It automates the tasks of importing image samples of aquaculture tiles, visually reconstructing the whole tiles, detecting and counting corals in the images of tile samples, and generating charts for effective data visualization.
 
+----
+
 ## Introduction to the Web Interface
 
 CCVS users can access the following functions through the web interface.
@@ -368,6 +370,7 @@ Press the __Confirm__ button to save the change or the __Cancel__ button to clos
 
 The chart enables users to view the applicable scope of all the COD models currently in the system.  The chart makes it easier to find gaps in the scope. 
 
+---
 ## Links
 
 - [Introduction to the CCVS and Installation Guide](../README.md)
@@ -375,14 +378,15 @@ The chart enables users to view the applicable scope of all the COD models curre
 - [Design Diagrams](./DESIGN.md)
 - [Summary of Processing Errors and System Issues](./ERROR_CODE.md)
 
-## Developer of the System
+---
+### Developer of the System
 
 Dr Andrew Lui, Senior Research Engineer <br />
 Robotics and Autonomous Systems, Research Engineering Facility <br />
 Research Infrastructure <br />
 Queensland University of Technology <br />
 
-## Author
+### Author
 
 Dr Andrew Lui <br />
 Latest update: June 2025

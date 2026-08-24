@@ -2,6 +2,7 @@
 
 This page displays key design diagrams of the Coral Counting and Visualization System (CCVS).
 
+---
 ## CGRAS 2025
 
 Monitoring the number of corals in the early post-settlement period of microscopic coral recruit phase is desirable in coral aquaculture operations and research. The data is imperative for the evaluation of instrument design and operational parameters, and for extending the knowledge of coral growing in controlled environments.
@@ -40,7 +41,7 @@ THe following figure shows the architecture of the whole CGRAS 2025 system and t
 
 <img src="./images/CGRASSystemArch.png" alt="Design of CGRAS 2025" height="240">
 
-
+---
 ## The Detect, Count and Locate Task of the CCVS
 
 A major task of the CCVS is to detect, count, and locate coral objects. Coral objects are small and therefore the resolution of the image samples requires to be very high. To achieve the required resolution suitable for object detection, imagery capture of an aquaculture tile is split into a grid of images, each of which covers an area of the tile. CCVS is designed to handle a regular grid of images as the input tile sample.
@@ -58,7 +59,7 @@ The detect, count, and locate task of the CCVS comprises the following stages:
 
 <img src="./images/CCVSDetectTaskProcess.png" alt="The Detect, Count and Locate Process" height="320">
 
-
+---
 ## Task Automation in the CCVS
 
 The task automation in the CCVS is driven by a state transition machine.
@@ -133,6 +134,7 @@ The table `tile_sample_detect_stat` models the detection statistics of a tile sa
 - `duplicated_removed`: the number of objects removed in the duplication removal process.​
 - `stat_yaml`: more details regarding the detection results of the tile sample
 
+---
 ## Links
 
 - [Introduction to the CCVS and Installation Guide](../README.md)
@@ -140,14 +142,15 @@ The table `tile_sample_detect_stat` models the detection statistics of a tile sa
 - [Modelling Coral Object Detection](./CORAL_CLASSES.md)
 - [Summary of Processing Errors and System Issues](./ERROR_CODE.md)
 
-## Developer of the System
+---
+### Developer of the System
 
 Dr Andrew Lui, Senior Research Engineer <br />
 Robotics and Autonomous Systems, Research Engineering Facility <br />
 Research Infrastructure <br />
 Queensland University of Technology <br />
 
-## Author
+### Author
 
 Dr Andrew Lui <br />
 Latest update: June 2025
